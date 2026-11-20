@@ -1,5 +1,5 @@
-//! The HTTP boundary of the platform: who I am, global secrets, the license
-//! and the updates.
+//! The HTTP boundary of the platform: who I am, global secrets and the
+//! updates.
 //!
 //! Everything here is for people with a session (cookie, and CSRF on
 //! mutations, through [`require_session`]). The capability each operation
@@ -21,11 +21,11 @@ use serde_json::{json, Value};
 use crate::error::ApiError;
 use crate::session::{require_session, CurrentSession};
 
-mod license;
 mod secrets;
+mod updates;
 
-use license::*;
 use secrets::*;
+use updates::*;
 
 /// Mount the platform's routes.
 pub fn routes(platform: PlatformService, sessions: SessionService) -> Router {
@@ -37,10 +37,6 @@ pub fn routes(platform: PlatformService, sessions: SessionService) -> Router {
             "/secrets/{id}",
             axum::routing::patch(update_secret).delete(delete_secret),
         )
-        .route("/license", get(get_license))
-        .route("/license/key", put(set_license_key))
-        .route("/license/refresh", post(refresh_license))
-        .route("/license/billing", get(license_billing))
         .route("/updates", get(get_updates))
         .route("/updates/policy", put(set_update_policy))
         .route("/updates/request", post(request_update))
@@ -96,8 +92,6 @@ async fn me(
         "actions": actor.actions(),
         "version": domain::VERSION,
         "edition": platform.edition(),
-        // The contract about to end, ended or read-only: everyone sees it.
-        "license_notice": platform.license_notice(),
         // Maintenance (everyone) and new versions (administrators).
         "update_notice": platform.update_notice(&actor).await,
     })))

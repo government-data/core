@@ -21,7 +21,6 @@ pub mod language;
 pub mod machines;
 pub mod openapi;
 pub mod platform;
-pub mod read_only;
 pub mod settings;
 pub mod tenancy;
 

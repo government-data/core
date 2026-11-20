@@ -3,8 +3,7 @@
 //! a certificate of the installation's CA and passes it in
 //! `X-Forwarded-Tls-Client-Cert`. The certificate is the proof: only the
 //! application VM's machine (role `app`) is taken, any other 403; no
-//! session, no CSRF, no shared secret. It also works while the license is
-//! read-only (`read_only.rs`), as the machines' other routes.
+//! session, no CSRF, no shared secret.
 //!
 //! 200 once the delivery's rows are committed; 4xx only for a body that is
 //! not Grafana's (Grafana retries on 5xx). Neither the request nor the

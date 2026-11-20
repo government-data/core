@@ -3,8 +3,7 @@
 //! entry point, which requires a certificate of the installation's CA and
 //! passes it in `X-Forwarded-Tls-Client-Cert`; the public one does not route
 //! here. The certificate is the proof: no session, no CSRF, no limit per
-//! address. It also works while the license is read-only (`read_only.rs`):
-//! a machine left without a certificate stops what is scheduled.
+//! address.
 //!
 //! The header is read only with `INTERNAL_CLIENT_CERT_HEADER=trusted`
 //! ([`ClientCertificates`]); without it, 503. Neither the request nor the
