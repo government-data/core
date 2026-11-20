@@ -43,8 +43,6 @@ async fn router(pool: sqlx::PgPool) -> axum::Router {
         audit,
         Arc::new(PgAdminRepository::new(pool.clone())),
         None,
-        None,
-        None,
         application::PlatformService::new(Arc::new(infrastructure::PgPlatformRepository::new(
             pool.clone(),
         ))),
