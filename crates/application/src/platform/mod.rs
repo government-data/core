@@ -1,5 +1,5 @@
 //! The platform's use cases besides identity: the session's actor and the
-//! IAM records (ADR 0016), global secrets, the license and the updates.
+//! IAM records (ADR 0016), global secrets and the updates.
 //!
 //! [`PlatformService`] is the only door: each operation of a person receives
 //! their [`Actor`] and checks the action it needs before touching anything.
@@ -9,9 +9,9 @@ use std::sync::Arc;
 use platform::{PlatformRepository, RepositoryError};
 
 mod edition;
-mod license;
 mod permissions;
 mod secrets;
+mod updates;
 
 pub use edition::Edition;
 pub use permissions::{CreatedServiceAccount, GroupChange, PolicyView};
@@ -71,8 +71,6 @@ pub struct PlatformService {
     repo: Arc<dyn PlatformRepository>,
     /// On-premise or online.
     edition: Edition,
-    /// The license (only in a local installation with a cloud configured).
-    license: Option<crate::LicenseService>,
     /// Encrypts the secrets' values (without it, in clear: only tests and
     /// development).
     cipher: Option<Arc<dyn crate::settings::SecretCipher>>,
@@ -97,7 +95,6 @@ impl PlatformService {
         Self {
             repo,
             edition: Edition::default(),
-            license: None,
             cipher: None,
             tokens: None,
             updates: None,
@@ -107,13 +104,6 @@ impl PlatformService {
 
     pub fn with_edition(mut self, edition: Edition) -> Self {
         self.edition = edition;
-        self
-    }
-
-    /// With the installation license, which decides limits and read-only
-    /// mode.
-    pub fn with_license(mut self, license: crate::LicenseService) -> Self {
-        self.license = Some(license);
         self
     }
 

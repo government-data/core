@@ -1,18 +1,9 @@
-//! The installation's license and updates.
+//! The installation's updates.
 
-use iam::catalog::{MANAGE_LICENSE, MANAGE_UPDATES};
+use iam::catalog::MANAGE_UPDATES;
 use iam::Actor;
 
 use super::{Edition, PlatformError, PlatformService, R};
-
-/// The first day of the current month (the monthly quotas count from there).
-fn month_start() -> chrono::DateTime<chrono::Utc> {
-    use chrono::{Datelike, TimeZone, Utc};
-    let now = Utc::now();
-    Utc.with_ymd_and_hms(now.year(), now.month(), 1, 0, 0, 0)
-        .single()
-        .unwrap_or(now)
-}
 
 fn updates_error(e: crate::UpdatesError) -> PlatformError {
     match e {
@@ -23,67 +14,6 @@ fn updates_error(e: crate::UpdatesError) -> PlatformError {
 }
 
 impl PlatformService {
-    /// The license and what is used of it (administrators only).
-    pub async fn license(
-        &self,
-        actor: &Actor,
-    ) -> R<Option<(crate::LicenseView, license_model::Usage)>> {
-        Self::require(actor, MANAGE_LICENSE)?;
-        let Some(license) = &self.license else {
-            return Ok(None);
-        };
-        Ok(Some((
-            license.view(),
-            self.repo.usage(month_start()).await?,
-        )))
-    }
-
-    fn license_service(&self) -> R<&crate::LicenseService> {
-        self.license
-            .as_ref()
-            .ok_or_else(|| PlatformError::Invalid(texts::tr!("app.platform.noLicenseUsed")))
-    }
-
-    /// Change the activation key and activate it with the cloud.
-    pub async fn set_license_key(&self, actor: &Actor, key: &str) -> R<()> {
-        Self::require(actor, MANAGE_LICENSE)?;
-        self.license_service()?
-            .set_key(key)
-            .await
-            .map_err(PlatformError::Invalid)
-    }
-
-    /// Renew with the cloud now (without waiting for the next day).
-    pub async fn refresh_license(&self, actor: &Actor) -> R<()> {
-        Self::require(actor, MANAGE_LICENSE)?;
-        self.license_service()?
-            .refresh()
-            .await
-            .map_err(PlatformError::Invalid)
-    }
-
-    /// The license's payments and renewal (admin only).
-    pub async fn license_billing(&self, actor: &Actor) -> R<crate::BillingView> {
-        Self::require(actor, MANAGE_LICENSE)?;
-        self.license_service()?
-            .billing()
-            .await
-            .map_err(PlatformError::Invalid)
-    }
-
-    /// Where the contract stands, to warn in the UI (nothing if it is current).
-    pub fn license_notice(&self) -> Option<license_model::ContractStatus> {
-        self.license
-            .as_ref()
-            .and_then(|l| l.contract())
-            .filter(|c| *c != license_model::ContractStatus::Current)
-    }
-
-    /// Why the installation is read-only, if it is.
-    pub fn read_only(&self) -> Option<String> {
-        self.license.as_ref().and_then(|l| l.read_only())
-    }
-
     /// The installation's updates (administrators only). `None` without the
     /// service (we update the online edition ourselves).
     pub async fn updates(&self, actor: &Actor) -> R<Option<crate::UpdatesView>> {

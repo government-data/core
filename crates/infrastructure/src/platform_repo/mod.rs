@@ -13,7 +13,6 @@ use std::collections::HashMap;
 
 use ::iam::Policy;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use platform::{
     Group, GroupFields, NewSecret, NewServiceAccount, PlatformRepository, PrincipalKind,
     RepositoryError, Secret, SecretId, ServiceAccount, UserAccess,
@@ -22,7 +21,7 @@ use serde_json::Value;
 use sqlx::postgres::{PgPool, PgRow};
 use sqlx::Row;
 
-mod license;
+mod admins;
 mod policies;
 mod secrets;
 
@@ -143,9 +142,6 @@ impl PlatformRepository for PgPlatformRepository {
         PgPlatformRepository::delete_service_account(self, id, owner).await
     }
 
-    async fn usage(&self, since: DateTime<Utc>) -> R<license_model::Usage> {
-        PgPlatformRepository::usage(self, since).await
-    }
     async fn admin_emails(&self) -> R<Vec<String>> {
         PgPlatformRepository::admin_emails(self).await
     }

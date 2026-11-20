@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use chrono::Utc;
 
-use crate::licensing::AdminContacts;
+use crate::admins::AdminContacts;
 use crate::settings::MailSlot;
 
 mod policy;
