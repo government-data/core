@@ -25,15 +25,6 @@
       "label": "OAuth2 / OIDC",
       "desc": "Sign in with Microsoft, Google or another provider."
     },
-    "license": {
-      "label": "License",
-      "desc": "Plan, limits and activation key.",
-      "unavailable": "Not available",
-      "none": "No license",
-      "basic": "Basic plan",
-      "plan": "{{plan}} plan",
-      "grace": "{{plan}} · not renewed"
-    },
     "updates": {
       "label": "Updates",
       "desc": "Installed version and new ones.",

@@ -17,8 +17,6 @@ export interface Me {
   service_account?: string | null;
   /** The actions it may do on some resource (ADR 0016); `admin`, everything. */
   actions?: string[];
-  /** The contract about to end, ended or read-only (nothing if it is current). */
-  license_notice?: ContractStatus | null;
   /** Maintenance (everyone), or a new version, one rolled back or a critical
    * state (administrators). */
   update_notice?: UpdateNotice | null;
@@ -102,83 +100,6 @@ export interface UpdatesView {
   }[];
 }
 
-export interface LicenseLimits {
-  servers: number | null;
-  workflows: number | null;
-  users: number | null;
-  executions_month: number | null;
-  deployments_month: number | null;
-}
-
-export type LicenseUsage = Record<keyof LicenseLimits, number>;
-
-/**
- * Where the contract is at. Past the grace period, or suspended, the
- * installation goes read-only: everything can be looked at and what is
- * scheduled keeps running.
- */
-export type ContractStatus =
-  | { state: "current" }
-  | { state: "ending_soon"; ends_at: string; days_left: number }
-  | { state: "grace"; ended_at: string; read_only_from: string }
-  | { state: "read_only"; reason: string };
-
-/** A confirmed payment of the license (the seller records it). */
-export interface BillingPayment {
-  /** The electronic invoice's number. */
-  invoice: string;
-  /** The day of the payment (`2026-10-15`). */
-  paid_on: string;
-  amount_cop: number;
-  period: string;
-  /** The contract period it covers. */
-  from: string;
-  to: string;
-}
-
-/** The license's billing, as the cloud keeps it. */
-export interface LicenseBilling {
-  billing: {
-    period: string | null;
-    packages: Record<string, number>;
-    /** What renewing would cost: the last payment, for the same period. */
-    renewal_cop: number | null;
-    payments: BillingPayment[];
-  } | null;
-  fetched_at: string | null;
-  /** If the cloud did not answer: the last it gave is shown. */
-  error: string | null;
-}
-
-/** The installation's license and how much of it is used. */
-export interface LicenseInfo {
-  license: {
-    status:
-      { state: "active" } | { state: "grace"; until: string } | { state: "basic"; reason: string };
-    entitlement: {
-      customer: string;
-      plan: string;
-      features: string[];
-      limits: LicenseLimits;
-      installation: string;
-      issued_at: string;
-      expires_at: string;
-      /** Until when the contract is paid (without it: it does not end). */
-      contract_ends_at?: string;
-      suspended?: string;
-    } | null;
-    limits: LicenseLimits;
-    contract: ContractStatus | null;
-    installation: string;
-    key_hint: string | null;
-    fetched_at: string | null;
-    last_attempt_at: string | null;
-    last_error: string | null;
-    dev_key: boolean;
-  };
-  usage: LicenseUsage;
-}
-
 /** An API error, with the readable message the backend returns. */
 export class PlatformApiError extends Error {
   constructor(
@@ -240,11 +161,6 @@ const put = <T>(path: string, body: unknown) => request<T>("PUT", path, body);
 export const platformApi = {
   me: () => get<Me>("/access/me"),
 
-  /** The license (`null` if the installation does not use one). */
-  license: () => get<LicenseInfo | null>("/license"),
-  setLicenseKey: (key: string) => request<void>("PUT", "/license/key", { key }),
-  refreshLicense: () => post<void>("/license/refresh"),
-  licenseBilling: () => get<LicenseBilling>("/license/billing"),
   /** The updates (`null` if the installation is not updated from here). */
   updates: () => get<UpdatesView | null>("/updates"),
   setUpdatePolicy: (policy: UpdatePolicy) => put<void>("/updates/policy", policy),
@@ -259,13 +175,6 @@ const dateFormat = new Intl.DateTimeFormat(locale(), {
 
 export function formatDate(iso: string | null | undefined): string {
   return iso ? dateFormat.format(new Date(iso)) : "—";
-}
-
-const dayFormat = new Intl.DateTimeFormat(locale(), { dateStyle: "long" });
-
-/** Only the day, in words: «4 de diciembre de 2026». */
-export function formatDay(iso: string | null | undefined): string {
-  return iso ? dayFormat.format(new Date(iso)) : "—";
 }
 
 export function formatDuration(from: string | null, to: string | null): string {

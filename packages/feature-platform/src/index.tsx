@@ -6,8 +6,8 @@ const view = <M,>(load: () => Promise<M>, pick: (m: M) => Component) =>
   lazy(() => load().then((m) => ({ default: pick(m) })));
 
 /**
- * The platform: the license and the updates, with the toasts and the notices
- * (contract, maintenance) every section shows.
+ * The platform: the updates, with the toasts and the maintenance notice every
+ * section shows.
  */
 export const platformFeature = defineFeature({
   id: "platform",
@@ -26,13 +26,6 @@ export const platformFeature = defineFeature({
       component: view(
         () => import("./AppFrame"),
         (m) => m.AppFrame,
-      ),
-    },
-    {
-      path: "/settings/license",
-      component: view(
-        () => import("./License"),
-        (m) => m.License,
       ),
     },
     {

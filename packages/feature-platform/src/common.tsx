@@ -1,6 +1,6 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { createResource, For, Show, type Component, type JSX } from "solid-js";
-import { formatDay, platformApi, type ContractStatus } from "./api";
+import { platformApi } from "./api";
 import { tr } from "./i18n";
 import { Icon, type IconName } from "./icons";
 import "./platform.css";
@@ -19,45 +19,6 @@ export const ErrorBox: Component<{ error: unknown }> = (props) => (
   </Show>
 );
 
-/**
- * How many days before the contract ends the UI warns. The cloud marks it as
- * «ending soon» earlier (60 days), for the warning emails to the
- * administrators (60, 30 and 7 days).
- */
-export const CONTRACT_BANNER_DAYS = 3;
-
-/** The contract in one sentence, with its tone (`null` if it is current). */
-export function contractNotice(
-  status: ContractStatus | null | undefined,
-): { text: string; tone: "warn" | "bad" } | null {
-  switch (status?.state) {
-    case "ending_soon":
-      if (status.days_left > CONTRACT_BANNER_DAYS) return null;
-      return {
-        text: tr("platform:common.contractExpiresOn", {
-          endsAt: formatDay(status.ends_at),
-          daysLeft: status.days_left,
-        }),
-        tone: "warn",
-      };
-    case "grace":
-      return {
-        text: tr("platform:common.contractExpired", {
-          endedAt: formatDay(status.ended_at),
-          readOnlyFrom: formatDay(status.read_only_from),
-        }),
-        tone: "warn",
-      };
-    case "read_only":
-      return {
-        text: tr("platform:common.readOnly", { reason: status.reason }),
-        tone: "bad",
-      };
-    default:
-      return null;
-  }
-}
-
 /** The updates notice, above every view. */
 const UpdateNoticeBanner: Component = () => (
   <Show when={updateNotice(me()?.update_notice)}>
@@ -67,17 +28,6 @@ const UpdateNoticeBanner: Component = () => (
         <Show when={n().link}>
           <A href="/settings/updates">{tr("platform:common.viewUpdates")}</A>
         </Show>
-      </div>
-    )}
-  </Show>
-);
-
-/** The contract notice, above every view (every user sees it). */
-const LicenseNotice: Component = () => (
-  <Show when={contractNotice(me()?.license_notice)}>
-    {(n) => (
-      <div class={`kn-notice kn-notice--${n().tone}`} role="status">
-        {n().text}
       </div>
     )}
   </Show>
@@ -112,7 +62,6 @@ export const Page: Component<{
         <div class="kn-page-head__actions">{props.actions}</div>
       </Show>
     </header>
-    <LicenseNotice />
     <UpdateNoticeBanner />
     {props.children}
   </section>

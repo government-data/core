@@ -85,30 +85,8 @@ const SECTIONS: SettingsSection[] = [
   },
 ];
 
-/** The license's state in one line. */
-interface LicenseSummary {
-  license: {
-    status: { state: "active" | "grace" | "basic" };
-    entitlement: { plan: string } | null;
-  };
-}
-
-async function licenseSummary(): Promise<{ on: boolean; text: string }> {
-  const res = await fetch("/api/license", { credentials: "same-origin" });
-  if (!res.ok) return { on: false, text: t("settings:home.license.unavailable") };
-  const info = (await res.json()) as LicenseSummary | null;
-  if (!info) return { on: false, text: t("settings:home.license.none") };
-  const { status, entitlement } = info.license;
-  if (status.state === "basic") return { on: false, text: t("settings:home.license.basic") };
-  const plan = t("settings:home.license.plan", { plan: entitlement?.plan ?? "" }).trim();
-  return {
-    on: true,
-    text: status.state === "grace" ? t("settings:home.license.grace", { plan }) : plan,
-  };
-}
-
-/** The common account this installation signs in with, or `null`: with it the license is in
- * its Billing and gestión handles the access (OAuth2). */
+/** The common account this installation signs in with, or `null`: with it gestión handles
+ * the access (OAuth2). */
 async function accountUrl(): Promise<string | null> {
   const r = await fetch("/api/settings/account", { credentials: "same-origin" }).catch(() => null);
   if (!r?.ok) return null;
@@ -192,8 +170,6 @@ export const Settings: Component = () => {
     () => can("admin:Configure"),
     () => settingsApi.all(),
   );
-  const [license] = createResource(() => can("admin:ManageLicense"), licenseSummary);
-  const [accountLink] = createResource(() => can("admin:ManageLicense"), accountUrl);
   const [updates] = createResource(() => can("admin:ManageUpdates"), updatesSummary);
   const [account] = createResource(accountSummary);
   const [users] = createResource(() => can("admin:ManageUsers"), usersSummary);
@@ -268,27 +244,6 @@ export const Settings: Component = () => {
               </Show>
             </div>
           </A>
-        </Show>
-        <Show when={can("admin:ManageLicense")}>
-          {/* With the common account, the license is in its Billing. */}
-          <Show when={accountLink.state === "ready" && !accountLink()}>
-            <A href="/settings/license" class="settings-card">
-              <span class="settings-card__icon">
-                <CardIcon name="license" />
-              </span>
-              <div class="settings-card__body">
-                <span class="settings-card__label">{t("settings:home.license.label")}</span>
-                <span class="settings-card__desc">{t("settings:home.license.desc")}</span>
-                <Show when={license()}>
-                  {(l) => (
-                    <span class="badge" classList={{ "badge--muted": !l().on }}>
-                      {l().text}
-                    </span>
-                  )}
-                </Show>
-              </div>
-            </A>
-          </Show>
         </Show>
         <Show when={updates()}>
           {(u) => (
