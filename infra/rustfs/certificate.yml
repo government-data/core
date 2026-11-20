@@ -1,0 +1,48 @@
+# RustFS with TLS and the machines' certificates (decisions 0023, 0066
+# points 10, 12 and 13; step 10). An overlay of docker-compose.yml for an
+# installation whose machines have certificates; development does not use
+# it (compose.dev.yml: plain HTTP inside Traefik's network namespace):
+#
+#   docker compose --project-directory . -p data-quality-lake \
+#     -f infra/rustfs/docker-compose.yml -f infra/rustfs/certificate.yml up -d
+#
+# - RustFS serves HTTPS only, with the lake node's machine certificate
+#   (its node agent's machine.pem, renewed every 8 hours), which
+#   tls/entrypoint.sh writes as RustFS's own files in a tmpfs
+#   (RUSTFS_TLS_PATH) before it starts and again when the agent renews
+#   them; RustFS re-reads them by itself every RUSTFS_TLS_RELOAD_INTERVAL
+#   seconds, without a restart.
+# - Client certificates are NOT required by default (RUSTFS_MTLS=0): the
+#   worker's DuckDB cannot present one (tools/verify/rustfs_stack_cert.sh),
+#   so with them required the jobs could not reach the lake. The job's STS
+#   credentials stay its identity. Decision 0066, point 10, records this as
+#   a finding awaiting the user's ruling; RUSTFS_MTLS=1 requires them (CA:
+#   client_ca.crt, the installation's).
+# - The agent runs as RustFS's user (uid 10001), so RustFS reads its 0600
+#   files as they are.
+#
+# Required environment, besides docker-compose.yml's:
+#   QD_MACHINE_DIR   the lake node's agent directory (QD_AGENT_DIR)
+# Optional: RUSTFS_BIND (0.0.0.0) and RUSTFS_PORT (9000), where it is reached;
+# QD_RUSTFS_TLS_CHECK_EVERY (30) and RUSTFS_TLS_RELOAD_INTERVAL (30), seconds.
+#
+# Verified with tools/verify/rustfs_stack_cert.sh.
+services:
+  rustfs:
+    # The watcher of tls/entrypoint.sh is a child of this init, never of RustFS.
+    init: true
+    entrypoint: ["/etc/qd/rustfs/entrypoint.sh"]
+    environment:
+      RUSTFS_TLS_PATH: /run/rustfs-tls
+      RUSTFS_TLS_RELOAD_ENABLE: "1"
+      RUSTFS_TLS_RELOAD_INTERVAL: ${RUSTFS_TLS_RELOAD_INTERVAL:-30}
+      RUSTFS_SERVER_MTLS_ENABLE: ${RUSTFS_MTLS:-0}
+      QD_RUSTFS_TLS_SOURCE: /run/qd-node
+      QD_RUSTFS_TLS_CHECK_EVERY: ${QD_RUSTFS_TLS_CHECK_EVERY:-30}
+    tmpfs:
+      - /run/rustfs-tls:uid=10001,gid=10001,mode=0700
+    volumes:
+      - ./infra/rustfs/tls/entrypoint.sh:/etc/qd/rustfs/entrypoint.sh:ro
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
+    ports:
+      - "${RUSTFS_BIND:-0.0.0.0}:${RUSTFS_PORT:-9000}:9000"

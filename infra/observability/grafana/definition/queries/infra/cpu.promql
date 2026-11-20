@@ -1,0 +1,1 @@
+100 * sum by (mode) (rate(node_cpu_seconds_total{job="host",vm="$vm",mode!="idle"}[$__rate_interval])) / scalar(count(count by (cpu) (node_cpu_seconds_total{job="host",vm="$vm"})))

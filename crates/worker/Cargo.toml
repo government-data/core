@@ -1,0 +1,65 @@
+[package]
+name = "worker"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# `qd-worker` (decision 0018): one loop per slot that takes jobs from the
+# PostgreSQL queue as the queue's role, asks the API for the rest (its
+# details, its credentials, its catalog), runs it on an embedded DuckDB and
+# reports counts. A composition root of its own, like `server`.
+[[bin]]
+name = "qd-worker"
+path = "src/main.rs"
+
+[dependencies]
+quality.workspace = true
+quality-rules.workspace = true
+quality-rules-duckdb.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# Each rules file's SHA-256, for the run's manifest (decision 0035).
+sha2.workspace = true
+# Each entity's hash with the tenant's entity key (decision 0057).
+hmac.workspace = true
+# A maintain job's requests to the catalog and the bucket (decision 0039).
+chrono.workspace = true
+sigv4.workspace = true
+# A source on Trino read through its catalog (decision 0048).
+trino-client.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+# One flat JSON line per event, as every service (decision 0026).
+logging.workspace = true
+# Its metrics file (decision 0071).
+prometheus-client.workspace = true
+uuid.workspace = true
+# Its own free disk before each claim (decision 0072, point 14).
+rustix.workspace = true
+# The machine's name, its certificate's CN (decision 0066, step 7).
+x509-parser.workspace = true
+
+[dev-dependencies]
+# A CA and machine certificates made in each test, as the node agent's.
+rcgen.workspace = true
+# An HTTPS server that asks for a client certificate (the API's internal
+# entry point as Traefik makes it).
+rustls.workspace = true
+tokio-rustls.workspace = true
+# The queue on a throwaway PostgreSQL that asks for the certificate.
+testcontainers.workspace = true
+testcontainers-modules.workspace = true
+# That PostgreSQL migrated as the API does it, the machines it knows and
+# their sessions ended at retiring (decision 0066, step 8).
+auth-gateway.workspace = true
+contracts.workspace = true
+infrastructure.workspace = true

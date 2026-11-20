@@ -1,0 +1,29 @@
+[package]
+name = "quality-rules-lint"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# Lint of a rules file (decisions 0019, point 8; 0033; 0034): findings with a
+# code, a severity, a place and the values of their message, whose text the
+# caller takes from `texts`. The rules' examples become a query the caller
+# runs on an in-memory DuckDB; and how the file is written (0041), whose
+# quotes are checked by reading the YAML both ways. Pure.
+[dependencies]
+quality-rules-compile.workspace = true
+quality-rules-model.workspace = true
+quality-rules-sql.workspace = true
+quality-rules-tree.workspace = true
+serde-saphyr.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+duckdb.workspace = true
+texts.workspace = true

@@ -1,0 +1,246 @@
+{
+  "datasource": "mimir",
+  "values": {
+    "vm": "{{ $labels.vm }}",
+    "path": "{{ $labels.mountpoint }}",
+    "device": "{{ $labels.device }}"
+  },
+  "groups": [
+    {
+      "name": "machines",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "qd-disk-low",
+          "title": "disk_low",
+          "qd_alert": "disk_low",
+          "severity": "warning",
+          "expr": "node_filesystem_avail_bytes{role!=\"worker\"} / node_filesystem_size_bytes{role!=\"worker\"}",
+          "below": 0.1,
+          "for": "5m",
+          "values": {
+            "free": "{{ humanizePercentage $values.A.Value }}",
+            "limit": "10 %"
+          }
+        },
+        {
+          "uid": "qd-disk-low-worker",
+          "title": "disk_low_worker",
+          "qd_alert": "disk_low",
+          "severity": "warning",
+          "expr": "node_filesystem_avail_bytes{role=\"worker\"}",
+          "below": 10000000000,
+          "for": "5m",
+          "values": {
+            "free": "{{ humanize $values.A.Value }}B",
+            "limit": "10 GB"
+          }
+        },
+        {
+          "uid": "qd-disk-critical",
+          "title": "disk_critical",
+          "qd_alert": "disk_critical",
+          "severity": "critical",
+          "expr": "node_filesystem_avail_bytes{role!=\"worker\"} / node_filesystem_size_bytes{role!=\"worker\"}",
+          "below": 0.05,
+          "for": "2m",
+          "values": {
+            "free": "{{ humanizePercentage $values.A.Value }}",
+            "limit": "5 %"
+          }
+        },
+        {
+          "uid": "qd-disk-critical-worker",
+          "title": "disk_critical_worker",
+          "qd_alert": "disk_critical",
+          "severity": "critical",
+          "expr": "node_filesystem_avail_bytes{role=\"worker\"}",
+          "below": 5000000000,
+          "for": "2m",
+          "values": {
+            "free": "{{ humanize $values.A.Value }}B",
+            "limit": "5 GB"
+          }
+        },
+        {
+          "uid": "qd-disk-filling",
+          "title": "disk_filling",
+          "qd_alert": "disk_filling",
+          "severity": "warning",
+          "expr": "predict_linear(node_filesystem_avail_bytes[6h], 86400)",
+          "below": 0,
+          "for": "30m"
+        },
+        {
+          "uid": "qd-lake-pool-filling",
+          "title": "lake_pool_filling",
+          "qd_alert": "lake_pool_filling",
+          "severity": "warning",
+          "expr": "(1 - rustfs_cluster_capacity_free_bytes / rustfs_cluster_capacity_usable_total_bytes) and predict_linear(rustfs_cluster_capacity_free_bytes[30d], 30 * 86400) < 0",
+          "above": 0.8,
+          "for": "1h",
+          "values": {
+            "used": "{{ humanizePercentage $values.A.Value }}",
+            "limit": "80 %"
+          }
+        },
+        {
+          "uid": "qd-lake-pool-filling-critical",
+          "title": "lake_pool_filling_critical",
+          "qd_alert": "lake_pool_filling",
+          "severity": "critical",
+          "expr": "(1 - rustfs_cluster_capacity_free_bytes / rustfs_cluster_capacity_usable_total_bytes) and predict_linear(rustfs_cluster_capacity_free_bytes[30d], 30 * 86400) < 0",
+          "above": 0.9,
+          "for": "1h",
+          "values": {
+            "used": "{{ humanizePercentage $values.A.Value }}",
+            "limit": "90 %"
+          }
+        },
+        {
+          "uid": "qd-memory-low",
+          "title": "memory_low",
+          "qd_alert": "memory_low",
+          "severity": "warning",
+          "expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes",
+          "below": 0.1,
+          "for": "10m",
+          "values": {
+            "free": "{{ humanizePercentage $values.A.Value }}",
+            "limit": "10 %"
+          }
+        },
+        {
+          "uid": "qd-memory-low-critical",
+          "title": "memory_low_critical",
+          "qd_alert": "memory_low",
+          "severity": "critical",
+          "expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes",
+          "below": 0.05,
+          "for": "10m",
+          "values": {
+            "free": "{{ humanizePercentage $values.A.Value }}",
+            "limit": "5 %"
+          }
+        },
+        {
+          "uid": "qd-network-errors",
+          "title": "network_errors",
+          "qd_alert": "network_errors",
+          "severity": "warning",
+          "expr": "sum by (vm, role, device) (rate(node_network_receive_errs_total[5m]) + rate(node_network_transmit_errs_total[5m]) + rate(node_network_receive_drop_total[5m]) + rate(node_network_transmit_drop_total[5m]))",
+          "above": 1,
+          "for": "10m",
+          "values": {
+            "rate": "{{ humanize $values.A.Value }}"
+          }
+        },
+        {
+          "uid": "qd-clock-offset",
+          "title": "clock_offset",
+          "qd_alert": "clock_offset",
+          "severity": "warning",
+          "expr": "abs(node_timex_offset_seconds)",
+          "above": 1,
+          "for": "5m",
+          "values": {
+            "limit": "1 s"
+          }
+        },
+        {
+          "uid": "qd-clock-offset-critical",
+          "title": "clock_offset_critical",
+          "qd_alert": "clock_offset",
+          "severity": "critical",
+          "expr": "abs(node_timex_offset_seconds)",
+          "above": 30,
+          "for": "5m",
+          "values": {
+            "limit": "30 s"
+          }
+        },
+        {
+          "uid": "qd-clock-unsynchronised",
+          "title": "clock_unsynchronised",
+          "qd_alert": "clock_offset",
+          "severity": "warning",
+          "expr": "node_timex_sync_status",
+          "below": 1,
+          "for": "5m",
+          "values": {
+            "limit": "1 s"
+          }
+        },
+        {
+          "uid": "qd-certificate-expiring",
+          "title": "certificate_expiring",
+          "qd_alert": "certificate_expiring",
+          "severity": "critical",
+          "expr": "qd_node_certificate_expiry_timestamp_seconds - time()",
+          "below": 14400,
+          "for": "0s",
+          "values": {
+            "left": "{{ humanizeDuration $values.A.Value }}"
+          }
+        },
+        {
+          "uid": "qd-machine-silent",
+          "title": "machine_silent",
+          "qd_alert": "machine_silent",
+          "severity": "critical",
+          "expr": "qd_machine_approved unless on (vm) (up{job=\"host\"} == 1)",
+          "above": 0,
+          "for": "5m"
+        },
+        {
+          "uid": "qd-worker-paused",
+          "title": "worker_paused",
+          "qd_alert": "worker_paused",
+          "severity": "warning",
+          "expr": "qd_worker_claim_paused",
+          "above": 0,
+          "for": "0s"
+        }
+      ]
+    },
+    {
+      "name": "heartbeat",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "qd-alerting-heartbeat",
+          "title": "alerting_heartbeat",
+          "qd_alert": "alerting_heartbeat",
+          "expr": "vector(1)",
+          "above": 0,
+          "for": "0s",
+          "noData": "NoData"
+        }
+      ]
+    }
+  ],
+  "policy": {
+    "receiver": "qd-mail-and-api",
+    "group_by": ["vm", "qd_alert"],
+    "group_wait": "30s",
+    "group_interval": "5m",
+    "repeat_interval": "12h",
+    "heartbeat": {
+      "receiver": "qd-api-heartbeat",
+      "group_interval": "1m",
+      "repeat_interval": "5m"
+    }
+  },
+  "contactPoints": {
+    "mail": {
+      "name": "qd-mail-and-api",
+      "addresses": "$GRAFANA_ALERT_EMAILS"
+    },
+    "webhook": {
+      "url": "https://${INTERNAL_DOMAIN}:9443/api/internal/machines/alerts"
+    },
+    "heartbeat": {
+      "name": "qd-api-heartbeat"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+# The audit and run logs (decision 0026, point 6): the application's
+# PostgreSQL, read as `qd_grafana` (infra/postgres/grafana-role.sh), which
+# may SELECT only the columns it was granted, of the installation's one
+# active tenant, and never write. Its address, database and TLS mode come
+# from the container's environment (docker-compose.yml); its password from
+# the secret file, never from a variable. Loki stays the default.
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    uid: postgres
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: $GRAFANA_PG_HOST:$GRAFANA_PG_PORT
+    user: qd_grafana
+    isDefault: false
+    editable: false
+    jsonData:
+      database: $GRAFANA_PG_DATABASE
+      # verify-full against the installation's CA in production; disable
+      # in development, where the database has no TLS.
+      sslmode: $GRAFANA_PG_SSLMODE
+      tlsConfigurationMethod: file-path
+      sslRootCertFile: /etc/qd/postgres-ca.crt
+      postgresVersion: 1600
+      timescaledb: false
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: $__file{/run/secrets/grafana_pg_password}

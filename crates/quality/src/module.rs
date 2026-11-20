@@ -1,0 +1,317 @@
+//! The quality core as a feature module (`contracts::Module`): its schema
+//! and its routes. `server` registers it.
+
+use std::sync::Arc;
+
+use axum::Router;
+use contracts::{Migration, Module};
+use sqlx::PgPool;
+
+use crate::catalog::Catalog;
+use crate::chart_api;
+use crate::console_api;
+use crate::cut_api;
+use crate::dataset_api;
+use crate::delete_api;
+use crate::deploy_api;
+use crate::draft_api::{self, DraftCatalog};
+use crate::draft_history;
+use crate::edit_api;
+use crate::field_api;
+use crate::lake_tables;
+use crate::map_api;
+use crate::proposal::Patterns;
+use crate::records_api;
+use crate::rule_test;
+use crate::rules_api;
+use crate::schedule_api;
+use crate::sla_api;
+use crate::source_api;
+use crate::source_catalog::Trino;
+use crate::source_store::Sealer;
+use crate::split_api;
+use crate::tables_api;
+use crate::trino_rules_api::{self, RulesAccess};
+use crate::worker_api::{self, WorkerServices};
+
+/// The quality module. [`Default`] carries only its schema (migrations);
+/// [`QualityModule::serving`] its routes too.
+#[derive(Default)]
+pub struct QualityModule {
+    workers: Option<(PgPool, WorkerServices)>,
+    sources: Option<SourceServices>,
+    patterns: Patterns,
+    drafts: Option<Arc<dyn DraftCatalog>>,
+    trino: Option<Arc<dyn Trino>>,
+    trino_rules: Option<RulesAccess>,
+}
+
+/// What the sources' routes use: the store, its sealer, and the catalog.
+struct SourceServices {
+    pool: PgPool,
+    sealer: Arc<dyn Sealer>,
+    catalog: Option<Arc<dyn Catalog>>,
+}
+
+impl std::fmt::Debug for QualityModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QualityModule")
+            .field("worker_routes", &self.workers.is_some())
+            .field("source_routes", &self.sources.is_some())
+            .finish()
+    }
+}
+
+impl QualityModule {
+    /// With the workers' routes, which read the jobs through `pool`.
+    pub fn serving(pool: PgPool, services: WorkerServices) -> Self {
+        Self {
+            workers: Some((pool, services)),
+            sources: None,
+            patterns: Patterns::default(),
+            drafts: None,
+            trino: None,
+            trino_rules: None,
+        }
+    }
+
+    /// With the routes for people: the sources', their secrets sealed by
+    /// `sealer`, _Run now_ and the schedules; without the `catalog`, no
+    /// source can be deleted and no dataset run or scheduled.
+    #[must_use]
+    pub fn with_sources(
+        mut self,
+        pool: PgPool,
+        sealer: Arc<dyn Sealer>,
+        catalog: Option<Arc<dyn Catalog>>,
+    ) -> Self {
+        self.sources = Some(SourceServices {
+            pool,
+            sealer,
+            catalog,
+        });
+        self
+    }
+
+    /// With the installation's semantic patterns, for the maps it queues
+    /// (decision 0038); Colombia's by default.
+    #[must_use]
+    pub fn with_patterns(mut self, patterns: Patterns) -> Self {
+        self.patterns = patterns;
+        self
+    }
+
+    /// With Trino, where a source on it keeps its catalog (decision 0048).
+    #[must_use]
+    pub fn with_trino(mut self, trino: Arc<dyn Trino>) -> Self {
+        self.trino = Some(trino);
+        self
+    }
+
+    /// With the route Trino reads its rules from (decision 0062); served
+    /// only with the sources and the catalog.
+    #[must_use]
+    pub fn with_trino_rules(mut self, access: RulesAccess) -> Self {
+        self.trino_rules = Some(access);
+        self
+    }
+
+    /// With the drafts' routes for people, over the tenant's catalog.
+    #[must_use]
+    pub fn with_drafts(mut self, drafts: Arc<dyn DraftCatalog>) -> Self {
+        self.drafts = Some(drafts);
+        self
+    }
+}
+
+impl Module for QualityModule {
+    fn name(&self) -> &'static str {
+        "quality"
+    }
+
+    fn migrations(&self) -> Vec<Migration> {
+        vec![
+            Migration::new("0001_jobs", include_str!("../migrations/0001_jobs.sql")),
+            Migration::new("0002_queue", include_str!("../migrations/0002_queue.sql")),
+            Migration::new(
+                "0003_results",
+                include_str!("../migrations/0003_results.sql"),
+            ),
+            Migration::new(
+                "0004_schedules",
+                include_str!("../migrations/0004_schedules.sql"),
+            ),
+            Migration::new(
+                "0005_manifests",
+                include_str!("../migrations/0005_manifests.sql"),
+            ),
+            Migration::new(
+                "0006_sources",
+                include_str!("../migrations/0006_sources.sql"),
+            ),
+            Migration::new(
+                "0007_source_tables",
+                include_str!("../migrations/0007_source_tables.sql"),
+            ),
+            Migration::new(
+                "0008_rule_tests",
+                include_str!("../migrations/0008_rule_tests.sql"),
+            ),
+            Migration::new(
+                "0009_lake_tables",
+                include_str!("../migrations/0009_lake_tables.sql"),
+            ),
+            Migration::new(
+                "0010_source_records",
+                include_str!("../migrations/0010_source_records.sql"),
+            ),
+            Migration::new(
+                "0011_schedule_triggers",
+                include_str!("../migrations/0011_schedule_triggers.sql"),
+            ),
+            Migration::new(
+                "0012_console",
+                include_str!("../migrations/0012_console.sql"),
+            ),
+            Migration::new(
+                "0013_rule_results_grouping",
+                include_str!("../migrations/0013_rule_results_grouping.sql"),
+            ),
+            Migration::new(
+                "0014_field_quality",
+                include_str!("../migrations/0014_field_quality.sql"),
+            ),
+            Migration::new(
+                "0015_entity_keys",
+                include_str!("../migrations/0015_entity_keys.sql"),
+            ),
+            Migration::new("0016_icd", include_str!("../migrations/0016_icd.sql")),
+            Migration::new(
+                "0017_recency",
+                include_str!("../migrations/0017_recency.sql"),
+            ),
+            Migration::new(
+                "0018_group_metrics",
+                include_str!("../migrations/0018_group_metrics.sql"),
+            ),
+            Migration::new(
+                "0019_distribution_checks",
+                include_str!("../migrations/0019_distribution_checks.sql"),
+            ),
+            Migration::new(
+                "0020_job_stats",
+                include_str!("../migrations/0020_job_stats.sql"),
+            ),
+            Migration::new("0021_cells", include_str!("../migrations/0021_cells.sql")),
+            Migration::new(
+                "0022_queue_findings",
+                include_str!("../migrations/0022_queue_findings.sql"),
+            ),
+            Migration::new(
+                "0023_remediation_slas",
+                include_str!("../migrations/0023_remediation_slas.sql"),
+            ),
+            Migration::new(
+                "0024_queue_machines",
+                include_str!("../migrations/0024_queue_machines.sql"),
+            ),
+            Migration::new(
+                "0025_trino_hold",
+                include_str!("../migrations/0025_trino_hold.sql"),
+            ),
+            Migration::new(
+                "0026_jobs_uses_trino",
+                include_str!("../migrations/0026_jobs_uses_trino.sql"),
+            ),
+        ]
+    }
+
+    fn router(&self) -> Router {
+        let workers = match &self.workers {
+            Some((pool, services)) => worker_api::routes(pool.clone(), services.clone()),
+            None => Router::new(),
+        };
+        let catalog = self.sources.as_ref().and_then(|s| s.catalog.clone());
+        match (&self.trino_rules, &self.sources, catalog) {
+            (Some(access), Some(s), Some(catalog)) => workers.merge(trino_rules_api::routes(
+                s.pool.clone(),
+                catalog,
+                access.clone(),
+            )),
+            _ => workers,
+        }
+    }
+
+    fn openapi(&self) -> utoipa::openapi::OpenApi {
+        let mut doc = <source_api::SourceDoc as utoipa::OpenApi>::openapi();
+        doc.merge(<cut_api::CutDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<dataset_api::DatasetDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<chart_api::ChartDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<schedule_api::ScheduleDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<map_api::MapDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<tables_api::TablesDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<lake_tables::LakeTablesDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<draft_api::DraftDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<rules_api::RulesDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<edit_api::EditDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<deploy_api::DeployDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<split_api::SplitDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<field_api::FieldDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<draft_history::HistoryDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<rule_test::TestDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<records_api::RecordsDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<console_api::ConsoleDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<delete_api::DeleteDoc as utoipa::OpenApi>::openapi());
+        doc.merge(<sla_api::SlaDoc as utoipa::OpenApi>::openapi());
+        doc
+    }
+
+    fn user_router(&self) -> Router {
+        let drafts = match &self.drafts {
+            Some(d) => draft_api::routes(d.clone(), self.sources.as_ref().map(|s| s.pool.clone()))
+                .merge(rules_api::routes(d.clone()))
+                .merge(edit_api::routes(d.clone()))
+                .merge(deploy_api::routes(d.clone()))
+                .merge(split_api::routes(d.clone()))
+                .merge(field_api::routes(d.clone()))
+                .merge(draft_history::routes(d.clone())),
+            None => Router::new(),
+        };
+        // A rule's test reads the catalog (to lint) and queues a job;
+        // deleting reaches the catalog, PostgreSQL and the lake (0055).
+        let tests = match (&self.drafts, &self.sources) {
+            (Some(d), Some(s)) => {
+                rule_test::routes(s.pool.clone(), d.clone()).merge(delete_api::routes(
+                    s.pool.clone(),
+                    d.clone(),
+                    s.catalog.clone(),
+                    self.workers.as_ref().and_then(|(_, w)| w.tables.clone()),
+                ))
+            }
+            _ => Router::new(),
+        };
+        drafts.merge(tests).merge(match &self.sources {
+            Some(s) => source_api::routes(
+                s.pool.clone(),
+                s.sealer.clone(),
+                s.catalog.clone(),
+                self.trino.clone(),
+            )
+            .merge(cut_api::routes(s.pool.clone(), s.catalog.clone()))
+            .merge(dataset_api::routes(s.pool.clone(), s.catalog.clone()))
+            .merge(chart_api::routes(s.pool.clone(), s.catalog.clone()))
+            .merge(sla_api::routes(s.pool.clone(), s.catalog.clone()))
+            .merge(schedule_api::routes(s.pool.clone(), s.catalog.clone()))
+            .merge(map_api::routes(
+                s.pool.clone(),
+                self.patterns.clone(),
+                s.catalog.clone(),
+            ))
+            .merge(tables_api::routes(s.pool.clone()))
+            .merge(records_api::routes(s.pool.clone(), s.catalog.clone()))
+            .merge(console_api::routes(s.pool.clone()))
+            .merge(lake_tables::routes(s.pool.clone())),
+            None => Router::new(),
+        })
+    }
+}

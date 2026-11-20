@@ -1,0 +1,5 @@
+# Files allowed above their hard limit (decision 0034), checked by
+# `cargo xtask sizes`. One per line: the path from the repository root, then
+# why. An exception that is no longer needed fails the check: remove it once
+# the file is split. The list only shrinks; a new file does not go here.
+packages/feature-platform/src/Updates.tsx TODO(0034): split (606 lines when the limit came)

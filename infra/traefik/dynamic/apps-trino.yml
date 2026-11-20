@@ -1,0 +1,46 @@
+# Trino (infra/trino): the Web UI of the execution plane's cluster, at /ui
+# (decision 0018), under the rules of apps.yml: by URL, never by Docker
+# labels, the frame policy `app-frame-headers`, priority above the web's
+# catch-all.
+#
+# Trino's UI asks for its files and its API at absolute paths (/ui/assets,
+# /ui/api), so it keeps its own path: a prefix stripped here would break
+# them. Only /ui and /oauth2 are routed; the client protocol (/v1) stays on the cluster's
+# private network.
+#
+# Sign-in: Trino's own, with Quality Data (OAuth 2.0 with OIDC, decision
+# 0030): its callback is /oauth2/callback, routed here too. The provider
+# gives a token for this client only to accounts with the policy
+# `quality-admin`; each person appears in Trino as themselves.
+#
+# And the route Trino reads its access-control rules from (decision 0062),
+# on the API: Trino can send no header, so its secret comes in the query,
+# and this router writes no access log, which would keep it. Above the
+# API's own routers; the same chain.
+{{ $domain := env "APP_DOMAIN" | default "localhost" }}
+http:
+  routers:
+    trino-ui:
+      rule: "Host(`{{ $domain }}`) && (Path(`/ui`) || PathPrefix(`/ui/`) || PathPrefix(`/oauth2/`))"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      priority: 10
+      service: trino
+      middlewares: [app-frame-headers]
+    trino-rules:
+      rule: "Host(`{{ $domain }}`) && Path(`/api/internal/trino/rules`)"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      priority: 300
+      service: "{{ env "TRINO_RULES_SERVICE" | default "api@docker" }}"
+      middlewares: [api-chain]
+      observability:
+        accessLogs: false
+
+  services:
+    trino:
+      loadBalancer:
+        servers:
+          - url: "{{ env "TRINO_URL" | default "http://127.0.0.1:8090" }}"

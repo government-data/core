@@ -1,0 +1,43 @@
+{
+  "name": "@knime-orchestador/feature-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ui": {
+      "types": "./src/ui/index.tsx",
+      "solid": "./src/ui/index.tsx",
+      "import": "./src/ui/index.tsx"
+    }
+  },
+  "files": [
+    "dist",
+    "src/ui"
+  ],
+  "scripts": {
+    "dev": "tsc -p tsconfig.json --watch",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@knime-orchestador/i18n": "workspace:*",
+    "@knime-orchestador/shared": "workspace:*",
+    "lucide-solid": "^1.59.0"
+  },
+  "peerDependencies": {
+    "@solidjs/router": "^0.15.0",
+    "solid-js": "^1.9.0"
+  },
+  "devDependencies": {
+    "@solidjs/router": "^0.15.4",
+    "solid-js": "^1.9.17"
+  }
+}

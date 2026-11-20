@@ -1,0 +1,460 @@
+{
+  "audit": {
+    "chain": {
+      "usage": "Usage: server audit verify [--tenant ID] [--lang es|en]",
+      "report_one": "{{tenant}}: {{count}} row checked, {{first}} to {{last}}; head {{head}} {{hash}}; adopted up to {{adopted}}",
+      "report_other": "{{tenant}}: {{count}} rows checked, {{first}} to {{last}}; head {{head}} {{hash}}; adopted up to {{adopted}}",
+      "unbroken": "unbroken",
+      "break": "first break at {{seq}}, {{kind}}",
+      "broken": "the audit chain is broken: its first break is above, by its number and kind"
+    }
+  },
+  "api": {
+    "license": {
+      "readOnly": "Read-only: {{reason}}. Everything can be viewed and scheduled runs keep going."
+    },
+    "machines": {
+      "certificateNotTrusted": "This server does not take a machine's certificate: it is not reached only through the internal entry point (INTERNAL_CLIENT_CERT_HEADER).",
+      "certificateRefused": "The machine's certificate is not accepted: it is unknown, replaced, or the machine is retired. Join it again with a new token.",
+      "drivesNotTaken": "Only a lake-replica takes drives; leave them out for this role.",
+      "installUnavailable": "This server does not serve the files a machine is installed with.",
+      "invalid": "It is not valid.",
+      "invalidDrive": "Each drive is an absolute path of letters, digits, . _ - and /, up to 255 characters, without . or .. as a part (for example /srv/disk1).",
+      "invalidLakeAccessKey": "The access key is 3 to 128 letters, digits, . _ or -, as join.sh showed it (qd-platform-admin).",
+      "invalidLakeSecret": "The secret is the 64 hex digits join.sh showed on the replica, once.",
+      "invalidName": "A machine’s name is lowercase letters, digits and hyphens, 1 to 63, and does not start or end with a hyphen.",
+      "invalidPool": "A pool’s name is lowercase letters, digits and hyphens, 1 to 63.",
+      "invalidRequest": "The signing request is not a PKCS#10 request of an EC P-256 key signed by that key.",
+      "invalidRole": "The role is one of worker, trino-coordinator, trino-worker, lake or lake-replica.",
+      "joinRefused": "The join token is unknown, used or expired. Ask for a new one in Settings → Execution.",
+      "lakeAdminUnavailable": "This server cannot ask the lake: it has no client for the lake's admin API (LAKE_CA_FILE, LAKE_CLIENT_CERT_FILE).",
+      "lakeKeysUnavailable": "This server does not keep the lake's keys.",
+      "nameTaken": "Another machine has that name. Retire it first, or choose another name.",
+      "nodeName": "This join token is for another node of the lake pool: run the command, as it is, on the server it names (--name).",
+      "invalidNode": "Choose one of the pool's nodes: the token is for that server alone.",
+      "nodeNotTaken": "Only a lake pool's node (the role lake) is named by its token.",
+      "poolDrives": "Each node has 1 to {{max}} drives.",
+      "poolDrivesCount": "Give as many drives as the pool's nodes have, or none and add them by hand.",
+      "poolJoined": "A node of this pool has joined: its layout can no longer change.",
+      "poolNodeName": "Each node is a server's name: lowercase letters, digits and hyphens, 1 to 63, not starting or ending with a hyphen.",
+      "poolNodes": "A pool has {{min}} to {{max}} nodes.",
+      "poolNotDefined": "Define the pool first, in Settings → Lake.",
+      "poolNotMain": "The lake's first pool is named main; adding another is not possible yet.",
+      "poolRepeatedNode": "Each node is given once.",
+      "poolsUnavailable": "This server does not keep the lake's pools.",
+      "noCa": "This installation has no certificate authority yet, so no machine can join. Create it with server ca-init.",
+      "noInstallFiles": "There are no installation files for that role yet: only worker and lake-replica.",
+      "notAllowed": "Not allowed for a machine that is {{state}}.",
+      "notFound": "There is no such machine.",
+      "repeatedDrive": "Each drive is given once.",
+      "renewNoCa": "This installation has no certificate authority, so no certificate can be renewed. Create it with server ca-init.",
+      "tooManyDrives": "At most {{max}} drives.",
+      "tooManyAttempts": "Too many attempts. Try again later.",
+      "trinoUnavailable": "This API has no Trino to ask, or no queue to hold its jobs: Trino cannot be restarted from here.",
+      "doltUnavailable": "This API has no catalog: Dolt cannot be restarted from here.",
+      "alertsNotApp": "Only the application VM's certificate delivers Grafana's alerts.",
+      "alertsUnavailable": "This API does not keep the machines' alerts.",
+      "invalidRange": "The range is 1h, 24h or 7d.",
+      "invalidAlert": "An alert of the delivery is not as Grafana sends it: a status firing or resolved, a fingerprint of letters and digits, and a start time."
+    },
+    "platform": {
+      "notFoundOrNoAccess": "It does not exist or you do not have access.",
+      "roleForbids": "Your role in this area does not allow this action."
+    }
+  },
+  "app": {
+    "account": {
+      "activation": {
+        "button": "Activate my account",
+        "expires": "The link expires in {{expiry}} and works only once. If it expires, ask whoever created the account to send it again, or use “Forgot your password?” on the sign-in screen.",
+        "intro": "{{greeting}}\n\nAn account was created for you in Quality Data with the email {{email}}. To activate it, open this link and choose your password:",
+        "notExpected": "If you were not expecting this email, ignore it: without a password nobody can sign in to the account.",
+        "subject": "Activate your Quality Data account",
+        "title": "Activate your account"
+      },
+      "commonAccount": "the Quality Data account",
+      "deleted": {
+        "body": "{{greeting}}\n\nAn administrator deleted the account {{email}} in Quality Data: it can no longer be used to sign in and its sessions were closed.",
+        "mistake": "If you think this is a mistake, talk to an administrator of Quality Data.",
+        "subject": "Your Quality Data account was deleted",
+        "title": "Your account was deleted"
+      },
+      "directory": {
+        "body": "Hello,\n\nWe received a request to reset the password of the account {{email}} in Quality Data. This account signs in with the company directory (LDAP / Active Directory), so its password is changed there: ask your help desk or use your company's tool.\n\nIf you did not ask for this change, ignore this email.\n",
+        "title": "Your password is changed in the directory"
+      },
+      "greeting": "Hello,",
+      "greetingName": "Hello {{name}},",
+      "hours_one": "1 hour",
+      "hours_other": "{{count}} hours",
+      "label": "Your account",
+      "linked": {
+        "body": "{{greeting}}\n\nAn external account was linked to the account {{email}} in Quality Data: from now on it can also be used to sign in.",
+        "notYou": "If it was not you, unlink it from your profile (Linked accounts) and tell an administrator of Quality Data.",
+        "subject": "{{provider}} was linked to your Quality Data account",
+        "title": "A new way to sign in to your account"
+      },
+      "locked": {
+        "body": "{{greeting}}\n\nThere were {{attempts}} attempts in a row to sign in to the account {{email}} in Quality Data with a wrong password, so it was locked for {{expiry}} to protect it. While it lasts, nobody can sign in, not even with the right password; afterwards, it can be tried again.",
+        "notYou": "If it was not you, someone is trying passwords on your account: tell an administrator of Quality Data and, if your password is easy to guess, change it.",
+        "subject": "Your Quality Data account was locked after failed attempts",
+        "title": "Your account was locked for a while"
+      },
+      "minutes_one": "1 minute",
+      "minutes_other": "{{count}} minutes",
+      "password": {
+        "body": "{{greeting}}\n\nThe password of the account {{email}} in Quality Data was changed with a reset link, and every open session of the account was signed out.",
+        "subject": "Your Quality Data password was changed",
+        "title": "Your password was changed"
+      },
+      "passwordNotYou": "If it was not you, someone else has access to the account: reset the password with “Forgot your password?” and tell an administrator of Quality Data.",
+      "provider": "Provider",
+      "providerAccount": "Account at the provider",
+      "reset": {
+        "button": "Choose a new password",
+        "expires": "The link expires in {{expiry}} and works only once. Changing the password signs the account out of every open session.",
+        "intro": "{{greeting}}\n\nWe received a request to reset the password of the account {{email}} in Quality Data. To choose a new one, open this link:",
+        "notYou": "If you did not ask for this change, ignore this email: your password stays the same.",
+        "subject": "Reset your Quality Data password",
+        "title": "Reset your password"
+      },
+      "security": "Security",
+      "unlinked": {
+        "body": "{{greeting}}\n\nThe account {{email}} in Quality Data can no longer be signed in to with {{provider}}.",
+        "notYou": "If it was not you, check the linked accounts in your profile and tell an administrator of Quality Data.",
+        "subject": "{{provider}} was unlinked from your Quality Data account",
+        "title": "A way to sign in to your account was removed"
+      },
+      "welcome": {
+        "body": "{{greeting}}\n\nThe account {{email}} in Quality Data is now active with the password you chose. From now on you sign in with your email and that password.",
+        "subject": "Your Quality Data account is active",
+        "title": "Your account is active"
+      }
+    },
+    "licensing": {
+      "becameReadOnly": "Quality Data became read-only",
+      "contractExpired": "The contract of {{customer}} expired on {{format}}.\n\nEverything keeps working until {{format2}}; from that day the installation is read-only until it is renewed.",
+      "contractExpiresOn": "The contract of {{customer}} ({{plan}} plan) expires on {{format}}.\n\nTo renew it, arrange the purchase order and invoice with your provider: bank transfer payments usually take 30 to 60 days.\n\nIf it expires without renewal, the installation stays fully working for {{CONTRACT_GRACE_DAYS}} more days; after that it becomes read-only: everything can be viewed and scheduled runs keep going, but workflows cannot be created, changed or deployed.",
+      "emptyKey": "the key cannot be empty",
+      "expired": "The Quality Data license expired",
+      "expiresInDays": "The Quality Data license expires in {{days_left}} days",
+      "graceEnded": "The contract of {{customer}} expired on {{format}} and the grace period ended.\n\nEverything can be viewed and scheduled runs keep going, but workflows cannot be created, changed or deployed until it is renewed. Once payment is recorded it works fully again in less than a day (or instantly with Settings → License → Renew now).",
+      "invalidPermit": "the key does not have a valid permit from the cloud ({{e}})",
+      "label": "License",
+      "noActivationKey": "no activation key",
+      "noPermitYet": "the key does not have a permit from the cloud yet",
+      "permitOfOtherInstallation": "the permit belongs to another installation"
+    },
+    "mail": {
+      "brand": "Quality Data",
+      "buttonFallback": "If the button does not work, copy this link into your browser:",
+      "contractEnd": "Contract end",
+      "customer": "Customer",
+      "details": "Details",
+      "footer": "Automatic message from Quality Data: do not reply to this email.",
+      "installedVersion": "Installed version",
+      "newVersion": "New version",
+      "plan": "Plan",
+      "previousVersion": "Previous version",
+      "version": "Version"
+    },
+    "platform": {
+      "editionExpected": "{{other}}: onpremise or online expected",
+      "forbidden": "no permission",
+      "noLicenseUsed": "this installation does not use a license",
+      "notFound": "not found",
+      "notUpdatedHere": "this installation is not updated from here",
+      "secrets": {
+        "descriptionTooLong": "the description is at most 500 characters",
+        "scalarValue": "the value must be text, a number or true/false",
+        "valueTooLong": "the value is over 16 KB",
+        "invalidName": "«{{name}}» is not a valid name: letters, numbers, _ . - and starting with a letter or _",
+        "encryptFailed": "a secret could not be encrypted: {{e}}",
+        "decryptFailed": "a secret could not be decrypted (did the Settings key change?): {{e}}"
+      }
+    },
+    "settings": {
+      "between1And120Seconds": "Between 1 and 120 seconds",
+      "directoryListsNoMembers": "this directory does not list a group's members",
+      "invalidEmail": "Invalid email",
+      "ldapScheme": "Must start with ldap:// or ldaps://",
+      "mailNotConfigured": "outgoing mail is not configured",
+      "mailWorks": "Outgoing mail works",
+      "noticeLanguage": "es or en",
+      "requiredWithUser": "Required with a username",
+      "resetLinkMinutes": "Between {{MIN_RESET_LINK_MINUTES}} and {{MAX_RESET_LINK_MINUTES}} minutes (0 for the default)",
+      "slug": "Lowercase letters, numbers and hyphens",
+      "starttlsForLdap": "StartTLS is for ldap://, not ldaps://",
+      "testLabel": "Test",
+      "testMailBody": "If you get this message, Quality Data's outgoing mail is configured correctly.",
+      "testMailSubject": "Quality Data test email",
+      "unknownSection": "unknown section"
+    },
+    "updates": {
+      "alreadyInProgress": "an update is already in progress ({{phase}})",
+      "maintenanceDuration": "maintenance lasts between 1 s and {{as_secs}} h",
+      "maintenanceReasonMissing": "the maintenance reason is missing",
+      "noUpdateService": "this installation does not have the update service: repeat the installation or run «orquestador actualizar» on the server",
+      "objectExpected": "an object was expected",
+      "policy": {
+        "automaticPaused": "Automatic updates are paused: it can be installed from Settings → Updates.",
+        "drainWait": "the wait for running work to finish goes from 5 min to 4 h",
+        "emptyWindow": "the window starts and ends at the same time",
+        "installFromSettings": "To install it go to Settings → Updates and click «Update».",
+        "installsInWindow": "It will install by itself in the next window ({{start}}–{{end}}, {{timezone}}), when no workflows are running.",
+        "pickADay": "choose at least one day of the week",
+        "timeFormat": "times go as HH:MM (24 h)",
+        "updatedByHand": "It is updated by hand: run «orquestador actualizar» on the server."
+      },
+      "report": {
+        "beforeInstalling": "Before installing it, running workflows are allowed to finish, the database is backed up, and if the new version does not start it goes back to the previous one on its own.",
+        "failedCritical": "The update failed and could not go back on its own. The server needs checking (orquestador logs api) and support must be notified. When it is resolved, run «orquestador-actualizador reconocer».",
+        "installedAndReady": "The installation is on version {{installed}} and {{version}} is ready.",
+        "label": "Update",
+        "newVersion": "A new version of Quality Data is available: {{version}}",
+        "notPrepared": "Version {{version}} of Quality Data could not be prepared",
+        "nothingTouched": "Nothing was touched: the installation stays as it was.",
+        "restored": "Version {{version}} did not start: the backup was restored",
+        "restoredDetail": "Neither the new version nor the previous one started on the updated database, so the backup taken right before starting was restored (with no runs in progress). Whatever was done in those minutes may be missing.",
+        "rolledBack": "Version {{version}} did not start: Quality Data stays on {{from}}",
+        "rolledBackDetail": "The new version did not respond, so it went back to the previous one on the same database. Nothing was lost and it will not retry by itself.",
+        "succeeded": "The update finished successfully and everything is working again.",
+        "updatedTo": "Quality Data was updated to version {{version}}",
+        "urgentDidNotComeBack": "URGENT: Quality Data did not come back after updating",
+        "whatsNew": "What's new"
+      }
+    }
+  },
+  "test": {
+    "hello": "Hi, {{name}}",
+    "workflows_one": "{{count}} workflow",
+    "workflows_other": "{{count}} workflows"
+  },
+  "quality": {
+    "lint": {
+      "qr001": "The YAML cannot be read: {{message}}",
+      "qr002": "Expression outside the grammar (column {{column}}): {{reason}} {{detail}}",
+      "qr003": "The field {{name}} is not in the dataset",
+      "qr004": "There is no {{kind}} named {{name}}",
+      "qr005": "The pattern {{pattern}} does not take the parameter {{parameter}}",
+      "qr006": "The parameter {{parameter}} is missing",
+      "qr007": "The value {{value}} of {{parameter}} does not fit the field's type",
+      "qr008": "Not compiled yet: {{what}}",
+      "qr009": "Another rule already uses the id {{id}}",
+      "qr010": "The regular expression uses {{construct}}, which RE2 lacks: it would not mean the same on DuckDB and Trino",
+      "qr011": "Example {{index}} should {{expected}}, but it gives: {{got}}",
+      "qr012": "{{name}} is not a named rule of the table's global rules",
+      "qr013": "{{name}} ({{kind}}) is already declared by the table's global rules: take it away from here or rename it",
+      "qr014": "The global rules have no rules of their own: each rule goes in its field's file",
+      "qr020": "It checks the same as {{other}}: each failure would count twice",
+      "qr021": "The rule has no alert: whoever fixes the record will not know what to do",
+      "qr022": "{{field}} already has required, which counts fillers as empty",
+      "qr023": "The condition never holds: the rule would apply to no record",
+      "qr024": "{{field}} is mapped as a number: a text pattern would read 1234.0; map the code as text",
+      "qr100": "The file has {{rules}} rules and {{lines}} lines: split it by field group (up to 30 rules or 300 lines)",
+      "qr101": "The draft changes {{count}} rules: split it (up to 25)",
+      "qr103": "The list {{name}} has {{count}} values: make it a catalog table",
+      "qr200": "The indentation is not two spaces a level",
+      "qr201": "There is a tab: use spaces",
+      "qr202": "Spaces at the end of the line",
+      "qr203": "These quotes are not needed: the value reads the same without them",
+      "qr204": "The line has {{length}} characters (over 120): if it is an expression, fold it with >-",
+      "qr205": "Leave exactly one blank line before each rule",
+      "qr206": "The # starts a comment and the value is lost: put it in quotes (\"{{value}}\")",
+      "suggestion": "Did you mean {{suggestion}}?",
+      "kind": {
+        "population": "population",
+        "list": "list",
+        "table": "table",
+        "reference": "reference",
+        "derived": "derived field",
+        "named": "named rule"
+      },
+      "unsupported": {
+        "table_on_several_fields": "a table on several fields"
+      },
+      "example": {
+        "fails": "fail",
+        "passes": "pass",
+        "skips": "not apply"
+      },
+      "reason": {
+        "syntax": "syntax error",
+        "trailing_input": "text left after the expression",
+        "not_allowed": "not allowed",
+        "unknown_function": "the function is not in the language",
+        "arity": "number of arguments",
+        "text_required": "the argument must be a text",
+        "unknown_parameter": "unknown parameter (only :cut exists)",
+        "control_character": "control character in a text",
+        "bad_interval": "use INTERVAL n YEAR, MONTH or DAY",
+        "unsupported_type": "type not allowed in CAST",
+        "too_deep": "nested too deep",
+        "too_large": "too large"
+      },
+      "syntax": {
+        "lost_value": "a # starts a comment and cuts the value off here, so what follows cannot be read; put that value in quotes",
+        "unclosed_quote": "a quote opens here and its line does not close it, so what follows cannot be read; close it",
+        "continued": "this line goes on the value above at its key's indent and reads as a new key, so what follows cannot be read; indent it further or use >- (Tidy does it)",
+        "block_on_map": "a >- or | here makes a single text of what must be a list of names with their values, so it cannot be read; take it away and put it on each name (Tidy does it)"
+      },
+      "qr207": "These quotes are not closed on their line: what follows, up to the next quote, goes into the value",
+      "qr208": "This line goes on the value above at its key's indent, and reads as a new key: indent it further or use >-",
+      "qr209": "{{block}} makes {{key}} a single text, but {{key}} is a list of names with their values: take {{block}} away from here and put it on each name",
+      "qr210": "This rule is about {{field}}: it goes in its own file, {{file}}",
+      "qr211": "{{key}} repeats what {{name}} already says: it is not needed"
+    },
+    "explain": {
+      "cut": "the cut",
+      "not": "it is not the case that {{x}}",
+      "filled": "{{x}} is filled",
+      "not_shaped": "{{x}} does not have the form «{{pattern}}»",
+      "not_in_reference": "{{x}} is not in {{reference}}",
+      "not_matches": "{{x}} is not {{format}}",
+      "and": "{{a}} and {{b}}",
+      "or": "{{a}} or {{b}}",
+      "eq": "{{a}} is {{b}}",
+      "not_eq": "{{a}} is not {{b}}",
+      "lt": "{{a}} is less than {{b}}",
+      "lt_eq": "{{a}} is at most {{b}}",
+      "gt": "{{a}} is greater than {{b}}",
+      "gt_eq": "{{a}} is at least {{b}}",
+      "has_value": "{{x}} has a value",
+      "no_value": "{{x}} has no value",
+      "one_of": "{{x}} is one of: {{values}}",
+      "not_one_of": "{{x}} is none of: {{values}}",
+      "between": "{{x}} is between {{low}} and {{high}}",
+      "not_between": "{{x}} is not between {{low}} and {{high}}",
+      "like": "{{x}} follows the pattern «{{pattern}}»",
+      "not_like": "{{x}} does not follow the pattern «{{pattern}}»",
+      "matches": "{{x}} is {{format}}",
+      "normalized": "{{x}} (letters and digits only)",
+      "duplicated": "another record has the same {{key}}",
+      "true": "true",
+      "false": "false",
+      "null": "no value",
+      "more": "{{values}} and {{count}} more",
+      "years_one": "{{count}} year",
+      "years_other": "{{count}} years",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "empty": "{{x}} is empty",
+      "shaped": "{{x}} has the form «{{pattern}}»",
+      "in_reference": "{{x}} is in {{reference}}",
+      "in_list": "{{x}} is in the list {{list}}",
+      "days_since": "the days from {{x}} to the cut",
+      "days_between": "the days between {{a}} and {{b}}",
+      "years_between": "the whole years between {{a}} and {{b}}",
+      "length": "the length of {{x}}",
+      "abs": "the absolute value of {{x}}",
+      "round": "{{x}} rounded",
+      "coalesce": "{{a}} (or, without it, {{b}})",
+      "format": {
+        "email": "a valid e-mail address",
+        "mobile_co": "a Colombian mobile (3 and nine digits)",
+        "divipola": "a DIVIPOLA code",
+        "address_co": "an address with a street nomenclature",
+        "person_name": "a person's name",
+        "not_only_symbols": "a text with letters or digits",
+        "capitalized": "a text that starts in upper case",
+        "normalized_spaces": "a text without double or trailing spaces"
+      },
+      "everyone": "every record",
+      "kind": {
+        "field": "field",
+        "across": "cross-field"
+      },
+      "dimension": {
+        "completeness": "completeness",
+        "consistency": "consistency",
+        "accuracy": "accuracy",
+        "validity": "validity",
+        "timeliness": "timeliness",
+        "uniqueness": "uniqueness"
+      },
+      "severity": {
+        "blocking": "blocking",
+        "major": "major",
+        "minor": "minor"
+      },
+      "label": {
+        "applies": "Applies to",
+        "fails": "Fails if",
+        "skips": "Does not apply if",
+        "kind": "Kind"
+      }
+    },
+    "cli": {
+      "blocked": "There are errors: fix them before saving the rules.",
+      "noData": "The dataset {{dataset}} is missing: load it with --data {{dataset}}=file.parquet",
+      "noCut": "The cut is missing: --cut YYYY-MM-DD",
+      "examplesNeedCut": "The examples compare dates with the cut: add --cut YYYY-MM-DD to test them.",
+      "error": "error",
+      "warning": "warning",
+      "usage": "Usage: server quality rules lint|explain|test FILE... --data DATASET=PARQUET... [--mapping FILE]... [--cut YYYY-MM-DD] [--type FIELD=email] [--lang es|en] · server quality rules tidy FILE... [--check]",
+      "column": {
+        "rule": "Rule",
+        "applies": "Applies",
+        "fails": "Fails",
+        "passes": "Passes",
+        "skipped": "Not applied",
+        "conformity": "Conformity"
+      },
+      "mapping": {
+        "parse": "The mapping cannot be read: {{message}}",
+        "unknownKey": "The key {{field}} is not among the mapping's fields",
+        "sameColumn": "Two fields read the column {{column}}",
+        "readFrom": "from needs a source name (a-z, 0-9, _) and a table of one to three parts",
+        "oneField": "The role {{role}} is held by one field only; {{field}} is a second",
+        "roleType": "The field {{field}} cannot hold the role {{role}}: an updated date is a date, an outlier amount or a drift variable a number, an active field text",
+        "activeValues": "The field {{field}} lists active_values only if it holds the role active, and the role active needs them, none blank",
+        "noColumn": "The source {{source}} has no column {{column}}"
+      },
+      "catalog": {
+        "usage": "Usage: server quality catalog import --mapping FILE RULES... [--tenant ID] [--author \"Name <email>\"]",
+        "noCatalog": "No catalog: set DOLT_URL (or DOLT_URL_FILE).",
+        "otherDataset": "{{file}} belongs to dataset {{dataset}}, not {{mapping}}.",
+        "imported": "{{dataset}}: {{files}} rules files in the catalog, commit {{commit}}."
+      },
+      "tidied": "{{file}}: tidied",
+      "untidy": "{{file}}: not tidy",
+      "untidyFiles": "Some files are not tidy: server quality rules tidy FILE..."
+    },
+    "proposal": {
+      "alerts": {
+        "required": "Empty field",
+        "unique": "Repeated value",
+        "email": "Email with an invalid format",
+        "mobile": "Mobile number with an invalid format",
+        "document": "Document number with an invalid format"
+      }
+    }
+  },
+  "machines": {
+    "alerts": {
+      "folder": "Machines",
+      "disk_low": "Disk almost full on {{vm}} ({{path}}): {{free}} free, under {{limit}}",
+      "disk_critical": "Disk full on {{vm}} ({{path}}): {{free}} free, under {{limit}}",
+      "disk_filling": "Disk {{path}} on {{vm}} will be full within 24 hours at the last 6 hours' rate",
+      "lake_pool_filling": "The lake, seen from {{vm}}, is {{used}} used, over {{limit}}, and will be full within 30 days at the last 30 days' rate",
+      "memory_low": "Low memory on {{vm}}: {{free}} available, under {{limit}}",
+      "network_errors": "Interface {{device}} on {{vm}} has {{rate}} errors and drops per second",
+      "clock_offset": "The clock of {{vm}} is off by more than {{limit}} or not synchronised",
+      "certificate_expiring": "The certificate of {{vm}} expires in {{left}}",
+      "machine_silent": "No data from {{vm}}: it sends no metrics",
+      "worker_paused": "Worker {{vm}} stopped taking jobs: its free disk or memory is at its limit",
+      "alerting_heartbeat": "Grafana's alerting works",
+      "metrics_unavailable": "Metrics not available: Grafana cannot evaluate rule {{rule}}",
+      "mail": {
+        "language": "English",
+        "firing": "ALERT",
+        "resolved": "RESOLVED",
+        "stateFiring": "firing",
+        "stateResolved": "resolved",
+        "noMachine": "no machine"
+      }
+    }
+  }
+}

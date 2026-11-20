@@ -1,0 +1,278 @@
+# The machines' entry point (decision 0066, point 5): a client certificate of
+# the installation's CA is required, and the API is told which one.
+#
+# Not in ./dynamic: it is copied there, next to the files it names, only once
+# the installation has its CA (infra/traefik/gen-dev-internal.sh in
+# development, the installer in production). Without it nothing answers on
+# `internal` (404) and the rest of the stack starts as before. Were it there
+# without its CA file, Traefik would still start, but fail that router's
+# handshake and log "invalid certificate(s) content" at every reload
+# (tools/verify/traefik_internal.sh). The files, all in the watched
+# directory so that a renewed one is taken without a restart (0066, point 13):
+#
+#   machines-ca.crt   the installation's CA (`server ca-init`): the only
+#                     issuer whose client certificates are accepted
+#   internal.crt/.key the server certificate for INTERNAL_DOMAIN, signed by
+#                     that CA, the one machines trust; in an installation
+#                     the application VM's own (INTERNAL_CERT_FILE and
+#                     INTERNAL_KEY_FILE, app-machine.pem: certificate.yml)
+#
+# TLS options are chosen by SNI (tools/verify/traefik_mtls.sh): a client that
+# sends another name finishes the handshake without a certificate, but gets
+# 404 or 421, never the API, because every router here has a Host rule for
+# INTERNAL_DOMAIN. The machines' own routes, their token and the worker's
+# routes (/api/internal/jobs/…, 0066 step 7) are here. The worker's stay on
+# the public entry point too, for the workers with a secret of the dev stack
+# and its Docker worker, until the dev stack moves to certificates (step 8),
+# when they leave it. Trino's rules (/api/internal/trino/rules) are here,
+# read with Trino's certificate (step 9); the public router of
+# dynamic/apps-trino.yml keeps the path for the dev stack's Trino, which
+# reads them with a key until it moves (in production no key is set and
+# that router finds 404).
+{{ $internal := env "INTERNAL_DOMAIN" | default "internal.localhost" }}
+tls:
+  certificates:
+    - certFile: {{ env "INTERNAL_CERT_FILE" | default "/etc/traefik/dynamic/internal.crt" }}
+      keyFile: {{ env "INTERNAL_KEY_FILE" | default "/etc/traefik/dynamic/internal.key" }}
+  options:
+    machines:
+      minVersion: VersionTLS12
+      clientAuth:
+        caFiles:
+          - /etc/traefik/dynamic/machines-ca.crt
+        clientAuthType: RequireAndVerifyClientCert
+
+http:
+  routers:
+    # A machine renews its certificate with the one it has
+    # (POST /api/internal/machines/renew). The public routers leave this
+    # path alone.
+    machines:
+      rule: "Host(`{{ $internal }}`) && PathPrefix(`/api/internal/machines/`)"
+      entryPoints: [internal]
+      tls:
+        options: machines
+      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
+      middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
+
+    # A machine asks for its OIDC token with its certificate
+    # (POST /api/oauth/token, RFC 8705 tls_client_auth; 0066, point 6). The
+    # public entry point keeps this path for people and clients with a
+    # secret, but there Traefik removes the certificate header a client
+    # sends, so a machine role's client never authenticates through it.
+    machine-token:
+      rule: "Host(`{{ $internal }}`) && Path(`/api/oauth/token`)"
+      entryPoints: [internal]
+      tls:
+        options: machines
+      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
+      middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
+
+    # A worker with its certificate asks for a job's details and sends its
+    # report (/api/internal/jobs/…) with the token it got above.
+    worker-jobs:
+      rule: "Host(`{{ $internal }}`) && PathPrefix(`/api/internal/jobs/`)"
+      entryPoints: [internal]
+      tls:
+        options: machines
+      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
+      middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
+
+    # Trino's coordinator reads its access-control rules with its machine
+    # certificate (GET /api/internal/trino/rules, 0066 point 9), no secret
+    # in the URL. Its hold and release before a restart are machines'
+    # routes (/api/internal/machines/trino/…), on the router above.
+    # (Named apart from apps-trino.yml's public `trino-rules`: one file
+    # provider, one namespace.)
+    trino-rules-internal:
+      rule: "Host(`{{ $internal }}`) && Path(`/api/internal/trino/rules`)"
+      entryPoints: [internal]
+      tls:
+        options: machines
+      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
+      middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
+
+    # The lake's check, asked by the gate in front of RustFS (0066, point
+    # 10), on the gates' entry point, where the header that names the
+    # machine at the gate arrives. The certificate header is the gate's
+    # own, written here. No rate limit: one check per request to the lake.
+    lake-check:
+      rule: "Host(`{{ $internal }}`) && Path(`/api/internal/machines/lake/check`)"
+      entryPoints: [lakegate]
+      tls:
+        options: machines
+      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
+      middlewares: [api-strip, machine-certificate, security-headers]
+
+    # The services' metrics, scraped by this VM's Alloy with its machine
+    # certificate (decision 0071, points 6 and 7) on the `metrics` entry
+    # point: Traefik's own, and those of Grafana and Dolt, which cannot
+    # require a client certificate themselves. Grafana's `/grafana/metrics`
+    # also asks for its basic auth (GF_METRICS_BASIC_AUTH_*), so the same
+    # path on the public entry point gives nothing. No access log: a scrape
+    # every 30 seconds is not a request anyone reads.
+    metrics-traefik:
+      rule: "Host(`{{ $internal }}`) && Path(`/metrics`)"
+      entryPoints: [metrics]
+      tls:
+        options: machines
+      service: prometheus@internal
+      observability:
+        accessLogs: false
+    metrics-grafana:
+      rule: "Host(`{{ $internal }}`) && Path(`/grafana/metrics`)"
+      entryPoints: [metrics]
+      tls:
+        options: machines
+      service: grafana
+      observability:
+        accessLogs: false
+    metrics-dolt:
+      rule: "Host(`{{ $internal }}`) && Path(`/dolt/metrics`)"
+      entryPoints: [metrics]
+      tls:
+        options: machines
+      middlewares: [metrics-dolt-strip]
+      service: metrics-dolt
+      observability:
+        accessLogs: false
+{{- if env "MIMIR_UPSTREAM" }}
+
+    # Mimir (decision 0071, amended on 2026-11-16 by the user's ruling), on
+    # the `mimir` entry point that certificate.yml publishes as 9009. Any
+    # machine of the CA pushes (remote write) with its own certificate; only
+    # the application VM's certificate (role `app`: the API's charts, this
+    # VM's Alloy scraping Mimir's /metrics) reads, everything else goes
+    # through `mimir-app-only` first. A rule cannot look at the client's
+    # certificate: Traefik writes its header only in a middleware, after
+    # routing (and removes a client's own at the entry point), so the role
+    # is read by a forwardAuth to `mimir-app-check` below, which sees the
+    # header passTLSClientCert wrote. Grafana reads Mimir by its service
+    # name on the observability stack's network, not through here.
+    mimir-push:
+      rule: "Host(`{{ $internal }}`) && Path(`/api/v1/push`)"
+      entryPoints: [mimir]
+      tls:
+        options: machines
+      service: mimir
+      observability:
+        accessLogs: false
+    mimir-read:
+      rule: "Host(`{{ $internal }}`) && PathPrefix(`/`)"
+      entryPoints: [mimir]
+      tls:
+        options: machines
+      middlewares: [mimir-subject, mimir-app-only]
+      service: mimir
+    # On Traefik's loopback alone (`mimircheck`): 200 when the first
+    # certificate's subject unit is exactly `app`, else 403 from
+    # `mimir-refused`. The CA writes O=qd, OU=<role>, CN=<name>; only OU
+    # is passed, one entry per certificate of the verified chain, the
+    # client's first (`Subject%3D%22OU%3Dapp%22%2C`, the CA having none).
+    mimir-app-check:
+      rule: "HeaderRegexp(`X-Forwarded-Tls-Client-Cert-Info`, `^Subject(%3D|=)(%22|\")OU(%3D|=)app(%22|\")(%2C|,|$)`)"
+      entryPoints: [mimircheck]
+      service: ping@internal
+      observability:
+        accessLogs: false
+    mimir-app-refused:
+      rule: "PathPrefix(`/`)"
+      priority: 1
+      entryPoints: [mimircheck]
+      middlewares: [mimir-refused]
+      service: ping@internal
+      observability:
+        accessLogs: false
+{{- end }}
+
+  services:
+    # Dolt's metrics port (infra/dolt/tls/config.yaml), HTTPS with the same
+    # machine certificate, on Traefik's network (infra/dolt/certificate.yml)
+    # and published nowhere.
+    metrics-dolt:
+      loadBalancer:
+        serversTransport: metrics-dolt
+        servers:
+          - url: "{{ env "DOLT_METRICS_URL" | default "https://dolt:11228" }}"
+{{- if env "MIMIR_UPSTREAM" }}
+    # Mimir on Traefik's network (infra/observability/certificate.yml), its
+    # port published nowhere; HTTPS requiring a client certificate.
+    mimir:
+      loadBalancer:
+        serversTransport: mimir
+        servers:
+          - url: "{{ env "MIMIR_UPSTREAM" }}"
+{{- end }}
+
+  serversTransports:
+    # Dolt's certificate is this VM's machine certificate: its name is
+    # INTERNAL_DOMAIN's, verified against the CA.
+    metrics-dolt:
+      serverName: "{{ $internal }}"
+      rootCAs:
+        - /etc/traefik/dynamic/machines-ca.crt
+{{- if env "MIMIR_UPSTREAM" }}
+
+    # Mimir serves and requires this VM's machine certificate: verified
+    # under INTERNAL_DOMAIN against the CA, the same one presented
+    # (app-machine.pem, renewed in place by certificate.yml's entrypoint).
+    mimir:
+      serverName: "{{ $internal }}"
+      rootCAs:
+        - /etc/traefik/dynamic/machines-ca.crt
+      certificates:
+        - certFile: /etc/traefik/dynamic/app-machine.pem
+          keyFile: /etc/traefik/dynamic/app-machine.pem
+{{- end }}
+
+{{- if env "LAKE_SERVER_NAME" }}
+
+    # How this Traefik reaches the lake through its gate (0066, point 10; the
+    # service `rustfs` of apps.yml with LAKE_TRANSPORT=lake@file and RUSTFS_URL
+    # the gate's https address): the lake node verified against the CA under
+    # its name (LAKE_SERVER_NAME), and the application VM's own machine
+    # certificate presented, its agent's machine.pem copied here as
+    # app-machine.pem (the certificate then the key) by certificate.yml's
+    # entrypoint, at each renewal. Read again when a file of the watched
+    # directory changes (tools/verify/traefik_app_certificate.sh).
+    lake:
+      serverName: "{{ env "LAKE_SERVER_NAME" }}"
+      rootCAs:
+        - /etc/traefik/dynamic/machines-ca.crt
+      certificates:
+        - certFile: /etc/traefik/dynamic/app-machine.pem
+          keyFile: /etc/traefik/dynamic/app-machine.pem
+{{- end }}
+
+  middlewares:
+    # The verified certificate to the API, in X-Forwarded-Tls-Client-Cert:
+    # URL-encoded, comma-separated base64 DER of every certificate the client
+    # sent, the verified one first. The API reads its subject and serial from
+    # that first entry only (0066, point 5), and only with
+    # INTERNAL_CLIENT_CERT_HEADER=trusted. Traefik removes the header when a
+    # client sends it.
+    machine-certificate:
+      passTLSClientCert:
+        pem: true
+    metrics-dolt-strip:
+      stripPrefix:
+        prefixes: ["/dolt"]
+{{- if env "MIMIR_UPSTREAM" }}
+    # The verified certificate's subject unit alone, in
+    # X-Forwarded-Tls-Client-Cert-Info; a client's own is removed.
+    mimir-subject:
+      passTLSClientCert:
+        info:
+          subject:
+            organizationalUnit: true
+    # Asks mimir-app-check with that header alone; its 403 is the answer.
+    mimir-app-only:
+      forwardAuth:
+        address: "http://127.0.0.1:9447/"
+        authRequestHeaders: ["X-Forwarded-Tls-Client-Cert-Info"]
+    # Allows no address: a documentation one (RFC 5737), which no
+    # connection to the loopback has, so every request gets 403.
+    mimir-refused:
+      ipAllowList:
+        sourceRange: ["192.0.2.1/32"]
+{{- end }}

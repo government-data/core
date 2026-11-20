@@ -1,0 +1,22 @@
+[package]
+name = "tenancy"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The tenant of the current task: the API sets it per request, the Postgres
+# pool (for RLS) and the application (background tasks, URLs) read it. It only
+# depends on tokio, so domain stays runtime-free and the layers do not cross.
+[dependencies]
+async-trait.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

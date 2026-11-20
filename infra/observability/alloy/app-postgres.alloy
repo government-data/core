@@ -1,0 +1,50 @@
+// PostgreSQL's metrics on the application VM (decision 0071, step 2), with
+// certificate.yml only: loaded beside app.alloy, whose remote write it
+// uses. Alloy's embedded exporter connects as `qd_metrics` (in pg_monitor,
+// no password: infra/postgres/initdb/30-metrics-role.sh) to the `postgres`
+// database, over TLS verified against the CA (verify-full) and presenting
+// this machine's certificate (METRICS_POSTGRES_DSN; tls/pg_hba.conf lets
+// that role in with it alone). Development's database has no TLS, so it is
+// not collected there.
+//
+// The exporter's default queries are off: its pg_stat_activity_count
+// carries `usename` and `application_name`, and dropping them would leave
+// two series with the same labels. Its two queries (postgres-queries.yml)
+// count by database and state only; no statement, no user, no client.
+
+prometheus.exporter.postgres "app" {
+  data_source_names          = [sys.env("METRICS_POSTGRES_DSN")]
+  disable_default_metrics    = true
+  custom_queries_config_path = "/etc/qd-alloy-postgres/queries.yml"
+}
+
+prometheus.scrape "postgres" {
+  job_name        = "postgres"
+  targets         = prometheus.exporter.postgres.app.targets
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+  sample_limit    = 5000
+  label_limit     = 20
+  forward_to      = [prometheus.relabel.postgres.receiver]
+}
+
+prometheus.relabel "postgres" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "up|pg_up|pg_stat_database_numbackends|pg_stat_database_xact_commit|pg_stat_database_xact_rollback|pg_stat_database_deadlocks|pg_stat_activity_count"
+    action        = "keep"
+  }
+  rule {
+    target_label = "job"
+    replacement  = "postgres"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = "postgres"
+  }
+  rule {
+    regex  = "__name__|job|instance|datname|state"
+    action = "labelkeep"
+  }
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}

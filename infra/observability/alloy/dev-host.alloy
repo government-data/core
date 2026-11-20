@@ -1,0 +1,46 @@
+// Development only (compose.dev.yml loads this file beside config.alloy):
+// in watch mode the API, and a worker started with tools/dev/worker.sh, run
+// on this machine, not in containers, so Alloy reads the JSON lines they
+// write to .dev/logs (mounted read-only at /var/log/qd-dev) and gives them
+// the labels their containers would have: service and compose_project as
+// in compose.yml and infra/worker/docker-compose.yml. Then the same
+// processing as the containers' lines (vm, level), in config.alloy.
+// worker.log is tools/dev/worker.sh's file, worker-<name>.log one of a
+// second worker started with QD_DEV_WORKER=<name>, so two never share one.
+
+local.file_match "dev_host" {
+  path_targets = [
+    {"__path__" = "/var/log/qd-dev/api.log", "service" = "api", "compose_project" = "data-quality"},
+    {"__path__" = "/var/log/qd-dev/worker*.log", "service" = "worker", "compose_project" = "data-quality-worker"},
+  ]
+  sync_period = "15s"
+}
+
+loki.source.file "dev_host" {
+  targets    = local.file_match.dev_host.targets
+  forward_to = [loki.process.dev_host.receiver]
+}
+
+loki.process "dev_host" {
+  // The file's name is not a label a container's line has.
+  stage.label_drop {
+    values = ["filename"]
+  }
+  // A process that writes text instead of JSON (LOG_FORMAT=pretty, or a
+  // binary built before it used the crate logging) is kept, line by line:
+  // its terminal colours removed, and the level of tracing's text format
+  // (`<RFC 3339 time>  INFO target: msg`) made the label, which the
+  // containers' processing keeps for a line that is not JSON. A JSON line
+  // starts with `{` and is left as it is.
+  stage.replace {
+    expression = "(\\x1b\\[[0-9;]*m)"
+    replace    = ""
+  }
+  stage.regex {
+    expression = "^\\d{4}-\\d{2}-\\d{2}T[0-9:.]+Z\\s+(?P<level>TRACE|DEBUG|INFO|WARN|ERROR)\\s"
+  }
+  stage.labels {
+    values = { level = "" }
+  }
+  forward_to = [loki.process.containers.receiver]
+}

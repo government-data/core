@@ -1,0 +1,39 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-32
+    field: "CiuResid"
+    check: "domain"
+    not_in: { "list": "departamentos" }
+    severity: major
+    cause: capture
+    alert: "Departamento en ciudad"
+    origin: { process: KNIME, node: "#1619" }
+
+  - id: V-PN-33
+    field: "CiuResid"
+    check: "placeholder"
+    values: ["ACTUALIZAR"]
+    severity: major
+    cause: capture
+    alert: "Actualizar"
+    origin: { process: KNIME, node: "#1619" }
+
+  - id: V-PN-34
+    field: "CiuResid"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1619" }
+
+  - id: P-17
+    field: "CiuResid"
+    check: "expression"
+    fails: "regexp_like(CiuResid, '.*(\\xa0| {2}).*') OR regexp_like(DeptoRes, '.*(\\xa0| {2}).*')"
+    dimension: "validity"
+    case: "exact"
+    severity: minor
+    cause: systemic
+    alert: "Texto sin normalizar (espacios dobles o NBSP)"
+    origin: { process: MVP }
+    note: "Viene del catálogo de ciudades: se corrige una vez en el maestro."

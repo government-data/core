@@ -1,0 +1,28 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-05
+    field: "FecUltActualiza"
+    check: "fresh"
+    when: "IdActivo = 'SI'"
+    max_age: "365 days"
+    severity: major
+    cause: systemic
+    alert: "Cliente desactualizado"
+    origin: { process: KNIME, node: "#1688" }
+    note: "La regla exige ActualizadosDespuesUnAnno vacío, pero «Transformación» siempre le asigna valor: nunca se emite. KNIME la clasifica como Exactitud; es Actualidad.; el flujo no la emite"
+
+  - id: "V-PN-08"
+    field: "FecUltActualiza"
+    extends: "V-PN-08"
+    alert: "Fecha Ultima Actualización Errada"
+
+  - id: P-26
+    field: "FecUltActualiza"
+    check: "fresh"
+    when: "IdActivo = 'SI'"
+    max_age: "365 days"
+    severity: major
+    cause: systemic
+    alert: "Cliente desactualizado (> 365 días)"
+    origin: { process: MVP }
+    note: "Reemplaza la regla vigente, que nunca se emite."

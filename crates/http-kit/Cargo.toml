@@ -1,0 +1,31 @@
+[package]
+name = "http-kit"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The HTTP pieces `api` and `auth-gateway` share: axum for the error response
+# and the request-id middleware (with `tracing` spans and a `tokio` task-local),
+# `serde`/`utoipa` for the error envelope and its OpenAPI schema; and the
+# API's request metrics (`prometheus-client`).
+[dependencies]
+axum.workspace = true
+serde.workspace = true
+utoipa.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+# The API's request metrics, by route template (decision 0071).
+prometheus-client.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tower.workspace = true
+# Reading the metrics back in the tests.
+logging.workspace = true

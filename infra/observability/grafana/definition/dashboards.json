@@ -1,0 +1,982 @@
+{
+  "languages": ["es", "en"],
+  "datasources": {
+    "postgres": { "type": "grafana-postgresql-datasource", "uid": "postgres" },
+    "loki": { "type": "loki", "uid": "loki" },
+    "mimir": { "type": "prometheus", "uid": "mimir" }
+  },
+  "variables": {
+    "event_type": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT DISTINCT event_type FROM public.admin_audit_events ORDER BY 1",
+      "multi": true,
+      "sample": "records_viewed"
+    },
+    "who": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT id::text AS __value, coalesce(display_name, email) AS __text FROM public.admin_users ORDER BY 2, 1",
+      "multi": true
+    },
+    "resource": { "kind": "textbox", "sample": "dataset/" },
+    "dataset": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT DISTINCT dataset FROM quality.cuts ORDER BY 1",
+      "multi": true
+    },
+    "cut": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT cut::text FROM quality.cuts WHERE dataset IN (${dataset:sqlstring}) ORDER BY cut DESC LIMIT 60",
+      "all": false
+    },
+    "jobs": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT coalesce(string_agg(x.id::text, '|' ORDER BY x.id::text), '[^\\x00-\\x{10FFFF}]') FROM quality.cuts c CROSS JOIN LATERAL (VALUES (c.extract_job), (c.evaluate_job)) x(id) WHERE c.dataset IN (${dataset:sqlstring}) AND c.cut::text IN (${cut:sqlstring}) AND x.id IS NOT NULL",
+      "all": false,
+      "hide": true
+    },
+    "run_id": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT coalesce(string_agg(c.id::text, '|' ORDER BY c.id::text), '[^\\x00-\\x{10FFFF}]') FROM quality.cuts c WHERE c.dataset IN (${dataset:sqlstring}) AND c.cut::text IN (${cut:sqlstring})",
+      "all": false,
+      "hide": true
+    },
+    "previous_cut": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT coalesce((SELECT cut::text FROM (SELECT cut FROM quality.run_summary WHERE dataset = ${dataset:sqlstring} ORDER BY cut DESC LIMIT 60) recent WHERE cut < ${cut:sqlstring}::date ORDER BY cut DESC LIMIT 1), '')",
+      "all": false,
+      "hide": true
+    },
+    "dimension": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT dimension FROM quality.group_metrics WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date UNION SELECT dimension FROM quality.distribution_checks WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date AND dimension <> '' UNION SELECT dimension FROM quality.queue_findings WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date ORDER BY 1",
+      "multi": true,
+      "repeat": true
+    },
+    "drift_variable": {
+      "kind": "query",
+      "datasource": "postgres",
+      "query": "SELECT DISTINCT c.variable FROM quality.distribution_checks c JOIN quality.distribution_checks p ON p.tenant_id = c.tenant_id AND p.dataset = c.dataset AND p.variable = c.variable AND p.dimension = '' AND p.percentiles IS NOT NULL AND p.cut = NULLIF(${previous_cut:sqlstring}, '')::date WHERE c.dataset = ${dataset:sqlstring} AND c.cut = ${cut:sqlstring}::date AND c.dimension = '' AND c.percentiles IS NOT NULL ORDER BY 1",
+      "multi": true,
+      "repeat": true
+    },
+    "vm": {
+      "kind": "query",
+      "datasource": "mimir",
+      "query": "label_values(up{job=\"host\"}, vm)",
+      "all": false
+    }
+  },
+  "chartColumns": {
+    "labels": {
+      "grp": "group",
+      "from_icd": "icdBin",
+      "from_band": "previousCut",
+      "to_band": "thisCut",
+      "cell": "sfcCell",
+      "ok": "sfcRight",
+      "total": "sfcActive",
+      "passes": "sfcState",
+      "missing": "sfcMissing",
+      "margin": "sfcMargin",
+      "closeness": "sfcCloseness",
+      "sfc": "sfcValue",
+      "serious_share": "seriousShare",
+      "before": "previousCut",
+      "now": "thisCut",
+      "base": "previousCut",
+      "open": "openFindings",
+      "overdue": "overdueFindings",
+      "resolved": "resolvedFindings",
+      "oldest_days": "oldestOpen",
+      "sla_days": "sla",
+      "band": "age",
+      "empty_share": "emptyShare",
+      "distinct_values": "distinct",
+      "pattern_share": "patternShare",
+      "ms": "stageMs",
+      "per_million": "perMillion",
+      "previous_ms": "previousMs",
+      "previous_per_million": "previousPerMillion",
+      "signal": "reading"
+    },
+    "values": {
+      "severity": "severityName",
+      "signal": "signal",
+      "stage": "stageName",
+      "from_band": "bandName",
+      "to_band": "bandName",
+      "band": "recencyBand",
+      "grp": "emptyGroup",
+      "segment": "emptyGroup"
+    }
+  },
+  "dashboards": [
+    {
+      "slug": "audit",
+      "folder": "folder",
+      "tags": ["quality-data", "audit"],
+      "time": "now-7d",
+      "variables": ["event_type", "who", "resource"],
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "audit.over_time",
+          "w": 24,
+          "h": 8,
+          "sql": "over_time.sql"
+        },
+        {
+          "type": "barchart",
+          "title": "audit.by_user",
+          "w": 8,
+          "h": 9,
+          "sql": "by_user.sql",
+          "columns": { "who": null, "events": null }
+        },
+        {
+          "type": "barchart",
+          "title": "audit.by_action",
+          "w": 8,
+          "h": 9,
+          "sql": "by_action.sql",
+          "columns": { "action": null, "events": null }
+        },
+        {
+          "type": "barchart",
+          "title": "audit.by_dataset",
+          "w": 8,
+          "h": 9,
+          "sql": "by_dataset.sql",
+          "columns": { "dataset": null, "events": null }
+        },
+        {
+          "type": "table",
+          "title": "audit.events",
+          "w": 24,
+          "h": 12,
+          "sql": "events.sql",
+          "columns": {
+            "time": 170,
+            "event_type": 160,
+            "who": 180,
+            "action": 200,
+            "resource": 280,
+            "dataset": 140,
+            "job_id": 120,
+            "ip": 120,
+            "user_agent": 220,
+            "email_attempted": 180
+          }
+        },
+        {
+          "type": "table",
+          "title": "audit.records_viewed",
+          "w": 24,
+          "h": 10,
+          "sql": "records_viewed.sql",
+          "columns": {
+            "time": 170,
+            "who": 180,
+            "action": 200,
+            "resource": 320,
+            "dataset": 140,
+            "job_id": 120,
+            "ip": 120,
+            "user_agent": null
+          }
+        }
+      ]
+    },
+    {
+      "slug": "personal-data",
+      "folder": "folder",
+      "tags": ["quality-data", "audit", "personal-data"],
+      "time": "now-30d",
+      "variables": ["who", "resource"],
+      "panels": [
+        {
+          "type": "text",
+          "title": "personal-data.recorded",
+          "w": 24,
+          "h": 7
+        },
+        {
+          "type": "timeseries",
+          "title": "personal-data.over_time",
+          "w": 24,
+          "h": 8,
+          "sql": "over_time.sql"
+        },
+        {
+          "type": "barchart",
+          "title": "personal-data.by_person",
+          "w": 8,
+          "h": 9,
+          "sql": "by_person.sql",
+          "columns": { "who": null, "views": null }
+        },
+        {
+          "type": "barchart",
+          "title": "personal-data.by_purpose",
+          "w": 8,
+          "h": 9,
+          "sql": "by_purpose.sql",
+          "columns": { "purpose": { "values": "purposes" }, "views": null }
+        },
+        {
+          "type": "table",
+          "title": "personal-data.by_resource",
+          "w": 8,
+          "h": 9,
+          "sql": "by_resource.sql",
+          "columns": { "resource": null, "views": 90 }
+        },
+        {
+          "type": "table",
+          "title": "personal-data.views",
+          "w": 24,
+          "h": 12,
+          "sql": "views.sql",
+          "columns": {
+            "time": 170,
+            "who": 180,
+            "kind": 90,
+            "purpose": { "w": 210, "values": "purposes" },
+            "reference": 130,
+            "rows_shown": 90,
+            "fields_shown": 260,
+            "resource": 300,
+            "job_id": null
+          }
+        }
+      ]
+    },
+    {
+      "slug": "runs",
+      "folder": "folder",
+      "tags": ["quality-data", "runs"],
+      "time": "now-30d",
+      "variables": ["dataset"],
+      "panels": [
+        {
+          "type": "table",
+          "title": "runs.runs",
+          "w": 24,
+          "h": 12,
+          "sql": "runs.sql",
+          "columns": {
+            "fired": 160,
+            "dataset": 170,
+            "cut": { "w": 100 },
+            "run": { "w": 100 },
+            "state": 100,
+            "lateness": { "w": 90, "unit": "s", "decimals": 1 },
+            "engine": 80,
+            "evaluate_state": 110,
+            "worker": 150,
+            "attempts": { "w": 95 },
+            "extract_time": { "w": 100, "unit": "s", "decimals": 1 },
+            "evaluate_time": { "w": 100, "unit": "s", "decimals": 1 },
+            "records": { "w": 100, "unit": "short" },
+            "duration": { "w": 100, "unit": "ms" },
+            "igcd": { "w": 80, "decimals": 3 },
+            "conformity": { "w": 110, "unit": "percentunit", "decimals": 2 }
+          },
+          "link": {
+            "dashboard": "run-logs",
+            "column": "cut",
+            "vars": { "dataset": "dataset", "cut": "cut" },
+            "from": "log_from",
+            "to": "log_to"
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "runs.by_state",
+          "w": 8,
+          "h": 8,
+          "sql": "by_state.sql",
+          "columns": {
+            "extracting": null,
+            "evaluating": null,
+            "done": null,
+            "failed": null
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "runs.volume",
+          "w": 8,
+          "h": 8,
+          "sql": "volume.sql",
+          "style": "lines",
+          "columns": {
+            "duration": { "unit": "ms" },
+            "records": { "unit": "short" }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "runs.stages",
+          "w": 8,
+          "h": 8,
+          "sql": "stages.sql",
+          "unit": "ms",
+          "style": "lines"
+        },
+        { "type": "text", "title": "runs.not_yet", "w": 24, "h": 3 }
+      ]
+    },
+    {
+      "slug": "run-logs",
+      "folder": "folder",
+      "tags": ["quality-data", "runs", "logs"],
+      "time": "now-24h",
+      "variables": [{ "name": "dataset", "multi": false, "all": false }, "cut", "jobs", "run_id"],
+      "panels": [
+        {
+          "type": "text",
+          "title": "run-logs.matching",
+          "w": 24,
+          "h": 5
+        },
+        {
+          "type": "table",
+          "title": "run-logs.jobs",
+          "w": 24,
+          "h": 5,
+          "sql": "jobs.sql",
+          "columns": {
+            "kind": 100,
+            "state": 100,
+            "engine": 90,
+            "worker": 200,
+            "attempts": { "w": 95 },
+            "started": 200,
+            "finished": 200,
+            "took": { "unit": "s", "decimals": 1 }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "run-logs.lines_per_service",
+          "w": 24,
+          "h": 7,
+          "logql": "sum by (service) (count_over_time({compose_project=~\"data-quality.*\", service!~\"grafana|loki|alloy\"} |~ `${run_id:raw}|${jobs:raw}` [$__auto]))",
+          "legend": "{{service}}"
+        },
+        {
+          "type": "logs",
+          "title": "run-logs.lines",
+          "w": 24,
+          "h": 16,
+          "logql": "{compose_project=~\"data-quality.*\", service!~\"grafana|loki|alloy\"} |~ `${run_id:raw}|${jobs:raw}`"
+        }
+      ]
+    },
+    {
+      "slug": "health",
+      "folder": "folder",
+      "tags": ["quality-data", "health"],
+      "time": "now-7d",
+      "variables": [],
+      "panels": [
+        { "type": "text", "title": "health.not_yet", "w": 24, "h": 4 },
+        {
+          "type": "table",
+          "title": "health.queue",
+          "w": 12,
+          "h": 7,
+          "sql": "queue.sql",
+          "columns": {
+            "kind": null,
+            "ready": null,
+            "waiting": null,
+            "running": null,
+            "lease_expired": null
+          }
+        },
+        {
+          "type": "stat",
+          "title": "health.oldest_ready",
+          "w": 6,
+          "h": 7,
+          "sql": "oldest_ready.sql",
+          "unit": "s",
+          "decimals": 0
+        },
+        {
+          "type": "stat",
+          "title": "health.on_trino",
+          "w": 6,
+          "h": 7,
+          "sql": "on_trino.sql",
+          "decimals": 0
+        },
+        {
+          "type": "timeseries",
+          "title": "health.finished",
+          "w": 24,
+          "h": 8,
+          "sql": "finished.sql",
+          "columns": { "done": null, "failed": null }
+        },
+        {
+          "type": "table",
+          "title": "health.machines",
+          "w": 12,
+          "h": 7,
+          "sql": "machines.sql",
+          "columns": {
+            "pool": null,
+            "approved": null,
+            "draining": null,
+            "valid_certificate": null
+          }
+        },
+        {
+          "type": "table",
+          "title": "health.leases",
+          "w": 12,
+          "h": 7,
+          "sql": "leases.sql",
+          "columns": {
+            "worker": 220,
+            "kind": 90,
+            "dataset": 150,
+            "engine": 80,
+            "started": 170,
+            "lease_until": 170
+          }
+        },
+        {
+          "type": "table",
+          "title": "health.maintenance",
+          "w": 12,
+          "h": 7,
+          "sql": "maintenance.sql",
+          "columns": {
+            "dataset": null,
+            "last_done": 170,
+            "last_failed": 170,
+            "pending": { "w": 90 }
+          }
+        },
+        {
+          "type": "table",
+          "title": "health.holds",
+          "w": 12,
+          "h": 7,
+          "sql": "holds.sql",
+          "columns": { "machine": null, "held_at": 170, "expires_at": 170 }
+        },
+        {
+          "type": "table",
+          "title": "health.certificates",
+          "w": 24,
+          "h": 6,
+          "sql": "certificates.sql",
+          "columns": {
+            "name": null,
+            "role": 140,
+            "pool": 120,
+            "state": 100,
+            "cert_not_after": 170
+          }
+        }
+      ]
+    },
+    {
+      "slug": "infra",
+      "folder": "folder",
+      "tags": ["quality-data", "infra"],
+      "time": "now-24h",
+      "variables": ["vm"],
+      "panels": [
+        {
+          "type": "row",
+          "title": "infra.row_cpu",
+          "w": 24,
+          "h": 1,
+          "open": true,
+          "panels": [
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.cpu",
+              "w": 12,
+              "h": 8,
+              "promql": "cpu.promql",
+              "unit": "percent",
+              "legend": "{{mode}}"
+            },
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.load",
+              "w": 12,
+              "h": 8,
+              "promql": "load.promql",
+              "unit": "short",
+              "legend": "{{__name__}}"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "infra.row_memory",
+          "w": 24,
+          "h": 1,
+          "open": true,
+          "panels": [
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.memory",
+              "w": 12,
+              "h": 8,
+              "promql": "memory.promql",
+              "unit": "percent",
+              "legend": "{{vm}}"
+            },
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.swap",
+              "w": 12,
+              "h": 8,
+              "promql": "swap.promql",
+              "unit": "percent",
+              "legend": "{{vm}}"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "infra.row_filesystems",
+          "w": 24,
+          "h": 1,
+          "open": true,
+          "panels": [
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.filesystems",
+              "w": 12,
+              "h": 8,
+              "promql": "filesystems.promql",
+              "unit": "percent",
+              "legend": "{{mountpoint}}"
+            },
+            {
+              "type": "stat",
+              "title": "infra.days_to_full",
+              "w": 6,
+              "h": 8,
+              "promql": "days_to_full.promql",
+              "unit": "d",
+              "decimals": 0,
+              "legend": "{{mountpoint}}"
+            },
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.disk_io",
+              "w": 6,
+              "h": 8,
+              "promql": "disk_io.promql",
+              "unit": "Bps",
+              "legend": "{{device}} {{direction}}"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "infra.row_network",
+          "w": 24,
+          "h": 1,
+          "open": true,
+          "panels": [
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.network",
+              "w": 12,
+              "h": 8,
+              "promql": "network.promql",
+              "unit": "Bps",
+              "legend": "{{device}} {{direction}}"
+            },
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.network_errors",
+              "w": 12,
+              "h": 8,
+              "promql": "network_errors.promql",
+              "unit": "pps",
+              "legend": "{{device}}"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "infra.row_clock",
+          "w": 24,
+          "h": 1,
+          "open": true,
+          "panels": [
+            {
+              "type": "timeseries",
+              "style": "lines",
+              "title": "infra.clock_offset",
+              "w": 12,
+              "h": 8,
+              "promql": "clock_offset.promql",
+              "unit": "s",
+              "legend": "{{vm}}",
+              "signed": true
+            },
+            {
+              "type": "stat",
+              "title": "infra.clock_sync",
+              "w": 12,
+              "h": 8,
+              "promql": "clock_sync.promql",
+              "decimals": 0,
+              "legend": "{{vm}}"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "infra.row_alerts",
+          "w": 24,
+          "h": 1,
+          "open": true,
+          "panels": [
+            {
+              "type": "alertlist",
+              "title": "infra.alerts",
+              "w": 24,
+              "h": 8,
+              "labels": "{vm=\"$vm\"}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "quality",
+      "folder": "folder_quality",
+      "tags": ["quality-data", "quality"],
+      "time": "now-30d",
+      "timepicker": false,
+      "variables": [
+        {
+          "name": "dataset",
+          "multi": false,
+          "all": false,
+          "query": "SELECT DISTINCT dataset FROM quality.run_summary ORDER BY 1"
+        },
+        {
+          "name": "cut",
+          "query": "SELECT cut::text FROM quality.run_summary WHERE dataset = ${dataset:sqlstring} ORDER BY cut DESC LIMIT 60"
+        },
+        "previous_cut",
+        "dimension",
+        "drift_variable"
+      ],
+      "tables": "tables",
+      "panels": [
+        {
+          "chart": "trend_by_cut",
+          "w": 24,
+          "h": 8,
+          "columns": {
+            "cut": { "unit": "time:YYYY-MM-DD" },
+            "records": { "hide": true },
+            "failures": { "hide": true },
+            "conformity": { "unit": "percentunit", "decimals": 1, "max": 1 },
+            "igcd": { "unit": "percentunit", "decimals": 1, "max": 1 }
+          }
+        },
+        {
+          "chart": "failures_by_dimension",
+          "w": 12,
+          "h": 10,
+          "limit": 15,
+          "label": { "columns": ["dimension", "severity"], "value": "failures" },
+          "columns": {
+            "dimension": { "values": "dimensionName" },
+            "failures": { "color": "#2a78d6" }
+          }
+        },
+        {
+          "chart": "failures_by_field",
+          "w": 12,
+          "h": 10,
+          "sort": { "column": "failures", "desc": true },
+          "limit": 15,
+          "columns": {
+            "rules": { "hide": true },
+            "applies": { "hide": true },
+            "failures": { "color": "#2a78d6" }
+          }
+        },
+        {
+          "chart": "lowest_icd",
+          "w": 8,
+          "h": 10,
+          "limit": 15,
+          "columns": { "icd": { "decimals": 2, "min": 0, "max": 1, "color": "#2a78d6" } }
+        },
+        {
+          "chart": "icd_distribution",
+          "w": 8,
+          "h": 10,
+          "orientation": "vertical",
+          "columns": { "from_icd": { "text": true }, "entities": { "color": "#2a78d6" } }
+        },
+        {
+          "chart": "bands_by_segment",
+          "w": 8,
+          "h": 10,
+          "as": "barchart",
+          "stacking": "percent",
+          "limit": 15,
+          "legendShown": true,
+          "columns": {
+            "high": { "label": "bandName.high", "color": "#0ca30c" },
+            "medium": { "label": "bandName.medium", "color": "#fab219" },
+            "low": { "label": "bandName.low", "color": "#d03b3b" }
+          }
+        },
+        {
+          "chart": "band_transitions",
+          "w": 8,
+          "h": 9,
+          "matrix": {
+            "rows": "from_band",
+            "columns": "to_band",
+            "value": "entities",
+            "head": "transitionHead",
+            "scheme": "continuous-blues"
+          }
+        },
+        {
+          "chart": "sfc_view",
+          "w": 16,
+          "h": 9,
+          "as": "barchart",
+          "min": null,
+          "note": "sfcNote",
+          "columns": {
+            "ok": { "hide": true },
+            "total": { "hide": true },
+            "p": {
+              "label": "sfcShare",
+              "unit": "percentunit",
+              "decimals": 1,
+              "softMin": 0.7,
+              "max": 1,
+              "thresholds": [
+                [null, "#d03b3b"],
+                [0.8, "#fab219"],
+                [0.9, "#0ca30c"]
+              ],
+              "thresholdsStyle": "dashed+area"
+            },
+            "passes": { "hide": true },
+            "missing": { "hide": true },
+            "margin": { "hide": true },
+            "closeness": { "hide": true },
+            "sfc": { "hide": true }
+          }
+        },
+        {
+          "chart": "groups_p_chart",
+          "w": 24,
+          "h": 9,
+          "repeat": "dimension",
+          "filter": "dimension",
+          "note": "pChartNote",
+          "position": {
+            "value": "p",
+            "low": "lcl",
+            "high": "ucl",
+            "as": "position",
+            "steps": [
+              [null, "#0ca30c"],
+              [0, "#898781"],
+              [1.0001, "#d03b3b"]
+            ]
+          },
+          "series": {
+            "x": "records",
+            "points": "p",
+            "color": "position",
+            "lines": ["ucl", "lcl", "p_bar"]
+          },
+          "columns": {
+            "records": { "min": 0 },
+            "serious": { "hide": true },
+            "p": { "label": "seriousShare", "unit": "percentunit", "decimals": 1, "min": 0 },
+            "p_bar": { "unit": "percentunit", "decimals": 1, "show": "lines", "color": "#898781" },
+            "lcl": { "unit": "percentunit", "decimals": 1, "show": "lines", "color": "#d03b3b" },
+            "ucl": { "unit": "percentunit", "decimals": 1, "show": "lines", "color": "#d03b3b" }
+          }
+        },
+        {
+          "chart": "largest_groups",
+          "w": 24,
+          "h": 10,
+          "repeat": "dimension",
+          "filter": "dimension",
+          "x": "grp",
+          "columns": {
+            "records": { "color": "#2a78d6" },
+            "serious": { "hide": true },
+            "serious_share": { "unit": "percentunit", "decimals": 1, "hide": true },
+            "icd": { "decimals": 3, "hide": true }
+          }
+        },
+        {
+          "chart": "groups_changed",
+          "w": 24,
+          "h": 10,
+          "min": null,
+          "repeat": "dimension",
+          "filter": "dimension",
+          "x": "grp",
+          "columns": {
+            "before": { "unit": "percentunit", "decimals": 1, "hide": true },
+            "now": { "unit": "percentunit", "decimals": 1, "hide": true },
+            "change": {
+              "unit": "percentunit",
+              "decimals": 1,
+              "thresholds": [
+                [null, "#e34948"],
+                [0, "#2a78d6"]
+              ]
+            }
+          }
+        },
+        {
+          "chart": "outliers_by_group",
+          "w": 24,
+          "h": 10,
+          "repeat": "dimension",
+          "filter": "dimension",
+          "x": "grp",
+          "rows": [{ "column": "share", "is": "above", "value": 0 }],
+          "stacking": "normal",
+          "legendShown": true,
+          "note": "outliersNote",
+          "columns": {
+            "records": { "hide": true },
+            "low": { "label": "outliersLow", "color": "#eb6834" },
+            "high": { "label": "outliersHigh", "color": "#2a78d6" },
+            "share": { "unit": "percentunit", "decimals": 1, "hide": true }
+          }
+        },
+        {
+          "chart": "psi_by_decile",
+          "w": 24,
+          "h": 9,
+          "repeat": "drift_variable",
+          "filter": "variable",
+          "x": "decile",
+          "split": "psi",
+          "orientation": "vertical",
+          "legendShown": true,
+          "explain": "psiReading",
+          "columns": {
+            "decile": { "text": true },
+            "base": { "unit": "percentunit", "decimals": 1, "color": "#898781" },
+            "now": {
+              "unit": "percentunit",
+              "decimals": 1,
+              "color": "#2a78d6",
+              "legend": "psiLegend"
+            },
+            "psi": { "decimals": 4 }
+          }
+        },
+        {
+          "chart": "remediation_queues",
+          "w": 24,
+          "h": 10,
+          "repeat": "dimension",
+          "filter": "dimension",
+          "x": "grp",
+          "orientation": "vertical",
+          "legendShown": true,
+          "note": "queuesNote",
+          "columns": {
+            "open": { "color": "#2a78d6" },
+            "overdue": { "color": "#d03b3b" },
+            "resolved": { "hide": true },
+            "oldest_days": { "hide": true },
+            "sla_days": { "hide": true },
+            "priority": { "hide": true }
+          }
+        },
+        { "chart": "update_recency", "w": 8, "h": 10 },
+        {
+          "chart": "time_by_stage",
+          "w": 8,
+          "h": 10,
+          "note": "stageNote",
+          "coalesce": {
+            "columns": ["ms", "per_million"],
+            "label": "stageMeasure",
+            "decimals": 2,
+            "color": "#2a78d6"
+          },
+          "columns": {
+            "ms": { "unit": "ms", "hide": true },
+            "per_million": { "decimals": 2, "hide": true },
+            "previous_ms": { "unit": "ms", "hide": true },
+            "previous_per_million": { "decimals": 2, "hide": true }
+          }
+        },
+        {
+          "chart": "profiling",
+          "w": 8,
+          "h": 10,
+          "as": "barchart",
+          "limit": 15,
+          "columns": {
+            "records": { "hide": true },
+            "empty": { "hide": true },
+            "empty_share": { "unit": "percentunit", "decimals": 1, "max": 1, "color": "#2a78d6" },
+            "distinct_values": { "hide": true },
+            "pattern_share": { "unit": "percentunit", "decimals": 1, "hide": true }
+          }
+        },
+        {
+          "chart": "conformity_by_rule",
+          "w": 24,
+          "h": 10,
+          "as": "barchart",
+          "rows": [{ "column": "conformity", "is": "notNull" }],
+          "limit": 15,
+          "label": { "columns": ["rule", "field"], "value": "conformity" },
+          "columns": {
+            "dimension": { "values": "dimensionName" },
+            "conformity": { "unit": "percentunit", "decimals": 1, "max": 1, "color": "#2a78d6" }
+          }
+        }
+      ]
+    }
+  ]
+}

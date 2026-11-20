@@ -1,0 +1,42 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-79
+    field: "FamNit1"
+    check: "required"
+    when: "NumHijos > 0"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1690" }
+    note: "the flow never emits it: its condition contradicts itself; this is what it meant"
+
+  - id: V-PN-80
+    field: "FamNit1"
+    check: "required"
+    when: "PerAcargo > 0"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1691" }
+    note: "the flow never emits it: its condition contradicts itself; this is what it meant"
+
+  - id: V-PN-82
+    field: "FamNit1"
+    check: "expression"
+    when: "EstadoCivil IN ('CASADO', 'UNION LIBRE')"
+    fails: "is_empty(FamNit1) OR FamNit1 = '0'"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1660" }
+
+  - id: P-27
+    field: "FamNit1"
+    check: "differs"
+    from: "Nit"
+    severity: major
+    cause: systemic
+    alert: "Familiar con la cédula del cliente"
+    origin: { process: MVP }
+    note: "Es mucho más frecuente en clientes antiguos y el nombre del familiar no coincide con el del cliente: apunta a una carga histórica o migración, no a un error de captura (ver la tasa por año en Hallazgos).; the prototype compares the part before a hyphen; the language takes no computed pattern, so a value with a suffix (123-4) is not compared"

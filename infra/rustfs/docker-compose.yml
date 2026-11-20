@@ -1,0 +1,74 @@
+# RustFS (S3-compatible, Apache-2.0): the data lake's storage (ADR 0017),
+# on its own servers, never on the application's (decisions 0018, 0028).
+# This file is its own stack, not part of the application's compose: in
+# production it runs on the lake nodes; in development it stands for them.
+#
+# The application reaches it by URL, never by Docker labels: the
+# application's Traefik routes the console (/rustfs), the S3 API (signed
+# requests) and the Iceberg catalog (/iceberg) to `RUSTFS_URL` (see
+# infra/traefik/dynamic/apps.yml). People sign in to the console with their
+# Quality Data account (OIDC, `policy` claim), inside the app at /apps/rustfs.
+#
+#   task lake:up | lake:down | lake:logs
+#
+# Required environment (in the repo `.env`):
+#   RUSTFS_ACCESS_KEY, RUSTFS_SECRET_KEY   the root credentials, used once by
+#                                          the installer (decision 0028)
+# For the sign-in with Quality Data (empty: only the root credentials):
+#   RUSTFS_OIDC_CLIENT_SECRET             from `server oidc-client rustfs …`
+# The object data cache (decision 0028, amended 2026-11-17; verified with
+# tools/verify/rustfs_cache.sh): whole objects up to 10 MiB kept in memory,
+# keyed by their version, so never stale. RustFS 1.0.5 has no metadata cache
+# (RUSTFS_OBJECT_CACHE_* are ignored). Each may be set in the .env:
+#   RUSTFS_OBJECT_DATA_CACHE_ENABLE          true (false turns it off)
+#   RUSTFS_OBJECT_DATA_CACHE_MODE            fill_materialize_enabled; RustFS's
+#                                            own default, fill_buffered_only,
+#                                            fills almost nothing
+#   RUSTFS_OBJECT_DATA_CACHE_MAX_BYTES       268435456 (256 MiB); the process
+#                                            grows up to ~170 MiB above it while
+#                                            filling, so leave the node room
+#   RUSTFS_OBJECT_DATA_CACHE_MAX_ENTRY_BYTES 10485760 (RustFS fills no larger)
+#   RUSTFS_OBJECT_DATA_CACHE_TTL_SECS        300
+name: data-quality-lake # `-p` in the tasks: .env sets COMPOSE_PROJECT_NAME for the app
+
+volumes:
+  rustfs-data:
+    # The data of the stack it came from, kept.
+    name: ${APP_STACK:-data-quality}_rustfs-data
+
+services:
+  rustfs:
+    image: ${RUSTFS_IMAGE:-rustfs/rustfs:1.0.5}
+    restart: unless-stopped
+    command: ["server", "--address", ":9000", "--console-enable", "/data"]
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY in .env}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY in .env}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_OBS_LOGGER_LEVEL: ${RUSTFS_LOG_LEVEL:-warn}
+      # The object data cache: see this file's header.
+      RUSTFS_OBJECT_DATA_CACHE_ENABLE: ${RUSTFS_OBJECT_DATA_CACHE_ENABLE:-true}
+      RUSTFS_OBJECT_DATA_CACHE_MODE: ${RUSTFS_OBJECT_DATA_CACHE_MODE:-fill_materialize_enabled}
+      RUSTFS_OBJECT_DATA_CACHE_MAX_BYTES: ${RUSTFS_OBJECT_DATA_CACHE_MAX_BYTES:-268435456}
+      RUSTFS_OBJECT_DATA_CACHE_MAX_ENTRY_BYTES: ${RUSTFS_OBJECT_DATA_CACHE_MAX_ENTRY_BYTES:-10485760}
+      RUSTFS_OBJECT_DATA_CACHE_TTL_SECS: ${RUSTFS_OBJECT_DATA_CACHE_TTL_SECS:-300}
+      # Sign in with Quality Data (the installation as OIDC provider).
+      RUSTFS_IDENTITY_OPENID_ENABLE: ${RUSTFS_OIDC_ENABLE:-off}
+      RUSTFS_IDENTITY_OPENID_CONFIG_URL: https://${APP_DOMAIN:-localhost}/api/.well-known/openid-configuration
+      RUSTFS_IDENTITY_OPENID_CLIENT_ID: rustfs
+      RUSTFS_IDENTITY_OPENID_CLIENT_SECRET: ${RUSTFS_OIDC_CLIENT_SECRET:-}
+      RUSTFS_IDENTITY_OPENID_SCOPES: openid,profile,email
+      RUSTFS_IDENTITY_OPENID_REDIRECT_URI: https://${APP_DOMAIN:-localhost}/rustfs/admin/v3/oidc/callback/default
+      RUSTFS_IDENTITY_OPENID_REDIRECT_URI_DYNAMIC: "off"
+      RUSTFS_IDENTITY_OPENID_DISPLAY_NAME: Quality Data
+      RUSTFS_IDENTITY_OPENID_CLAIM_NAME: policy
+      RUSTFS_IDENTITY_OPENID_EMAIL_CLAIM: email
+      RUSTFS_IDENTITY_OPENID_USERNAME_CLAIM: email
+      # The provider is this installation, at a private address.
+      RUSTFS_OUTBOUND_ALLOW_ORIGINS: https://${APP_DOMAIN:-localhost}
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
+      interval: 10s
+      retries: 12

@@ -1,0 +1,12 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-112
+    field: "Salario"
+    check: "expression"
+    when: "OtrIngresos = 0 AND in_list(ActLaboral, 'genera_ingresos')"
+    fails: "Salario = 0"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1645" }

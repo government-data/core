@@ -1,0 +1,63 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The server is the composition root — the ONLY crate that depends on every
+# layer. It loads config, builds infrastructure adapters, injects them into the
+# application services, hands those to the API router, and runs the HTTP server.
+[dependencies]
+license-model.workspace = true
+api.workspace = true
+application.workspace = true
+domain.workspace = true
+auth-gateway.workspace = true
+# The modules' callers (src/callers.rs): the session's IAM actor, its 403.
+http-kit.workspace = true
+iam.workspace = true
+payments.workspace = true
+platform.workspace = true
+infrastructure.workspace = true
+# Trino's protocol, for a source's catalog (decision 0048).
+trino-client.workspace = true
+tenancy.workspace = true
+chrono.workspace = true
+contracts.workspace = true
+axum.workspace = true
+async-trait.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+# Structured logging: emit through `tracing`; `logging` installs the
+# subscriber (decision 0026) here at the composition root.
+tracing.workspace = true
+logging.workspace = true
+# The API's metrics file: its registry and the queue's gauges (decision 0071).
+prometheus-client.workspace = true
+# The rule language and its DuckDB runner, for `server quality rules`.
+quality.workspace = true
+quality-rules.workspace = true
+quality-rules-duckdb.workspace = true
+# Tenant ids for the catalog (`quality catalog import --tenant`).
+uuid.workspace = true
+texts.workspace = true
+# `server app-machine` (0066, point 16): the key, the signing request and
+# the files as the node agent makes and keeps them.
+node-agent.workspace = true
+
+# `tests/audit_verify_it.rs`: the audit chain's verifier on an ephemeral
+# PostgreSQL (decision 0070).
+[dev-dependencies]
+testkit.workspace = true
+sqlx.workspace = true
+
+[[bin]]
+name = "server"
+path = "src/main.rs"

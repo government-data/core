@@ -1,0 +1,92 @@
+# The main lake's way to its replica (decisions 0027, 0028 and 0029,
+# point 7; 0066 step 11, the user's rulings 2 and 7 of 2026-11-13): an
+# overlay of docker-compose.yml and certificate.yml (and gate.yml, when the
+# lake has its gate) for the lake that replicates into the replica:
+#
+#   docker compose --project-directory . -p data-quality-lake \
+#     -f infra/rustfs/docker-compose.yml -f infra/rustfs/certificate.yml \
+#     [-f infra/rustfs/gate.yml] -f infra/rustfs/replication.yml up -d
+#
+# - `replication-proxy`, a Traefik in RustFS's own network namespace, on
+#   its loopback (127.0.0.1:9100), presents the node's machine certificate
+#   to the replica's gate, which takes only machines' certificates and
+#   RustFS cannot present one (infra/worker/lake/entrypoint.sh, the
+#   worker's proxy, with QD_LAKE_HTTP1_ONLY=1: RustFS's replication client
+#   offers HTTP/2, which the gate behind a TCP proxy never hears). It reads
+#   no request; the replication's signature, made with the replica's keys,
+#   reaches the replica as RustFS made it. It runs as the node agent's
+#   user (uid 10001, RustFS's) and reads the agent's files as they are; a
+#   renewed machine.pem is taken without a restart.
+# - RustFS reaches it by the node's own name, which its loopback answers
+#   to here (the remote target the application sets is
+#   `<QD_MACHINE_NAME>:9100`, secure), and trusts the installation's CA
+#   for it: tls/entrypoint.sh writes ca.crt too (QD_RUSTFS_TLS_TRUST_CA).
+#   RustFS 1.0.5 still trusts the system's roots for its other calls out
+#   with ca.crt there (its OIDC discovery at the public address;
+#   tools/verify/rustfs_source_proxy.sh).
+# - RustFS joins a network of its own, `replication`, with no other
+#   container, so the proxy in its namespace can reach the replica's gate:
+#   gate.yml's `lake` network is internal, without a way out. Nothing
+#   reaches RustFS through it.
+#
+# Required environment, besides those files':
+#   QD_MACHINE_NAME        the lake node's name, as in its certificate
+#   QD_LAKE_REPLICA_GATE   the replica's gate, <the replica's name>:9000
+#                          (the port its compose file publishes)
+# Optional: TRAEFIK_IMAGE (traefik:v3.6), QD_LAKE_CHECK_EVERY (30, seconds).
+#
+# Verified with tools/verify/rustfs_source_proxy.sh.
+services:
+  rustfs:
+    environment:
+      QD_RUSTFS_TLS_TRUST_CA: "1"
+    extra_hosts:
+      - "${QD_MACHINE_NAME:?set QD_MACHINE_NAME to the lake node's name}:127.0.0.1"
+    networks: [replication]
+
+  replication-proxy:
+    image: ${TRAEFIK_IMAGE:-traefik:v3.6}
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    network_mode: "service:rustfs"
+    # When RustFS restarts by itself or by `docker restart` (Compose's own
+    # restart restarts the proxy too), Docker leaves the proxy in its old
+    # namespace, its loopback alone, and replication stops: so it runs
+    # under the loop of the pool's proxy and Alloy
+    # (infra/rustfs/pool/docker-compose.yml), which ends it once its
+    # namespace has no other interface, and its restart policy starts it
+    # again in RustFS's new one (tools/verify/rustfs_source_proxy.sh, (f)).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        /etc/qd/lake/entrypoint.sh "$$@" &
+        pid=$$!
+        trap 'kill -TERM $$pid; wait $$pid; exit' TERM INT
+        while kill -0 $$pid 2>/dev/null; do
+          if [ "$$(grep -c : /proc/net/dev)" -le 1 ]; then
+            echo "qd: RustFS restarted, its network namespace is gone: the proxy restarts to join the new one" >&2
+            kill -TERM $$pid
+            wait $$pid
+            exit 1
+          fi
+          sleep 15 &
+          wait $$!
+        done
+        wait $$pid
+      - lake-proxy
+    environment:
+      QD_LAKE_GATE: ${QD_LAKE_REPLICA_GATE:?set QD_LAKE_REPLICA_GATE to the replica's gate, <name>:9000}
+      QD_LAKE_LISTEN: 127.0.0.1:9100
+      QD_LAKE_HTTP1_ONLY: "1"
+      QD_LAKE_CHECK_EVERY: ${QD_LAKE_CHECK_EVERY:-30}
+    tmpfs:
+      - /run/qd-lake:uid=10001,gid=10001,mode=0700
+    volumes:
+      - ./infra/worker/lake/entrypoint.sh:/etc/qd/lake/entrypoint.sh:ro
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
+
+networks:
+  # RustFS alone: its way out, for the proxy in its namespace.
+  replication: {}

@@ -1,0 +1,12 @@
+dataset: clientes_juridicas
+rules:
+  - id: P-26
+    field: "FecUltActualiza"
+    check: "fresh"
+    when: "CliIdActivo = 'SI'"
+    max_age: "365 days"
+    severity: major
+    cause: systemic
+    alert: "Cliente desactualizado (> 365 días)"
+    origin: { process: MVP }
+    note: "Reemplaza la regla vigente, que nunca se emite."

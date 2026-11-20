@@ -1,0 +1,475 @@
+# The mapping of clientes_juridicas (decision 0020): the catalog's field names
+# to the source's columns, as the KNIME flow renames them (Column
+# Rename #1033 and #1034); `por confirmar` marks what the flow does not.
+dataset: clientes_juridicas
+description: "Clientes personas jurídicas: identificación, contacto, representante legal y estados financieros, como los entrega la fuente en cada corte."
+source: clientes_juridicas
+key: [Nit]
+fields:
+  ActLabSoc:
+    column: ActLabSoc
+    type: text
+    description: "Actividad laboral del representante legal."
+  Activostotales:
+    column: Activostotales
+    type: number
+    semantic: amount
+    description: "Activos totales de la información financiera del negocio."
+  ApeSocio:
+    column: ApeSocio
+    type: text
+    description: "Apellidos del representante legal."
+  Asesor:
+    column: Asesor
+    type: text
+    description: "Nombre del asesor comercial del cliente."
+  BalIniciacion:
+    column: BalIniciacion
+    type: text
+    semantic: flag
+    description: "Si la persona jurídica presentó balance de iniciación (SI/NO)."
+  CargoPEP:
+    column: CargoPEP
+    type: text
+    description: "Cargo público que hace al cliente PEP."
+  CargoSoc:
+    column: CargoSoc
+    type: text
+    description: "Cargo del representante legal."
+  CauIngreso:
+    column: CauIngreso
+    type: text
+  CiuResid:
+    column: CiuResid
+    type: text
+    description: "Centro poblado de residencia (en personas jurídicas el flujo lo toma de la ciudad de residencia, CiuResid)."
+  CiuComerc:
+    column: CiuComerc
+    type: text
+    description: "Centro poblado de la dirección comercial."
+  CiuExpedicion:
+    column: CiuExpedicion
+    type: text
+    description: "Ciudad de expedición del documento de identidad."
+  CiuComsoc:
+    column: CiuComsoc
+    type: text
+    description: "Ciudad laboral del representante legal."
+  ClaseSocied:
+    column: ClaseSocied
+    type: text
+    description: "Clase de sociedad."
+  CliIdActivo:
+    column: CliIdActivo
+    type: text
+    semantic: flag
+    description: "Si el cliente está activo en la cooperativa (SI/NO)."
+  CodAsesor:
+    column: CodAsesor
+    type: text
+    semantic: code
+    description: "Código del asesor comercial del cliente; enlaza con el maestro de asesores."
+  Ciiu:
+    column: Ciiu
+    type: text
+    semantic: code
+    description: "Código CIIU de la actividad económica."
+  CodCiuRes:
+    column: CodCiuRes
+    type: text
+    semantic: code
+    description: "Código DIVIPOLA de la ciudad de residencia."
+  CodCiuCom:
+    column: CodCiuCom
+    type: text
+    description: "Código DIVIPOLA de la ciudad comercial."
+  OFICINA:
+    column: OFICINA
+    type: text
+    description: "Código de la oficina del cliente."
+  Comisiones:
+    column: Comisiones
+    type: number
+    semantic: amount
+    description: "Ingresos por comisiones."
+  ContTransacciones:
+    column: ContTransacciones
+    type: number
+    semantic: amount
+  ContratoEEUU:
+    column: ContratoEEUU
+    type: text
+    description: "Si el cliente tiene contrato en Estados Unidos (FATCA)."
+  Correspondencia:
+    column: Correspondencia
+    type: text
+    description: "Dónde quiere recibir la correspondencia: residencia, laboral, correo electrónico u otra dirección."
+  CostosFinanc:
+    column: CostosFinanc
+    type: number
+    semantic: amount
+    description: "Costos financieros."
+  CostosVentas:
+    column: CostosVentas
+    type: number
+    semantic: amount
+    description: "Costo de ventas."
+  DeptoComc:
+    column: DeptoComc
+    type: text
+    description: "Departamento de la dirección comercial."
+  DeptoComSoc:
+    column: DeptoComSoc
+    type: text
+    description: "Departamento laboral del representante legal."
+  DeptoRes:
+    column: DeptoRes
+    type: text
+    description: "Departamento de residencia de la persona jurídica."
+  DirResid:
+    column: DirResid
+    type: text
+    description: "Dirección de residencia registrada en la fuente para la persona jurídica; el flujo usa la dirección comercial."
+  DirComsoc:
+    column: DirComsoc
+    type: text
+    description: "Dirección laboral del representante legal."
+  # The flow renames TelComSoc (the partner's phone) here; the prototype reports it (P-21).
+  TelComSoc:
+    column: TelComSoc
+    type: text
+    description: "Dirección del representante legal (el flujo la toma de TelComSoc, el teléfono del socio: ver P-21)."
+  DirComerc:
+    column: DirComerc
+    type: text
+    description: "Dirección de residencia (en personas jurídicas, la dirección comercial: el flujo renombra DirComerc)."
+  Diversos:
+    column: Diversos
+    type: number
+    semantic: amount
+    description: "Ingresos diversos."
+  Email:
+    column: Email
+    type: text
+    semantic: email
+    description: "Correo electrónico del cliente."
+  Estado:
+    column: Estado
+    type: text
+    description: "Estado del cliente en la fuente."
+  IdExpPublicaPEP:
+    column: IdExpPublicaPEP
+    type: text
+    semantic: flag
+    description: "Si el cliente es persona expuesta políticamente, PEP (SI/NO)."
+  FecEscritura:
+    column: FecEscritura
+    type: date
+    description: "Fecha de constitución (escritura) de la persona jurídica."
+  FecCorte:
+    column: FecCorte
+    type: date
+    description: "Fecha de corte que la fuente registra por cliente (varía entre registros)."
+  FecCreacion:
+    column: FecCreacion
+    type: date
+    description: "Fecha en que se creó el cliente."
+  FecExpedicion:
+    column: FecExpedicion
+    type: date
+    description: "Fecha de expedición del documento de identidad."
+  FecIngreso:
+    column: FecIngreso
+    type: date
+    description: "Fecha de ingreso del cliente a la cooperativa."
+  FecProceso:
+    column: FecProceso
+    type: date
+    description: "Fecha en que la fuente procesó el extracto: el corte."
+  FecUltActualiza:
+    column: FecUltActualiza
+    type: date
+    description: "Fecha de la última actualización de los datos del cliente."
+  GastosAdmin:
+    column: GastosAdmin
+    type: number
+    semantic: amount
+    description: "Gastos administrativos."
+  GastosFinanc:
+    column: GastosFinanc
+    type: number
+    semantic: amount
+    description: "Gastos financieros."
+  GastosGenerales:
+    column: GastosGenerales
+    type: number
+    semantic: amount
+    description: "Gastos generales."
+  GastosPersonal:
+    column: GastosPersonal
+    type: number
+    semantic: amount
+    description: "Gastos de personal."
+  GastosVentas:
+    column: GastosVentas
+    type: number
+    semantic: amount
+    description: "Gastos de ventas."
+  IDClientesJuridicas:
+    column: IDClientesJuridicas
+    type: text
+    description: "Identificador interno del registro en la fuente."
+  IdRiesgoLavado:
+    column: IdRiesgoLavado
+    type: text
+    description: "Calificación de riesgo de lavado de activos (SARLAFT)."
+  IngVentasNetas:
+    column: IngVentasNetas
+    type: number
+    semantic: amount
+    description: "Ingresos por ventas netas."
+  Ingresos:
+    column: Ingresos
+    type: number
+    semantic: amount
+    description: "Ingresos."
+  IngresosFinanc:
+    column: IngresosFinanc
+    type: number
+    semantic: amount
+    description: "Ingresos financieros."
+  IngresosServicios:
+    column: IngresosServicios
+    type: number
+    semantic: amount
+    description: "Ingresos por servicios."
+  InterCreditos:
+    column: InterCreditos
+    type: number
+    semantic: amount
+    description: "Intereses de créditos."
+  InterDepositos:
+    column: InterDepositos
+    type: number
+    semantic: amount
+    description: "Intereses de depósitos."
+  InterDescuentos:
+    column: InterDescuentos
+    type: number
+    semantic: amount
+    description: "Intereses y descuentos."
+  MonedaExtranjera:
+    column: MonedaExtranjera
+    type: text
+    description: "Si el cliente maneja moneda extranjera."
+  ManejaTIN:
+    column: ManejaTIN
+    type: text
+    description: "Si el cliente tiene número de identificación tributaria extranjero (TIN)."
+  MatMercantil:
+    column: MatMercantil
+    type: text
+    description: "Matrícula mercantil de la persona jurídica."
+  Naturaleza:
+    column: Naturaleza
+    type: text
+    description: "Naturaleza jurídica de la persona jurídica."
+  NitSocio:
+    column: NitSocio
+    type: text
+    semantic: document
+    description: "Documento del representante legal."
+  DetCiiu:
+    column: DetCiiu
+    type: text
+    description: "Descripción del código CIIU."
+  NomOficina:
+    column: NomOficina
+    type: text
+    description: "Nombre de la oficina del cliente."
+  Nombre:
+    column: Nombre
+    type: text
+    description: "Razón social de la persona jurídica."
+  NomSocio:
+    column: NomSocio
+    type: text
+    description: "Nombres del representante legal."
+  NroPasaporte:
+    column: NroPasaporte
+    type: text
+    description: "Número de pasaporte."
+  NroTIN:
+    column: NroTIN
+    type: text
+    description: "Número de identificación tributaria extranjero."
+  NumTrabaja:
+    column: NumTrabaja
+    type: number
+    description: "Número de trabajadores de la persona jurídica (el flujo no lo renombra a NroTrabajadores)."
+  Celular:
+    column: Celular
+    type: text
+    semantic: mobile
+    description: "Número de teléfono celular del cliente."
+  Nit:
+    column: Nit
+    type: text
+    semantic: document
+    description: "Número del documento de identidad del cliente (NIT en personas jurídicas)."
+  OtrIngresosNoFin:
+    column: OtrIngresosNoFin
+    type: number
+    semantic: amount
+    description: "Otros ingresos no financieros."
+  OtrosEgresos:
+    column: OtrosEgresos
+    type: number
+    semantic: amount
+    description: "Otros egresos."
+  OtrosIngresos:
+    column: OtrosIngresos
+    type: number
+    semantic: amount
+    description: "Otros ingresos de una entidad financiera, como los trae la fuente; INF FINANCIERA los toma como OtrosIngresos."
+  OtrosIntereses:
+    column: OtrosIntereses
+    type: number
+    semantic: amount
+    description: "Otros intereses."
+  PagWeb:
+    column: PagWeb
+    type: text
+    description: "Página web de la persona jurídica."
+  PaisContrato:
+    column: PaisContrato
+    type: text
+    description: "País del contrato en el exterior."
+  PaisPermanancia:
+    column: PaisPermanancia
+    type: text
+    description: "País de permanencia en el exterior."
+  PasivosTotal:
+    column: PasivosTotal
+    type: number
+    semantic: amount
+    description: "Pasivos totales de la información financiera."
+  Patriminio:
+    column: Patriminio
+    type: number
+    semantic: amount
+    description: "Patrimonio de la información financiera (así se llama la columna en la fuente)."
+  PerJuridica:
+    column: PerJuridica
+    type: text
+  Periodo:
+    column: Periodo
+    type: text
+  PermanenciaEEUU:
+    column: PermanenciaEEUU
+    type: text
+    description: "Si el cliente tiene permanencia en Estados Unidos (FATCA)."
+  ProviImpRenta:
+    column: ProviImpRenta
+    type: number
+    semantic: amount
+    description: "Provisión de impuesto de renta."
+  RecupOperacionales:
+    column: RecupOperacionales
+    type: number
+    semantic: amount
+    description: "Recuperaciones operacionales."
+  RegCamComercio:
+    column: RegCamComercio
+    type: text
+    description: "Registro en cámara de comercio de la persona jurídica."
+  Relacion:
+    column: Relacion
+    type: text
+  RendimientoInv:
+    column: RendimientoInv
+    type: number
+    semantic: amount
+    description: "Rendimiento de inversiones."
+  ResProvisiones:
+    column: ResProvisiones
+    type: number
+    semantic: amount
+    description: "Provisiones."
+  Resolucion:
+    column: Resolucion
+    type: text
+  Sigla:
+    column: Sigla
+    type: text
+    description: "Sigla de la persona jurídica."
+  TelComerc:
+    column: TelComerc
+    type: text
+    description: "Teléfono del lugar de trabajo o del negocio."
+  TelResSoc:
+    column: TelResSoc
+    type: text
+    description: "Teléfono del representante legal."
+  TelResid:
+    column: TelResid
+    type: text
+    description: "Teléfono fijo de la residencia."
+  TipIdnent:
+    column: TipIdnent
+    type: text
+    description: "Tipo de documento de identidad: cédula de ciudadanía, cédula de extranjería, tarjeta de identidad, registro civil, NIT."
+  TipoOperacionMEX:
+    column: TipoOperacionMEX
+    type: text
+    description: "Tipo de operación en moneda extranjera."
+  TipoPerJur:
+    column: TipoPerJur
+    type: text
+    description: "Tipo de persona jurídica; «NO DETERMINADA» no tiene totales financieros calculados."
+  TotACtivosNoFin:
+    column: TotACtivosNoFin
+    type: number
+    semantic: amount
+    description: "Total de activos no financieros."
+  TotEgresosNoFin:
+    column: TotEgresosNoFin
+    type: number
+    semantic: amount
+    description: "Total de egresos no financieros."
+  TotIngresosNoFin:
+    column: TotIngresosNoFin
+    type: number
+    semantic: amount
+    description: "Total de ingresos no financieros."
+  TotPasivosNoFin:
+    column: TotPasivosNoFin
+    type: number
+    semantic: amount
+    description: "Total de pasivos no financieros."
+  TotPatrimoNoFin:
+    column: TotPatrimoNoFin
+    type: number
+    semantic: amount
+    description: "Total de patrimonio no financiero."
+  TotalEgresos:
+    column: TotalEgresos
+    type: number
+    semantic: amount
+    description: "Total de egresos de una entidad financiera, como lo trae la fuente; INF FINANCIERA lo toma como TotalEgresos."
+  TotalIngresos:
+    column: TotalIngresos
+    type: number
+    semantic: amount
+    description: "Total de ingresos como lo trae la fuente; el flujo calcula el suyo (TotalIngresos)."
+  UtilVentaInversion:
+    column: UtilVentaInversion
+    type: number
+    semantic: amount
+    description: "Utilidad en venta de inversiones."
+  Valorizaciones:
+    column: Valorizaciones
+    type: number
+    semantic: amount
+    description: "Ingresos por valorizaciones."
+  cut: { column: "cut", type: date }

@@ -1,0 +1,29 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-61
+    field: "EstadoCivil"
+    check: "placeholder"
+    values: ["ACTUALIZAR"]
+    severity: major
+    cause: capture
+    alert: "Actualizar"
+    origin: { process: KNIME, node: "#1614" }
+
+  - id: V-PN-62
+    field: "EstadoCivil"
+    check: "required"
+    when: "NOT coalesce(TipIdnent, '') LIKE 'Registro Civil%'"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1614" }
+
+  - id: V-PN-63
+    field: "EstadoCivil"
+    check: "expression"
+    fails: "NOT (EstadoCivil = 'SOLTERO' OR is_empty(EstadoCivil)) AND TipIdnent IN ('Registro Civil*', 'Tarjeta de Identidad*')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "no coincide con tipo documento"
+    origin: { process: KNIME, node: "#1614" }

@@ -1,0 +1,31 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-86
+    field: "Profesion"
+    check: "expression"
+    fails: "Profesion IN ('TECNICO', 'TECNOLOGO', 'SIN TITULO PROFESIONAL') AND NivEducativo = 'UNIVERSITARIO O MAYOR' AND TipIdnent IN ('Cédula de Ciudadanía', 'Cédula de Extranjería')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No concide con tipo de documento"
+    origin: { process: KNIME, node: "#1607" }
+
+  - id: V-PN-87
+    field: "Profesion"
+    check: "expression"
+    fails: "Profesion IN ('TECNICO', 'SIN TITULO PROFESIONAL') AND NivEducativo = 'TECNOLOGO'"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con nivel educativo"
+    origin: { process: KNIME, node: "#1607" }
+
+  - id: V-PN-88
+    field: "Profesion"
+    check: "expression"
+    fails: "Profesion IN ('SIN TITULO PROFESIONAL', 'BACHILLER') AND NivEducativo IN ('TECNICO', 'TECNOLOGO', 'UNIVERSITARIO O MAYOR', 'ACTUALIZAR')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con nivel educativo"
+    origin: { process: KNIME, node: "#1607" }

@@ -1,0 +1,300 @@
+// The lake's replica's metrics (decision 0071, step 4): its Alloy reads the
+// node agent's metrics file and its own, keeps only the metrics of point 8
+// and the label names listed here (point 10), and pushes them to Mimir.
+// Downloaded by infra/join/join.sh beside the role's compose file, checked
+// by its SHA-256, and loaded alone from /etc/qd-alloy.
+//
+//   files   /run/qd-metrics: node-agent.prom (point 9), read with the node
+//           exporter's textfile collector; no network
+//   host    the machine (decision 0072, step 2): its own /proc, the watched
+//           paths /host/watch/drive<n> (each RustFS drive, as --drive gave
+//           them) and the host's /proc/1/net, all bound read-only (the
+//           drives by join.sh's metrics.yml, /proc/1/net by the compose file)
+//   alloy   itself, no network
+//   rustfs  RustFS's own, pushed to this Alloy over OTLP (point 7): it has
+//           no Prometheus endpoint and cannot present a client certificate
+//
+// RustFS's push is received over HTTPS with the machine's certificate
+// (re-read every minute, as the agent renews it) and must carry the node's
+// token (the user's ruling of 2026-11-14), which join.sh made on this
+// machine (OTLP_TOKEN_FILE, 0600, RustFS's user's and Alloy's): a push
+// without it, or with another, is refused. The receiver listens on the
+// machine's name, which is Alloy's on the compose network `otlp` alone,
+// whose only other member is RustFS; its certificate names the machine.
+//
+// Nothing here listens for another machine: Alloy's own server is on its
+// container's loopback, the receiver on the network `otlp`, and no port is
+// published. It pushes over HTTPS to METRICS_PUSH_URL (the join command's
+// --metrics-url), Mimir verified against the installation's CA and this
+// machine's certificate presented (METRICS_CA_FILE, METRICS_CERT_FILE, the
+// node agent's, read again when it renews them). Every scrape fails whole
+// past 5,000 samples (the host's 1,000) or 20 labels on a series (point 11). `job` and `instance` come from here, `vm` (OBS_VM,
+// the machine's name) and `role` from the remote write, never from a
+// target. What Mimir does not take waits in the write-ahead log under
+// alloy-data.
+
+prometheus.remote_write "mimir" {
+  external_labels = {
+    vm   = coalesce(sys.env("OBS_VM"), "dev"),
+    role = "lake-replica",
+  }
+
+  endpoint {
+    url = sys.env("METRICS_PUSH_URL")
+
+    tls_config {
+      ca_file   = sys.env("METRICS_CA_FILE")
+      cert_file = sys.env("METRICS_CERT_FILE")
+      key_file  = sys.env("METRICS_CERT_FILE")
+    }
+  }
+}
+
+// --- The node agent's file: the certificate's renewals and expiry, its
+// CPU and memory by `service`; the file's age, so a stopped agent shows as
+// a stale file, and a file it cannot read as node_textfile_scrape_error 1.
+prometheus.exporter.unix "files" {
+  set_collectors = ["textfile"]
+
+  textfile {
+    directory = "/run/qd-metrics"
+  }
+}
+
+prometheus.scrape "files" {
+  job_name        = "files"
+  targets         = prometheus.exporter.unix.files.targets
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+  sample_limit    = 5000
+  label_limit     = 20
+  forward_to      = [prometheus.relabel.files.receiver]
+}
+
+prometheus.relabel "files" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "up|node_textfile_mtime_seconds|node_textfile_scrape_error|process_cpu_seconds_total|process_resident_memory_bytes|qd_node_renewals_total|qd_node_certificate_expiry_timestamp_seconds"
+    action        = "keep"
+  }
+  // Its own names: the exporter's target says `integrations/unix` and the
+  // container's id.
+  rule {
+    target_label = "job"
+    replacement  = "files"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = "files"
+  }
+  rule {
+    regex  = "__name__|job|instance|file|service|result"
+    action = "labelkeep"
+  }
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+// --- The host (decision 0072, points 1 to 3): CPU, memory, load, disk I/O,
+// the clock and the boot time from the container's own /proc, which is not
+// namespaced for them; the watched paths' filesystems, each bound read-only
+// at /host/watch/<name> (statfs, no file read); and the host's interfaces
+// from /host/proc1/net, the host's /proc/1/net bound read-only (never the
+// whole /proc). Two exporters: procfs_path moves every collector of its
+// exporter, and `host`'s own netdev would see the container's namespace,
+// so it is not run. Both are job `host`, `instance` naming the exporter.
+// The scrape fails whole past 1,000 samples or 20 labels (point 3).
+prometheus.exporter.unix "host" {
+  set_collectors = ["cpu", "meminfo", "loadavg", "filesystem", "diskstats", "timex", "stat"]
+
+  // Whole devices only: partitions, loop and RAM disks dropped.
+  disk {
+    device_exclude = "^(z?ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\\d+n\\d+p)\\d+$"
+  }
+}
+
+prometheus.exporter.unix "network" {
+  set_collectors = ["netdev"]
+  procfs_path    = "/host/proc1"
+
+  netdev {
+    device_exclude = "^(loop.*|ram.*|veth.*|docker.*|br-.*|lo)$"
+  }
+}
+
+discovery.relabel "host" {
+  targets = prometheus.exporter.unix.host.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "host"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = "host"
+  }
+}
+
+discovery.relabel "network" {
+  targets = prometheus.exporter.unix.network.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "host"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = "network"
+  }
+}
+
+prometheus.scrape "host" {
+  job_name        = "host"
+  targets         = array.concat(discovery.relabel.host.output, discovery.relabel.network.output)
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+  sample_limit    = 1000
+  label_limit     = 20
+  forward_to      = [prometheus.relabel.host.receiver]
+}
+
+// Point 1's keep list. A filesystem series is kept only for a watched path,
+// its mountpoint renamed to the path's name (`drive1`, `drive2`…): the
+// collector also lists the container's own mounts (/etc/hosts…).
+prometheus.relabel "host" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "up|node_cpu_seconds_total|node_load1|node_load5|node_memory_(MemTotal|MemAvailable|SwapTotal|SwapFree)_bytes|node_filesystem_(size_bytes|avail_bytes|files|files_free|readonly)|node_disk_(read_bytes_total|written_bytes_total|io_time_seconds_total)|node_network_(receive|transmit)_(bytes|errs|drop)_total|node_timex_offset_seconds|node_timex_sync_status|node_boot_time_seconds"
+    action        = "keep"
+  }
+  rule {
+    source_labels = ["__name__", "mode"]
+    regex         = "node_cpu_seconds_total;(nice|irq|softirq|steal|guest.*)"
+    action        = "drop"
+  }
+  rule {
+    source_labels = ["__name__", "mountpoint"]
+    regex         = "node_filesystem_.+;/host/watch/[^/]+"
+    target_label  = "__watched"
+    replacement   = "1"
+  }
+  rule {
+    source_labels = ["__name__", "__watched"]
+    regex         = "node_filesystem_.+;"
+    action        = "drop"
+  }
+  rule {
+    source_labels = ["mountpoint"]
+    regex         = "/host/watch/([^/]+)"
+    target_label  = "mountpoint"
+  }
+  rule {
+    regex  = "__name__|job|instance|cpu|mode|mountpoint|device"
+    action = "labelkeep"
+  }
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+// --- Alloy itself: whether it sends, and whether it is behind.
+prometheus.exporter.self "alloy" { }
+
+prometheus.scrape "alloy" {
+  job_name        = "alloy"
+  targets         = prometheus.exporter.self.alloy.targets
+  scrape_interval = "30s"
+  scrape_timeout  = "10s"
+  sample_limit    = 5000
+  label_limit     = 20
+  forward_to      = [prometheus.relabel.alloy.receiver]
+}
+
+prometheus.relabel "alloy" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "up|process_cpu_seconds_total|process_resident_memory_bytes|prometheus_remote_storage_samples_failed_total"
+    action        = "keep"
+  }
+  // Its own names, never the container's id.
+  rule {
+    target_label = "job"
+    replacement  = "alloy"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = "alloy"
+  }
+  rule {
+    regex  = "__name__|job|instance|component_id|host|reason|remote_name|url"
+    action = "labelkeep"
+  }
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}
+
+// --- RustFS: whether the lake answers, how full it is, its drives. The
+// push is OTLP, so no scrape limits apply: the names kept and the label
+// names kept bound it (point 10: never `bucket`, `disk_id`, `process_pid`
+// or a code path), and Mimir's limits refuse what passes (point 11).
+local.file "otlp_token" {
+  filename  = sys.env("OTLP_TOKEN_FILE")
+  is_secret = true
+}
+
+otelcol.auth.bearer "rustfs" {
+  token = local.file.otlp_token.content
+}
+
+otelcol.receiver.otlp "rustfs" {
+  http {
+    endpoint = string.format("%s:4318", sys.env("OBS_VM"))
+    auth     = otelcol.auth.bearer.rustfs.handler
+
+    tls {
+      cert_file       = sys.env("METRICS_CERT_FILE")
+      key_file        = sys.env("METRICS_CERT_FILE")
+      reload_interval = "1m"
+    }
+  }
+
+  output {
+    metrics = [otelcol.exporter.prometheus.rustfs.input]
+  }
+}
+
+otelcol.exporter.prometheus "rustfs" {
+  include_target_info  = false
+  include_scope_info   = false
+  include_scope_labels = false
+  forward_to           = [prometheus.relabel.rustfs.receiver]
+}
+
+// The names, from RustFS 1.0.5's push (tools/verify/metrics_rustfs_push.sh):
+// requests by S3 API, by method, failures and latency by status class; the
+// lake's capacity and drives online (its own view of the cluster), each
+// drive's bytes and healing; the heal queue; replication's workers and
+// backlog; the process's CPU, memory and uptime.
+prometheus.relabel "rustfs" {
+  rule {
+    source_labels = ["__name__"]
+    regex         = "rustfs_api_requests_total|rustfs_http_server_(requests_total|failures_total|request_duration_seconds_(bucket|count|sum))|rustfs_cluster_capacity_(raw_total|usable_total|free|used)_bytes|rustfs_cluster_health_drives_(count|online_count|offline_count)|rustfs_system_drive_(free_bytes|total_bytes|used_bytes|healing)|rustfs_heal_mrf_queue_depth|rustfs_replication_(current_active_workers|current_data_transfer_rate|last_minute_queued_count|last_minute_queued_bytes|recent_backlog_count)|rustfs_system_process_(cpu_seconds_total|resident_memory_bytes)|rustfs_process_uptime_seconds"
+    action        = "keep"
+  }
+  // The S3 API a request was for (`s3:GetObject`), which RustFS names `name`.
+  rule {
+    source_labels = ["__name__", "name"]
+    regex         = "rustfs_api_requests_total;(.+)"
+    target_label  = "api"
+  }
+  // Its own names, never RustFS's service or instance id.
+  rule {
+    target_label = "job"
+    replacement  = "rustfs"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = "rustfs"
+  }
+  rule {
+    regex  = "__name__|job|instance|api|method|status_class|pool|drive|le"
+    action = "labelkeep"
+  }
+  forward_to = [prometheus.remote_write.mimir.receiver]
+}

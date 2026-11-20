@@ -1,0 +1,683 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Generado desde infra/observability/grafana/definition con tools/grafana/dashboards.mjs: no se edita aquí ni en Grafana.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Eventos en el tiempo, por tipo",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- Audit events over time, one series per event type.\nSELECT $__timeGroupAlias(a.occurred_at, $__interval), a.event_type AS metric, count(*) AS value\nFROM public.admin_audit_events a\nWHERE $__timeFilter(a.occurred_at)\n  AND ('__all' IN (${event_type:sqlstring}) OR a.event_type IN (${event_type:sqlstring}))\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nGROUP BY 1, 2\nORDER BY 1, 2",
+          "refId": "A"
+        }
+      ],
+      "maxDataPoints": 100,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Por persona",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Events per person or service account (the 20 with most).\nSELECT coalesce(u.display_name, u.email, a.service_account, '—') AS who, count(*) AS events\nFROM public.admin_audit_events a\nLEFT JOIN public.admin_users u ON u.id = a.admin_id\nWHERE $__timeFilter(a.occurred_at)\n  AND ('__all' IN (${event_type:sqlstring}) OR a.event_type IN (${event_type:sqlstring}))\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nGROUP BY 1\nORDER BY 2 DESC, 1\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Quién"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "who": "Quién",
+              "events": "Eventos"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "barchart",
+      "title": "Por acción",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Events per action (the permission or job it was for; sign-ins have none).\nSELECT coalesce(a.action, a.event_type) AS action, count(*) AS events\nFROM public.admin_audit_events a\nWHERE $__timeFilter(a.occurred_at)\n  AND ('__all' IN (${event_type:sqlstring}) OR a.event_type IN (${event_type:sqlstring}))\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nGROUP BY 1\nORDER BY 2 DESC, 1\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Acción"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "action": "Acción",
+              "events": "Eventos"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "Por conjunto de datos",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Events per dataset, from resources named dataset/, catalog/ or pipeline/<dataset>.\nSELECT substring(a.resource FROM '^(?:dataset|catalog|pipeline)/([^/]+)') AS dataset, count(*) AS events\nFROM public.admin_audit_events a\nWHERE $__timeFilter(a.occurred_at)\n  AND ('__all' IN (${event_type:sqlstring}) OR a.event_type IN (${event_type:sqlstring}))\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\n  AND a.resource ~ '^(dataset|catalog|pipeline)/[^/]+'\nGROUP BY 1\nORDER BY 2 DESC, 1\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Conjunto de datos"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "dataset": "Conjunto de datos",
+              "events": "Eventos"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Eventos",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Every event, newest first (at most 1000).\nSELECT a.occurred_at AS time, a.event_type, coalesce(u.display_name, u.email, a.service_account) AS who,\n  a.action, a.resource, substring(a.resource FROM '^(?:dataset|catalog|pipeline)/([^/]+)') AS dataset,\n  a.job_id::text AS job_id, a.ip, a.user_agent, a.email_attempted\nFROM public.admin_audit_events a\nLEFT JOIN public.admin_users u ON u.id = a.admin_id\nWHERE $__timeFilter(a.occurred_at)\n  AND ('__all' IN (${event_type:sqlstring}) OR a.event_type IN (${event_type:sqlstring}))\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nORDER BY a.occurred_at DESC, a.id\nLIMIT 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hora"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tipo"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quién"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Acción"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Recurso"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Conjunto de datos"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Trabajo"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Agente de usuario"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Correo intentado"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "time": "Hora",
+              "event_type": "Tipo",
+              "who": "Quién",
+              "action": "Acción",
+              "resource": "Recurso",
+              "dataset": "Conjunto de datos",
+              "job_id": "Trabajo",
+              "ip": "IP",
+              "user_agent": "Agente de usuario",
+              "email_attempted": "Correo intentado"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Quién vio datos de clientes",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Who saw clients' data: the records_viewed events, newest first (at most 1000).\nSELECT a.occurred_at AS time, coalesce(u.display_name, u.email, a.service_account) AS who,\n  a.action, a.resource, substring(a.resource FROM '^(?:dataset|catalog|pipeline)/([^/]+)') AS dataset,\n  a.job_id::text AS job_id, a.ip, a.user_agent\nFROM public.admin_audit_events a\nLEFT JOIN public.admin_users u ON u.id = a.admin_id\nWHERE $__timeFilter(a.occurred_at)\n  AND a.event_type = 'records_viewed'\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nORDER BY a.occurred_at DESC, a.id\nLIMIT 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hora"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quién"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Acción"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Recurso"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Conjunto de datos"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Trabajo"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "time": "Hora",
+              "who": "Quién",
+              "action": "Acción",
+              "resource": "Recurso",
+              "dataset": "Conjunto de datos",
+              "job_id": "Trabajo",
+              "ip": "IP",
+              "user_agent": "Agente de usuario"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "quality-data",
+    "audit"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "'__all'",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT DISTINCT event_type FROM public.admin_audit_events ORDER BY 1",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Tipo de evento",
+        "multi": true,
+        "name": "event_type",
+        "options": [],
+        "query": "SELECT DISTINCT event_type FROM public.admin_audit_events ORDER BY 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "allValue": "'__all'",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT id::text AS __value, coalesce(display_name, email) AS __text FROM public.admin_users ORDER BY 2, 1",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Quién",
+        "multi": true,
+        "name": "who",
+        "options": [],
+        "query": "SELECT id::text AS __value, coalesce(display_name, email) AS __text FROM public.admin_users ORDER BY 2, 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Recurso contiene",
+        "name": "resource",
+        "options": [],
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Rastro de auditoría",
+  "uid": "qd-audit-es",
+  "weekStart": ""
+}

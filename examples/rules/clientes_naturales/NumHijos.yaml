@@ -1,0 +1,11 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-78
+    field: "NumHijos"
+    check: "expression"
+    fails: "NumHijos > 0 AND NOT TipIdnent IN ('Cédula de Ciudadanía', 'Cédula de Extranjería', 'Nit')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "Menor con hijos"
+    origin: { process: KNIME, node: "#1690" }

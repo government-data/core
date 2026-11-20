@@ -1,0 +1,53 @@
+# The online edition's middlewares, behind CloudFront. The same limits as
+# dynamic/middlewares.yml, but counting by the visitor's IP (the last one of
+# X-Forwarded-For, the one CloudFront appended) and not by CloudFront's, which
+# is the same for thousands of visitors.
+http:
+  middlewares:
+    api-ratelimit-cdn:
+      rateLimit:
+        average: 50
+        period: 1s
+        burst: 100
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    api-inflight-cdn:
+      inFlightReq:
+        amount: 100
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    web-ratelimit-cdn:
+      rateLimit:
+        average: 100
+        period: 1s
+        burst: 300
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    api-chain-cdn:
+      chain:
+        middlewares:
+          - api-strip
+          - api-ratelimit-cdn
+          - api-inflight-cdn
+          - tenant-inflight
+          - security-headers
+          - compression
+    # The live notices: see api-events-chain in dynamic/middlewares.yml.
+    api-events-chain-cdn:
+      chain:
+        middlewares:
+          - api-strip
+          - api-ratelimit-cdn
+          - security-headers
+    web-chain-cdn:
+      chain:
+        middlewares:
+          - web-ratelimit-cdn
+          - security-headers
+          - compression

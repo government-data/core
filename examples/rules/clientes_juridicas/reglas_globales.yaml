@@ -1,0 +1,19 @@
+dataset: clientes_juridicas
+
+derived:
+  TotalIngresos: "CASE WHEN TipoPerJur = 'FINANCIERA' THEN InterDescuentos + OtrosIntereses + Valorizaciones + RendimientoInv + Comisiones + UtilVentaInversion + RecupOperacionales + Diversos + IngresosServicios WHEN TipoPerJur = 'NO FINANCIERA' THEN IngVentasNetas + IngresosFinanc END"
+  TotalEgresos: "CASE WHEN TipoPerJur = 'FINANCIERA' THEN TotalEgresos WHEN TipoPerJur = 'NO FINANCIERA' THEN TotEgresosNoFin END"
+  Activo: "CASE WHEN TipoPerJur = 'FINANCIERA' THEN Activostotales WHEN TipoPerJur = 'NO FINANCIERA' THEN TotACtivosNoFin END"
+  Pasivo: "CASE WHEN TipoPerJur = 'FINANCIERA' THEN PasivosTotal WHEN TipoPerJur = 'NO FINANCIERA' THEN TotPasivosNoFin END"
+  Patrimonio: "CASE WHEN TipoPerJur = 'FINANCIERA' THEN Patriminio WHEN TipoPerJur = 'NO FINANCIERA' THEN TotPatrimoNoFin END"
+
+references:
+  asesores: { dataset: asesores, key: CodigoEscalaAsesor }
+  asesores_activos: { dataset: asesores, key: CodigoEscalaAsesor, where: "EstadoAsesor = 'ACTIVO'" }
+
+named:
+  "V-PJ-13":
+    check: "required"
+    severity: blocking
+    cause: capture
+    origin: { process: KNIME, node: "#1633" }

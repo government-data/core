@@ -1,0 +1,135 @@
+{
+  "app": {
+    "name": "Quality Data"
+  },
+  "common": {
+    "email": "Correo",
+    "password": "Contraseña",
+    "or": "o",
+    "backToLogin": "Volver a iniciar sesión",
+    "errors": {
+      "tooMany": "Demasiados intentos. Espera un momento y vuelve a intentarlo.",
+      "server": "Algo falló de nuestro lado. Inténtalo más tarde.",
+      "directory": "El directorio no responde. Inténtalo más tarde.",
+      "captcha": "Confirma que no eres un robot y vuelve a intentarlo."
+    }
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "submit": "Entrar",
+    "submitting": "Entrando…",
+    "backHome": "Volver al inicio",
+    "forgot": "¿Olvidaste tu contraseña?",
+    "invalid": "Correo o contraseña incorrectos.",
+    "passwordChanged": "Se cambió tu contraseña. Entra con la nueva.",
+    "ssoFailed": "No se pudo entrar con el proveedor. Si es la primera vez y tu correo allí no es el de tu usuario, entra con tu contraseña y vincula la cuenta en Configuración → Cuentas vinculadas.",
+    "continueWith": "Continuar con {{provider}}",
+    "activated": "Listo: tu cuenta quedó activada. Entra con tu correo y tu contraseña."
+  },
+  "signInPage": {
+    "intro": "Escribe tu correo y tu contraseña: te llevamos a tu empresa.",
+    "orByAddress": "o por la dirección",
+    "addressHelp": "¿Entras con Google o Microsoft, o olvidaste tu contraseña? Entra por la dirección de tu empresa.",
+    "address": "Dirección de tu empresa",
+    "addressExample": "tuempresa",
+    "go": "Ir",
+    "pick": "¿A cuál entras?",
+    "pickHelp": "Tu cuenta está en varias empresas.",
+    "linkExpired": "Este enlace para entrar ya no sirve. Vuelve a iniciar sesión."
+  },
+  "forgot": {
+    "title": "Restablecer la contraseña",
+    "intro": "Escribe el correo de tu cuenta y te enviamos un enlace para elegir una contraseña nueva.",
+    "send": "Enviar el enlace",
+    "sending": "Enviando…",
+    "sent": "Si existe una cuenta para {{email}}, le enviamos un enlace para restablecer la contraseña. Vence en {{minutes}} minutos y sirve una sola vez. Revisa la carpeta de spam si no llega.",
+    "directoryHint": "Las cuentas que entran con el directorio de la empresa (LDAP / Active Directory) o con un proveedor de inicio de sesión único cambian su contraseña allá.",
+    "noMail": "La recuperación de contraseña no está disponible: el correo saliente no está configurado. Pídeselo a un administrador.",
+    "invalidEmail": "Escribe un correo válido."
+  },
+  "reset": {
+    "title": "Elige una contraseña nueva",
+    "checking": "Revisando el enlace…",
+    "newPassword": "Contraseña nueva",
+    "repeat": "Repite la contraseña nueva",
+    "mismatch": "Las contraseñas no coinciden.",
+    "save": "Cambiar la contraseña",
+    "saving": "Guardando…",
+    "hint": "Al cambiarla se cierra la sesión en todas partes; vuelves a entrar con la contraseña nueva.",
+    "expired": "Este enlace no es válido o ya venció. Los enlaces sirven una sola vez y por un tiempo limitado.",
+    "newLink": "Enviar un enlace nuevo",
+    "invalidLink": "Este enlace no es válido o ya venció. Pide uno nuevo.",
+    "rejected": "La contraseña {{reason}}.",
+    "rules": "La contraseña no cumple las reglas.",
+    "rule": {
+      "length": "Al menos {{count}} caracteres",
+      "upper": "Una mayúscula",
+      "lower": "Una minúscula",
+      "digit": "Un número",
+      "symbol": "Un símbolo"
+    }
+  },
+  "session": {
+    "loading": "Cargando…",
+    "redirecting": "Llevándote a iniciar sesión…"
+  },
+  "shell": {
+    "primary": "Principal",
+    "expand": "Expandir menú",
+    "collapse": "Minimizar menú",
+    "closeNav": "Cerrar navegación",
+    "toggleNav": "Mostrar u ocultar la navegación",
+    "resize": "Arrastra para cambiar el ancho; doble clic lo restablece",
+    "settings": "Configuración",
+    "signOut": "Cerrar sesión",
+    "apps": "Aplicaciones",
+    "docs": "Documentación",
+    "switchApp": "Cambiar de aplicación",
+    "app": {
+      "gestion": "Gestión",
+      "gestionDetail": "El panel de la plataforma",
+      "billing": "Facturación",
+      "billingDetail": "Plan, pagos y renovación",
+      "trial": "Prueba"
+    },
+    "language": "Idioma",
+    "notFound": {
+      "title": "Página no encontrada",
+      "body": "La página que buscas no existe."
+    },
+    "denied": {
+      "title": "Acceso denegado",
+      "body": "No tienes permiso para ver esta página."
+    },
+    "version": {
+      "web": "Interfaz {{version}} {{commit}}",
+      "api": "API {{version}} {{commit}}",
+      "mismatch": "No coinciden: recarga la página.",
+      "copyHint": "Pulsa para copiar el diagnóstico.",
+      "aria": "Versión {{version}}. Copiar diagnóstico",
+      "copied": "Diagnóstico copiado"
+    },
+    "backHome": "Volver al inicio",
+    "opening": "Abriendo {{app}}…",
+    "openingAccount": "Abriendo tu cuenta…",
+    "account": "Mi cuenta",
+    "backToApp": "Volver a la aplicación",
+    "theme": "Tema"
+  },
+  "lang": {
+    "es": "Español",
+    "en": "English"
+  },
+  "activate": {
+    "title": "Activa tu cuenta",
+    "save": "Activar la cuenta",
+    "hint": "Con esta contraseña entras a Quality Data desde ahora.",
+    "expired": "Este enlace de activación no es válido o ya venció (sirve 72 horas y una sola vez). Pide a quien te creó la cuenta que te lo envíe de nuevo, o pide uno aquí.",
+    "newLink": "Pedir un enlace nuevo"
+  },
+  "theme": {
+    "light": "Claro",
+    "dark": "Oscuro",
+    "auto": "Sistema"
+  }
+}

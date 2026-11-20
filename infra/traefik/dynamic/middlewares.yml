@@ -1,0 +1,202 @@
+# Reusable middlewares, loaded by the file provider and referenced from Docker
+# labels as "<name>@file". Defining them once here keeps the per-service labels
+# short and the edge security posture in a single reviewable place.
+http:
+  middlewares:
+    # Security response headers applied to every route (bead authapp-3e68cc).
+    # CORS is NOT set here — it needs per-request Origin reflection against an
+    # explicit allowlist plus preflight handling, which belongs at the API
+    # layer (see crates/api/src/cors.rs); Traefik headers are static per-route.
+    security-headers:
+      headers:
+        frameDeny: true # X-Frame-Options: DENY
+        contentTypeNosniff: true # X-Content-Type-Options: nosniff
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        stsSeconds: 31536000 # HSTS: 1 year
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true # send HSTS even if Traefik does not detect TLS itself
+        # Strict CSP for the SPA: no 'unsafe-inline'/'unsafe-eval' anywhere.
+        # `frame-ancestors 'none'` is the CSP-native, modern-browser-preferred
+        # equivalent of `frameDeny` above (kept both for older-browser
+        # coverage). Applied to the API's JSON responses too — harmless there,
+        # and keeps one policy in one place instead of two.
+        # Cloudflare Turnstile (the captcha on sign-in and password recovery)
+        # is the only third party: its script and its frame. 'self' in
+        # frame-src: this installation's applications (RustFS) open inside the
+        # app.
+        contentSecurityPolicy: >-
+          default-src 'self';
+          script-src 'self' https://challenges.cloudflare.com;
+          frame-src 'self' https://challenges.cloudflare.com;
+          style-src 'self';
+          img-src 'self' data:;
+          font-src 'self';
+          connect-src 'self';
+          frame-ancestors 'none';
+          base-uri 'none';
+          form-action 'self';
+          upgrade-insecure-requests
+        customResponseHeaders:
+          Server: "" # strip server fingerprint
+          X-Powered-By: ""
+
+    # The applications of the installation (RustFS's console, Grafana…, see
+    # apps.yml): only this domain may frame them (the app's /apps/<id>);
+    # their own CSP is their business.
+    app-frame-headers:
+      headers:
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        forceSTSHeader: true
+        contentSecurityPolicy: "frame-ancestors 'self'"
+        customResponseHeaders:
+          Server: ""
+
+    # An application's static files whose names carry a hash of their content
+    # (RustFS's console under /_next/static/, see apps.yml): a new version is
+    # a new name, so the browser may keep them for a year. RustFS sends no
+    # Cache-Control, ETag or Last-Modified, so without this they are
+    # downloaded again on every load.
+    app-static-immutable:
+      headers:
+        customResponseHeaders:
+          Cache-Control: "public, max-age=31536000, immutable"
+
+    # gzip/brotli compression for compressible responses.
+    compression:
+      compress: {}
+
+    # Edge rate limit for the API: ~50 req/s sustained per client IP, bursting
+    # to 100. Tune per deployment. App-level limits on sensitive endpoints
+    # (login, webhooks) are a separate, finer-grained concern.
+    api-ratelimit:
+      rateLimit:
+        average: 50
+        period: 1s
+        burst: 100
+
+    # In-flight requests at once per IP: it stops whoever opens connections
+    # without closing them (the limit above only counts the ones arriving).
+    # Roomy for an office behind a single IP.
+    api-inflight:
+      inFlightReq:
+        amount: 100
+
+    # The same per company (each tenant is a subdomain): one cannot hog the
+    # API and slow down the others.
+    tenant-inflight:
+      inFlightReq:
+        amount: 400
+        sourceCriterion:
+          requestHost: true
+
+    # The web is static, but the first load asks for dozens of files.
+    web-ratelimit:
+      rateLimit:
+        average: 100
+        period: 1s
+        burst: 300
+
+    # Strip the "/api" prefix before the request reaches the backend, so the
+    # Rust service stays prefix-agnostic (it serves "/health", not
+    # "/api/health").
+    api-strip:
+      stripPrefix:
+        prefixes:
+          - "/api"
+
+    # Composed chains the routers reference — one label instead of four.
+    api-chain:
+      chain:
+        middlewares:
+          - api-strip
+          - api-ratelimit
+          - api-inflight
+          - tenant-inflight
+          - security-headers
+          - compression
+    # The live notices (`/api/events`, SSE): a connection that stays open.
+    # Without `inFlightReq`, which would count it as an in-flight request
+    # forever (an office behind a single IP would run out of room), and
+    # without compression, which would batch the notices before sending them.
+    # The requests-per-second limit stays, against reconnection loops.
+    api-events-chain:
+      chain:
+        middlewares:
+          - api-strip
+          - api-ratelimit
+          - security-headers
+    web-chain:
+      chain:
+        middlewares:
+          - web-ratelimit
+          - security-headers
+          - compression
+
+    # The documentation (/docs, apps/docs): only with a session. Traefik asks
+    # the API on each request; without a session, the API answers with the
+    # redirect to the sign-in, which then comes back to the requested page.
+    docs-auth:
+      forwardAuth:
+        address: "http://api:8080/auth/docs"
+    # The gate of an application that does not speak OAuth (put on its
+    # router): Traefik asks the API on each request. With a session, the
+    # identity reaches the application in X-Auth-User, X-Auth-Email,
+    # X-Auth-Role and X-Auth-Org (the API always sends the four, so a client
+    # cannot slip in its own); without one, a page goes to sign in and comes
+    # back, the rest gets a 401.
+    orq-auth:
+      forwardAuth:
+        address: "http://api:8080/auth/verify"
+        authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role", "X-Auth-Org"]
+    # The same, for administrators only (403 for the rest).
+    orq-auth-admin:
+      forwardAuth:
+        address: "http://api:8080/auth/verify?role=admin"
+        authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role", "X-Auth-Org"]
+    # Starlight puts inline scripts and styles (the light or dark theme) and
+    # the search runs on WebAssembly: the web's CSP does not allow them. They
+    # are static pages, with nothing a user writes.
+    docs-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        contentSecurityPolicy: >-
+          default-src 'self';
+          script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval';
+          style-src 'self' 'unsafe-inline';
+          img-src 'self' data:;
+          font-src 'self';
+          connect-src 'self';
+          frame-ancestors 'none';
+          base-uri 'none';
+          form-action 'self';
+          upgrade-insecure-requests
+        customResponseHeaders:
+          Server: ""
+          X-Powered-By: ""
+    # In the online cell /docs is not served (it belongs to the local
+    # installation): a 403 for everyone.
+    docs-closed:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+    docs-chain:
+      chain:
+        middlewares:
+          - web-ratelimit
+          - docs-auth
+          - docs-headers
+          - compression

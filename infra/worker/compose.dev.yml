@@ -1,0 +1,26 @@
+# Development only: the worker on the host's network, where the dev stack
+# publishes PostgreSQL (127.0.0.1:5432) and Traefik (https://localhost),
+# as `tools/dev/worker.sh` runs it: the queue's role, the dev machine
+# client `qd-worker-dev`, the development CA. Its stack stays apart, as on
+# its own server; only the network is shared.
+#
+# It stays on its secret (no QD_MACHINE_DIR, no node agent) until the dev
+# stack moves to certificates (decision 0066, step 8), when this mode goes.
+services:
+  node:
+    # Not started in development: the worker uses its secret.
+    profiles: [certificate]
+  worker:
+    network_mode: host
+    environment:
+      QD_MACHINE_DIR: ""
+      QD_QUEUE_DATABASE_URL: postgres://qd_queue:${QD_QUEUE_PASSWORD:?run tools/dev/queue-role.sh}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=disable
+      QD_API_URL: https://localhost/api
+      QD_WORKER_CLIENT_ID: qd-worker-dev
+      QD_WORKER_CLIENT_SECRET: ${QD_WORKER_DEV_CLIENT_SECRET:?register qd-worker-dev (see .env.example)}
+      QD_CA_FILE: /etc/qd/dev-ca.crt
+      # Trino's protocol, published on 127.0.0.1 (compose.watch.yml), for
+      # the sources read through it (decision 0048).
+      QD_TRINO_URL: https://127.0.0.1:8490
+    volumes:
+      - ./infra/traefik/certs/dev-ca.crt:/etc/qd/dev-ca.crt:ro

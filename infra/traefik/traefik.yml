@@ -1,0 +1,174 @@
+# Traefik v3 static configuration — the single entry point for the stack.
+#
+# Everything Traefik must know at startup lives here: entry points, the ACME
+# (Let's Encrypt) certificate resolver, and the providers it watches. Per-service
+# routing (which host/path maps to which container) is NOT here — it is
+# discovered from Docker labels — and the reusable middlewares come from the
+# file provider under ./dynamic.
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# Entry points:
+#   web       :80   — plain HTTP, only ever used to redirect to HTTPS and to
+#                     answer the ACME HTTP-01 challenge.
+#   websecure :443  — TLS traffic; every router defaults to the letsencrypt
+#                     resolver so certificates are issued automatically.
+#   traefik   :8080 — internal-only, backs the container healthcheck (/ping).
+#                     Not published to the host.
+#   internal  :9443 — the machines' entry point (decision 0066, point 5): TLS
+#                     with a client certificate of the installation's CA
+#                     required. Its routers and TLS options are in
+#                     dynamic/internal.yml, which exists only once the CA
+#                     does (infra/traefik/internal.yml); until then nothing
+#                     answers here. Published as TRAEFIK_INTERNAL_PORT.
+#   lakegate  :9444 — the lake's gates' entry point (0066, point 10): the
+#                     same TLS, one route, forwarded headers kept.
+#   metrics   :9445 — the services' metrics (decision 0071, point 7): Alloy
+#                     scrapes Traefik's own, Grafana's and Dolt's here, a
+#                     client certificate of the CA required (internal.yml's
+#                     routers); nothing answers without them. Published by
+#                     certificate.yml for the VM's own Alloy alone.
+#   mimir     :9446 — Mimir (decision 0071, amended 2026-11-16): a client
+#                     certificate of the CA required; any machine may push
+#                     (/api/v1/push), only the application VM's
+#                     certificate (role `app`) may read (internal.yml's
+#                     routers). Published by certificate.yml as 9009,
+#                     where every VM's Alloy pushes.
+#   mimircheck 127.0.0.1:9447 — on Traefik's own loopback, never published:
+#                     the read check that `mimir`'s forwardAuth asks.
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+    # So a slow connection (slowloris) does not hold the server:
+    #   readTimeout  reading the whole request, body included. An upload chunk
+    #                is 16 MB: 120 s are enough from ~1.1 Mbps.
+    #   writeTimeout no cap: large downloads (of several GB) take their time.
+    #   idleTimeout  a keep-alive connection without requests is closed.
+    transport:
+      respondingTimeouts:
+        readTimeout: 120s
+        writeTimeout: 0s
+        idleTimeout: 90s
+  # No certificate resolver: its name is not public, so its server
+  # certificate comes from the installation's CA (internal.yml).
+  internal:
+    address: ":9443"
+    transport:
+      respondingTimeouts:
+        readTimeout: 30s
+        writeTimeout: 30s
+        idleTimeout: 90s
+  # The lake's gates' entry point (decision 0066, point 10): one route, the
+  # API's lake check (internal.yml), with a client certificate of the CA
+  # required as on `internal`. Here alone the forwarded headers are kept as
+  # they come: a gate names the machine at its door in
+  # X-Forwarded-Tls-Client-Cert-Info, and the API believes it only from a
+  # machine of the lake, known by the certificate header this Traefik
+  # writes. Published as TRAEFIK_LAKEGATE_PORT.
+  lakegate:
+    address: ":9444"
+    forwardedHeaders:
+      insecure: true
+    transport:
+      respondingTimeouts:
+        readTimeout: 30s
+        writeTimeout: 30s
+        idleTimeout: 90s
+  metrics:
+    address: ":9445"
+    transport:
+      respondingTimeouts:
+        readTimeout: 30s
+        writeTimeout: 30s
+        idleTimeout: 90s
+  mimir:
+    address: ":9446"
+    transport:
+      respondingTimeouts:
+        readTimeout: 30s
+        writeTimeout: 30s
+        idleTimeout: 90s
+  # Only Traefik itself connects here (`mimir`'s forwardAuth), so its
+  # forwarded headers are trusted: the certificate header the check reads
+  # is the one `mimir`'s passTLSClientCert wrote, an entry point removing
+  # it from an untrusted client (tools/verify/mimir_read_role.sh).
+  mimircheck:
+    address: "127.0.0.1:9447"
+    forwardedHeaders:
+      trustedIPs: ["127.0.0.1/32"]
+  traefik:
+    address: ":8080"
+
+# Traefik's own metrics (decision 0071), served only through a router to
+# `prometheus@internal` (manualRouting): internal.yml's, on `metrics`, with
+# a client certificate of the CA; in development dynamic/metrics-dev.yml's.
+# By entry point and by service; never by router.
+metrics:
+  prometheus:
+    manualRouting: true
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: false
+
+# Providers: Docker (routers/services from container labels) and the file
+# provider (reusable middlewares + TLS options under ./dynamic, hot-reloaded).
+# `exposedByDefault: false` keeps a container off the proxy until it opts in
+# with `traefik.enable=true`.
+providers:
+  docker:
+    exposedByDefault: false
+    watch: true
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+# Let's Encrypt. HTTP-01 is the default challenge and works with only ports
+# 80/443 reachable. For wildcard certificates, or when port 80 cannot be
+# exposed, switch to the DNS-01 block below and provide the DNS provider
+# credentials through the environment.
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      # Placeholder; overridden at runtime by
+      # TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL (see compose).
+      email: "codecsrayo@gmail.com"
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+      # --- DNS-01 alternative: remove httpChallenge above and uncomment ---
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   resolvers:
+      #     - "1.1.1.1:53"
+
+# Health probe for the container healthcheck, bound to the internal entry point.
+ping:
+  entryPoint: traefik
+
+# The dashboard/API stays off by default; enable only behind authentication.
+api:
+  dashboard: false
+
+# JSON, like every service of the installation (decision 0026, point 1):
+# `level`, `time`, `message`. The access log too, one object per request
+# (`level`, `RouterName`, `RequestPath` with its query, `DownstreamStatus`,
+# `Duration` in ns, the client's address), without request headers; a
+# router with `observability.accessLogs: false` writes none.
+log:
+  level: INFO
+  format: json
+accessLog:
+  format: json

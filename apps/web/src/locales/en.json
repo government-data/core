@@ -1,0 +1,135 @@
+{
+  "app": {
+    "name": "Quality Data"
+  },
+  "common": {
+    "email": "Email",
+    "password": "Password",
+    "or": "or",
+    "backToLogin": "Back to sign in",
+    "errors": {
+      "tooMany": "Too many attempts. Please wait a moment and try again.",
+      "server": "Something went wrong on our side. Please try again later.",
+      "directory": "The directory is not responding. Please try again later.",
+      "captcha": "Confirm that you are not a robot and try again."
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "backHome": "Back to home",
+    "forgot": "Forgot your password?",
+    "invalid": "Invalid email or password.",
+    "passwordChanged": "Your password was changed. Sign in with the new one.",
+    "ssoFailed": "Signing in with the provider did not work. If it is your first time and your email there is not your user's, sign in with your password and link the account under Settings → Linked accounts.",
+    "continueWith": "Continue with {{provider}}",
+    "activated": "Done: your account is active. Sign in with your email and password."
+  },
+  "signInPage": {
+    "intro": "Enter your email and password: we'll take you to your company.",
+    "orByAddress": "or by address",
+    "addressHelp": "Do you sign in with Google or Microsoft, or forgot your password? Go to your company's address.",
+    "address": "Your company's address",
+    "addressExample": "yourcompany",
+    "go": "Go",
+    "pick": "Which one?",
+    "pickHelp": "Your account is in several companies.",
+    "linkExpired": "This sign-in link no longer works. Please sign in again."
+  },
+  "forgot": {
+    "title": "Reset your password",
+    "intro": "Enter the email of your account and we will send you a link to choose a new password.",
+    "send": "Send reset link",
+    "sending": "Sending…",
+    "sent": "If an account exists for {{email}}, we sent it a link to reset the password. The link expires in {{minutes}} minutes and works once. Check your spam folder if it does not arrive.",
+    "directoryHint": "Accounts that sign in with the company directory (LDAP / Active Directory) or a single sign-on provider change their password there.",
+    "noMail": "Password recovery is not available: outgoing mail is not configured. Ask an administrator.",
+    "invalidEmail": "Enter a valid email address."
+  },
+  "reset": {
+    "title": "Choose a new password",
+    "checking": "Checking the link…",
+    "newPassword": "New password",
+    "repeat": "Repeat the new password",
+    "mismatch": "The passwords do not match.",
+    "save": "Change password",
+    "saving": "Saving…",
+    "hint": "Changing it signs the account out everywhere; you will sign in again with the new password.",
+    "expired": "This link is invalid or has expired. Links work once and only for a limited time.",
+    "newLink": "Send a new link",
+    "invalidLink": "This link is invalid or has expired. Ask for a new one.",
+    "rejected": "The password {{reason}}.",
+    "rules": "The password does not meet the rules.",
+    "rule": {
+      "length": "At least {{count}} characters",
+      "upper": "An uppercase letter",
+      "lower": "A lowercase letter",
+      "digit": "A digit",
+      "symbol": "A symbol"
+    }
+  },
+  "session": {
+    "loading": "Loading…",
+    "redirecting": "Redirecting to sign in…"
+  },
+  "shell": {
+    "primary": "Primary",
+    "expand": "Expand menu",
+    "collapse": "Collapse menu",
+    "closeNav": "Close navigation",
+    "toggleNav": "Toggle navigation",
+    "resize": "Drag to change the width; double-click resets it",
+    "settings": "Settings",
+    "signOut": "Sign out",
+    "apps": "Applications",
+    "docs": "Documentation",
+    "switchApp": "Switch application",
+    "app": {
+      "gestion": "Management",
+      "gestionDetail": "The platform panel",
+      "billing": "Billing",
+      "billingDetail": "Plan, payments and renewal",
+      "trial": "Trial"
+    },
+    "language": "Language",
+    "notFound": {
+      "title": "Page not found",
+      "body": "The page you were looking for does not exist."
+    },
+    "denied": {
+      "title": "Access denied",
+      "body": "You do not have permission to view this page."
+    },
+    "version": {
+      "web": "Interface {{version}} {{commit}}",
+      "api": "API {{version}} {{commit}}",
+      "mismatch": "They do not match: reload the page.",
+      "copyHint": "Click to copy the diagnostics.",
+      "aria": "Version {{version}}. Copy diagnostics",
+      "copied": "Diagnostics copied"
+    },
+    "backHome": "Back to the start page",
+    "opening": "Opening {{app}}…",
+    "openingAccount": "Opening your account…",
+    "account": "My account",
+    "backToApp": "Back to the application",
+    "theme": "Theme"
+  },
+  "lang": {
+    "es": "Español",
+    "en": "English"
+  },
+  "activate": {
+    "title": "Activate your account",
+    "save": "Activate the account",
+    "hint": "From now on you sign in to Quality Data with this password.",
+    "expired": "This activation link is not valid or has expired (it works for 72 hours and only once). Ask whoever created your account to send it again, or ask for one here.",
+    "newLink": "Ask for a new link"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "auto": "System"
+  }
+}

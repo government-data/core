@@ -1,0 +1,22 @@
+dataset: clientes_naturales
+rules:
+  - id: P-29
+    field: "CodAsesor"
+    check: "domain"
+    in: { "reference": "asesores.CodigoEscalaAsesor" }
+    severity: minor
+    cause: systemic
+    alert: "Asesor no está en el maestro"
+    origin: { process: MVP }
+    note: "pendiente de verificación; the prototype also counts clients without an advisor code; the pattern skips them"
+
+  - id: P-30
+    field: "CodAsesor"
+    check: "expression"
+    fails: "in_reference(CodAsesor, 'asesores.CodigoEscalaAsesor') AND NOT in_reference(CodAsesor, 'asesores_activos.CodigoEscalaAsesor')"
+    dimension: "validity"
+    severity: minor
+    cause: systemic
+    alert: "Asesor inactivo"
+    origin: { process: MVP }
+    note: "pendiente de verificación"

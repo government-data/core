@@ -1,0 +1,12 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-06
+    field: "FecCreacion"
+    check: "range"
+    when: "IdActivo = 'SI'"
+    max: ":cut"
+    severity: major
+    cause: capture
+    alert: "Fecha Creación Errada"
+    origin: { process: KNIME, node: "#1688" }
+    note: "KNIME no le asigna dimensión (CaracteristicasCalidad queda vacía)."

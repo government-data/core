@@ -1,0 +1,48 @@
+# Dolt's server settings (decision 0021), read by the image's entrypoint from
+# /etc/dolt/servercfg.d. With a config file Dolt ignores its command-line
+# flags, so the listener is set here too.
+log_level: ${DOLT_LOG_LEVEL}
+# JSON lines (`level`, `msg`, `time`), like every service (decision 0026).
+log_format: json
+# Long statements (a rule's YAML) are cut in the logs.
+max_logged_query_len: 512
+
+behavior:
+  read_only: false
+  autocommit: true
+  # Dolt commits are made by the application (DOLT_COMMIT with an author),
+  # never one per SQL transaction.
+  dolt_transaction_commit: false
+  disable_client_multi_statements: false
+  # Nothing is scheduled inside the database; backups run from outside.
+  event_scheduler: "OFF"
+  auto_gc_behavior:
+    enable: true
+
+listener:
+  # Inside the container; what is published is decided by the compose files.
+  host: 0.0.0.0
+  port: 3306
+  # One small pool per tenant database in the application: plenty for a catalog.
+  max_connections: ${DOLT_MAX_CONNECTIONS}
+  back_log: 50
+  max_connections_timeout_millis: 60000
+  read_timeout_millis: 28800000
+  write_timeout_millis: 28800000
+
+# Its metrics (decision 0071), plain HTTP in development, on Traefik's
+# network only (compose.dev.yml) and published nowhere: Alloy scrapes them
+# through Traefik's metrics entry point (dynamic/metrics-dev.yml).
+metrics:
+  host: 0.0.0.0
+  port: 11228
+
+# Databases (one per tenant), users and grants, all in the data volume.
+data_dir: /var/lib/dolt
+cfg_dir: /var/lib/dolt/.doltcfg
+privilege_file: /var/lib/dolt/.doltcfg/privileges.db
+branch_control_file: /var/lib/dolt/.doltcfg/branch_control.db
+
+system_variables:
+  # No LOAD DATA or SELECT … INTO OUTFILE with the server's files.
+  secure_file_priv: /nonexistent

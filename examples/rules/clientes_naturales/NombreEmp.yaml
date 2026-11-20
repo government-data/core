@@ -1,0 +1,17 @@
+dataset: clientes_naturales
+rules:
+  - id: "V-PN-03"
+    field: "NombreEmp"
+    extends: "V-PN-03"
+    alert: "No corresponde con nombre Empresa"
+
+  - id: V-PN-89
+    field: "NombreEmp"
+    check: "expression"
+    when: "ActLaboral IN ('ASALARIADO', 'TRABAJO ASOCIADO', 'JUBILADO/PENSIONADO', 'EMPLEADO INFORMAL')"
+    fails: "is_empty(NombreEmp) OR NombreEmp = 'ACTUALIZAR'"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1642" }

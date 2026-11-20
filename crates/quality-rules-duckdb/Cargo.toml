@@ -1,0 +1,29 @@
+[package]
+name = "quality-rules-duckdb"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The rule language run on an embedded DuckDB: datasets as views over
+# Parquet files, their schema read from them, the lint's examples, and the
+# rules evaluated in one pass with counts per rule. An adapter: it does
+# I/O, so the language's stages stay pure.
+[dependencies]
+duckdb.workspace = true
+quality.workspace = true
+quality-rules-compile.workspace = true
+quality-rules-lint.workspace = true
+quality-rules-model.workspace = true
+quality-rules-sql.workspace = true
+quality-rules-tree.workspace = true
+
+[dev-dependencies]
+hmac.workspace = true
+sha2.workspace = true

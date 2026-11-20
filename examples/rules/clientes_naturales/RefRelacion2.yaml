@@ -1,0 +1,10 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-109
+    field: "RefRelacion2"
+    check: "required"
+    when: "NOT is_empty(FamParente2)"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "AlertasPN › RelacionRef2" }

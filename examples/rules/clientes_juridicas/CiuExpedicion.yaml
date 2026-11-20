@@ -1,0 +1,9 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-04
+    field: "CiuExpedicion"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1600" }

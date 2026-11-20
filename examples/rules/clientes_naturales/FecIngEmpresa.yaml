@@ -1,0 +1,19 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-68
+    field: "FecIngEmpresa"
+    check: "required"
+    when: "in_list(ActLaboral, 'genera_ingresos')"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1633" }
+
+  - id: V-PN-69
+    field: "FecIngEmpresa"
+    check: "empty"
+    when: "in_list(ActLaboral, 'no_laboral')"
+    severity: major
+    cause: capture
+    alert: "No corresponde a actividad laboral"
+    origin: { process: KNIME, node: "#1633" }

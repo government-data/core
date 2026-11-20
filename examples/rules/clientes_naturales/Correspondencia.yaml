@@ -1,0 +1,9 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-48
+    field: "Correspondencia"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1677" }

@@ -1,0 +1,33 @@
+{
+  "name": "@knime-orchestador/feature-platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.tsx",
+      "solid": "./src/index.tsx",
+      "import": "./src/index.tsx"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@knime-orchestador/feature-kit": "workspace:*",
+    "@knime-orchestador/i18n": "workspace:*"
+  },
+  "peerDependencies": {
+    "@solidjs/router": "^0.15.0",
+    "solid-js": "^1.9.0"
+  },
+  "devDependencies": {
+    "@solidjs/router": "^0.15.4",
+    "@types/jsdom": "^21.1.7",
+    "jsdom": "^26.1.0",
+    "solid-js": "^1.9.17",
+    "vitest": "^4.1.12"
+  }
+}

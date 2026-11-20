@@ -1,0 +1,23 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-113
+    field: "TotIngresos"
+    check: "expression"
+    when: "in_list(ActLaboral, 'genera_ingresos')"
+    fails: "TotIngresos <= 0"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1696" }
+
+  - id: P-09
+    field: "TotIngresos"
+    check: "expression"
+    when: "Salario IS NOT NULL"
+    fails: "abs(coalesce(Salario, 0) + coalesce(OtrIngresos, 0) - TotIngresos) > 1"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Ingresos no cuadran"
+    origin: { process: MVP }

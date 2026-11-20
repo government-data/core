@@ -1,0 +1,23 @@
+[package]
+name = "domain"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The domain is the innermost layer of the hexagon: it declares the business
+# model and the ports (traits) that outer layers implement. It takes no web
+# framework (axum) and no database driver (sqlx) — the core stays independent of
+# delivery and infrastructure concerns. `async-trait` is the sole exception: an
+# ergonomics macro (it compiles to boxed futures, pulls in no runtime) that lets
+# a port method be `async` while the trait stays object-safe behind `dyn`.
+[dependencies]
+async-trait.workspace = true
+# The audit chain's encoding (decision 0070): a pure hash, no I/O.
+sha2.workspace = true

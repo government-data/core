@@ -1,0 +1,158 @@
+# The DuckDB workers (decision 0018): stateless, on their own servers,
+# never on the application's. This file is its own stack, like Trino's: in
+# production each worker VM runs it; in development it stands for them
+# (with compose.dev.yml, which keeps the worker on its secret).
+#
+# A worker reaches the application only by URL: the queue on PostgreSQL as
+# the queue's role, the API (`/api`) for a job's details and its report,
+# and the lake with the credentials each job brings. It holds no lake or
+# Trino user (decision 0030), and here no secret at all (decision 0066,
+# step 7): the node agent (`node`, `qd-node`, from the same image) joins
+# once with its token and keeps the machine's certificate renewed in the
+# volume `machine`, which the worker reads (read-only) as its identity for
+# the API, on Traefik's internal entry point, and for the queue. Both run
+# as the image's user (distroless `nonroot`, uid 65532), as the key is 0600.
+#
+#   task worker:up | worker:down | worker:logs
+#
+# Required environment:
+#   QD_MACHINE_NAME           the machine's name, its certificate's CN
+#   QD_CA_SHA256              the installation's CA, as `server ca-init` printed it
+#   QD_JOIN_TOKEN_DIR         a directory with the join token in `token`
+#                             (deleted by the agent once joined; 0029)
+#   APP_DOMAIN, INTERNAL_DOMAIN  the public and the internal entry points
+#   QD_QUEUE_DATABASE_URL     postgres://qd_queue@<host>:5432/<database>,
+#                             no password: TLS verify-full and the
+#                             certificate are the worker's
+#   QD_WORKER_CLIENT_ID       the workers' role client (`server oidc-client
+#                             qd-worker … --machine-role worker
+#                             --client-credentials --audience quality-api`)
+#
+# With the profile `metrics` (join.sh turns it on when its command names
+# --metrics-url), Alloy reads the agent's and the worker's metrics files and
+# pushes them to Mimir (decision 0071, step 4), with worker.alloy (beside
+# this file, as join.sh writes it), as the agent's user, presenting the
+# machine's certificate; it listens on its loopback alone and publishes no
+# port. Its environment: METRICS_PUSH_URL (Mimir's remote write, HTTPS) and
+# OBS_VM (the machine's name). It also reads the machine's metrics (decision
+# 0072, step 1): Docker's data (QD_WATCH_DOCKER, which join.sh sets as
+# `docker info` gives it) and the host's /proc/1/net, both read-only.
+#
+# Untested as an image (0066 step 7 was built and checked without building
+# it); `docker compose config` validates this file.
+name: data-quality-worker
+
+services:
+  node:
+    image: ${QD_WORKER_IMAGE:-qd-worker}
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    entrypoint: ["/usr/local/bin/qd-node"]
+    # It exits non-zero only when a person must act (a refused token or
+    # renewal, another CA), and says what to do; anything else it retries.
+    restart: unless-stopped
+    read_only: true
+    environment:
+      QD_AGENT_DIR: /var/lib/qd-node
+      QD_PUBLIC_URL: ${QD_PUBLIC_URL:-https://${APP_DOMAIN:-localhost}/api}
+      QD_INTERNAL_URL: ${QD_INTERNAL_URL:-https://${INTERNAL_DOMAIN:-internal.localhost}:9443/api}
+      QD_MACHINE_NAME: ${QD_MACHINE_NAME:-}
+      QD_JOIN_TOKEN_FILE: /run/qd-join/token
+      QD_CA_SHA256: ${QD_CA_SHA256:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - machine:/var/lib/qd-node
+      - ${QD_JOIN_TOKEN_DIR:-./join}:/run/qd-join
+      - metrics:/run/qd-metrics
+
+  worker:
+    image: ${QD_WORKER_IMAGE:-qd-worker}
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    # It waits for the agent's files, and takes no job until its machine is
+    # approved (no token before). No secret: with one it does not start.
+    environment:
+      QD_MACHINE_DIR: /var/lib/qd-node
+      QD_QUEUE_DATABASE_URL: ${QD_QUEUE_DATABASE_URL:-}
+      QD_API_URL: ${QD_INTERNAL_URL:-https://${INTERNAL_DOMAIN:-internal.localhost}:9443/api}
+      QD_WORKER_CLIENT_ID: ${QD_WORKER_CLIENT_ID:-qd-worker}
+      QD_WORKER_SLOTS: ${QD_WORKER_SLOTS:-1}
+      # Below either no job is claimed (decision 0072, point 14); empty, the
+      # worker's defaults (5 GB, 10 %). Set in the .env beside this file,
+      # which join.sh keeps.
+      QD_WORKER_MIN_FREE_BYTES: ${QD_WORKER_MIN_FREE_BYTES:-}
+      QD_WORKER_MIN_FREE_MEMORY_PCT: ${QD_WORKER_MIN_FREE_MEMORY_PCT:-}
+      RUST_LOG: ${RUST_LOG:-info}
+      # The VM's name, the `vm` of every log line (decision 0026, point 1).
+      OBS_VM: ${OBS_VM:-dev}
+    volumes:
+      - machine:/var/lib/qd-node:ro
+      - metrics:/run/qd-metrics
+
+  # Alloy's write-ahead log, made the agent's user's before it starts (the
+  # image's /var/lib/alloy is its own user's alone, 0770).
+  alloy-volume:
+    image: ${ALLOY_IMAGE:-grafana/alloy:v1.21.3}
+    profiles: [metrics]
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c", '[ "$$(stat -c %u /data)" = 65532 ] || chown 65532:65532 /data']
+    volumes:
+      - alloy-data:/data
+
+  alloy:
+    image: ${ALLOY_IMAGE:-grafana/alloy:v1.21.3}
+    profiles: [metrics]
+    user: "65532:65532"
+    restart: unless-stopped
+    read_only: true
+    # No capability, none gained (decision 0072, point 2, as V1 ran it).
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/var/lib/qd-alloy
+      - --disable-reporting
+      - /etc/qd-alloy
+    environment:
+      METRICS_PUSH_URL: ${METRICS_PUSH_URL:-}
+      METRICS_CA_FILE: /run/qd-node/ca.crt
+      METRICS_CERT_FILE: /run/qd-node/machine.pem
+      OBS_VM: ${OBS_VM:-dev}
+    volumes:
+      - alloy-data:/var/lib/qd-alloy
+      - machine:/run/qd-node:ro
+      - metrics:/run/qd-metrics:ro
+      - ./worker.alloy:/etc/qd-alloy/worker.alloy:ro
+      # The watched path, for its filesystem's size and free space (statfs):
+      # not recursive, so no container's mount under it is listed.
+      - type: bind
+        source: ${QD_WATCH_DOCKER:-/var/lib/docker}
+        target: /host/watch/docker
+        read_only: true
+        bind:
+          recursive: disabled
+      # The host's interfaces: its init's network files alone, never the
+      # whole /proc (0072, point 2 as amended on 2026-11-16).
+      - /proc/1/net:/host/proc1/net:ro
+    depends_on:
+      alloy-volume:
+        condition: service_completed_successfully
+
+volumes:
+  # The machine's key and certificate: kept across restarts, so the agent
+  # joins once.
+  machine:
+  # The agent's and the worker's metrics files (decision 0071, point 9),
+  # which the machine's Alloy reads.
+  metrics:
+  # What Alloy has not pushed yet (0071, point 5).
+  alloy-data:

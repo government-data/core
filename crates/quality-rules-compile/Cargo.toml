@@ -1,0 +1,18 @@
+[package]
+name = "quality-rules-compile"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The fourteen patterns lowered to the tree with the semantics of decision
+# 0033: where a rule applies, when it skips, when it fails. Pure.
+[dependencies]
+quality-rules-model.workspace = true
+quality-rules-tree.workspace = true

@@ -1,0 +1,1547 @@
+/* The engine feature's styles, over the semantic tokens of the shell's theme. */
+
+:root {
+  /* Chart series (validated categorical palette, slots 1–2). */
+  --kn-series-cpu: #2a78d6;
+  --kn-series-ram: #eb6834;
+  /* Status (the same in both modes; always with an icon + label). */
+  --kn-status-good: #0ca30c;
+  --kn-status-warning: #fab219;
+  --kn-status-critical: #d03b3b;
+  --kn-danger: #c92a2a;
+  --kn-danger-soft: rgba(201, 42, 42, 0.12);
+  --kn-warn: #b25e09;
+  --kn-warn-soft: rgba(230, 119, 0, 0.14);
+  --kn-log-bg: #10141c;
+  --kn-log-fg: #d6dde6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --kn-series-cpu: #3987e5;
+    --kn-series-ram: #d95926;
+    --kn-danger: #ff8787;
+    --kn-danger-soft: rgba(255, 135, 135, 0.16);
+    --kn-warn: #ffc078;
+    --kn-warn-soft: rgba(255, 192, 120, 0.16);
+    --kn-log-bg: #07090d;
+  }
+}
+
+:root[data-theme="dark"] {
+  --kn-series-cpu: #3987e5;
+  --kn-series-ram: #d95926;
+  --kn-danger: #ff8787;
+  --kn-danger-soft: rgba(255, 135, 135, 0.16);
+  --kn-warn: #ffc078;
+  --kn-warn-soft: rgba(255, 192, 120, 0.16);
+  --kn-log-bg: #07090d;
+}
+
+.kn-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.kn-toolbar__spacer {
+  flex: 1;
+}
+
+.kn-toolbar .kn-search {
+  flex: 1 1 18rem;
+  max-width: 28rem;
+}
+
+/* A date in a list's filters: its label beside it. */
+.kn-date-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+/* A long text (an error) in two lines; the whole of it, on hover. */
+.kn-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 28rem;
+}
+
+.kn-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  margin-top: var(--space-3);
+  font-size: 0.85rem;
+}
+
+.kn-pager__range {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.kn-pager__size {
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem var(--space-2);
+  cursor: pointer;
+}
+
+.kn-pager__pages {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.kn-pager__btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+.kn-pager__btn:hover:not(:disabled):not([aria-current]) {
+  background: var(--color-muted-soft);
+}
+
+.kn-pager__btn:focus-visible,
+.kn-pager__size:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.kn-pager__btn:disabled {
+  color: var(--color-muted);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.kn-pager__btn[aria-current="page"] {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-weight: 600;
+  cursor: default;
+}
+
+.kn-pager__gap {
+  min-width: 1.5rem;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.kn-pager__compact {
+  display: none;
+  padding: 0 var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* On a phone the numbers do not fit: «Página 2 de 6» between the arrows. */
+@media (max-width: 640px) {
+  .kn-pager__num,
+  .kn-pager__gap {
+    display: none;
+  }
+
+  .kn-pager__compact {
+    display: inline;
+  }
+}
+
+.kn-state {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-muted-soft);
+  color: var(--color-muted);
+}
+
+.kn-state--running,
+.kn-state--queued {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.kn-state--succeeded {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.kn-state--failed,
+.kn-state--lost {
+  background: var(--kn-danger-soft);
+  color: var(--kn-danger);
+}
+
+.kn-state--timed_out,
+.kn-state--cancelled {
+  background: var(--kn-warn-soft);
+  color: var(--kn-warn);
+}
+
+.kn-form {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+.kn-form label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.kn-form input,
+.kn-form select,
+.kn-form textarea,
+.kn-toolbar select,
+.kn-toolbar input {
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.kn-form textarea {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  min-height: 5rem;
+}
+
+.kn-form__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-3);
+}
+
+.kn-form__check {
+  display: flex !important;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.kn-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.kn-error {
+  color: var(--kn-danger);
+  background: var(--kn-danger-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+}
+
+.kn-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.kn-dl dt {
+  color: var(--color-muted);
+}
+
+.kn-dl dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kn-mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.kn-license__status {
+  font-weight: 600;
+}
+
+.kn-license__status--ok {
+  color: var(--color-success, #067647);
+}
+
+.kn-license__status--warn {
+  color: var(--color-warning, #b54708);
+}
+
+.kn-license__status--bad,
+.kn-license__error {
+  color: var(--color-danger, #b42318);
+}
+
+.kn-license__bar progress {
+  width: 10rem;
+}
+
+.kn-license__features {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kn-license__off {
+  color: var(--color-muted, #667085);
+}
+
+.kn-section {
+  margin-top: var(--space-6);
+}
+
+.kn-section h2 {
+  font-size: 1.05rem;
+  margin: 0 0 var(--space-3);
+}
+
+.kn-table-wrap {
+  overflow-x: auto;
+}
+
+.kn-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.kn-link:hover {
+  text-decoration: underline;
+}
+
+/* «Volver» above a page: like the one of the Settings sections. */
+.kn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: var(--space-2);
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.kn-back:hover {
+  color: var(--color-accent);
+}
+
+.kn-empty {
+  color: var(--color-muted);
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.fk-btn.kn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+/* --- Toasts ---------------------------------------------------------------- */
+
+.kn-logbar {
+  margin: 0 0 var(--space-2);
+}
+
+.kn-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+/* Inside a form, the checkbox stays beside its text. */
+.kn-form .kn-check {
+  display: flex;
+  flex-direction: row;
+}
+
+.kn-check input {
+  width: auto;
+  flex: none;
+}
+
+/* --- Log lines -------------------------------------------------------------- */
+
+.kn-log {
+  background: var(--kn-log-bg);
+  color: var(--kn-log-fg);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: var(--space-2) 0;
+  border-radius: var(--radius);
+  max-height: 65vh;
+  overflow: auto;
+}
+
+.kn-log__empty {
+  padding: var(--space-3) var(--space-4);
+  color: #8b95a5;
+}
+
+.kn-line {
+  display: grid;
+  grid-template-columns: 4.6rem 4.4rem 1fr;
+  gap: var(--space-2);
+  padding: 1px var(--space-3);
+  border-left: 3px solid transparent;
+}
+.kn-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.kn-line__time {
+  color: #6c778a;
+}
+
+.kn-line__level {
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: #8b95a5;
+  align-self: center;
+}
+
+.kn-line__text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-width: 0;
+}
+.kn-log--nowrap .kn-line__text {
+  white-space: pre;
+  word-break: normal;
+}
+
+.kn-line__source {
+  color: #8fa3c4;
+  margin-right: var(--space-2);
+}
+.kn-line__source::after {
+  content: " ›";
+  color: #56607a;
+}
+
+.kn-line--error {
+  border-left-color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.08);
+}
+.kn-line--error .kn-line__level,
+.kn-line--error .kn-line__text {
+  color: #ffa8a8;
+}
+
+.kn-line--warn {
+  border-left-color: #ffc078;
+}
+.kn-line--warn .kn-line__level {
+  color: #ffc078;
+}
+
+.kn-line--info .kn-line__level {
+  color: #74c0fc;
+}
+
+.kn-line--agent .kn-line__level,
+.kn-line--agent .kn-line__text {
+  color: #91a7ff;
+}
+
+.kn-line--debug {
+  opacity: 0.7;
+}
+
+/* --- Row actions with icons ------------------------------------------------ */
+
+.kn-rowactions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.kn-iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+.kn-iconbtn:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-muted);
+}
+
+.kn-iconbtn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.kn-iconbtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.kn-iconbtn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.kn-iconbtn--primary:hover:not(:disabled) {
+  color: var(--color-accent-fg);
+  border-color: var(--color-accent);
+  filter: brightness(1.08);
+}
+
+.kn-iconbtn--danger {
+  color: var(--kn-danger);
+  border-color: var(--kn-danger-soft);
+  background: var(--kn-danger-soft);
+}
+
+.kn-iconbtn--danger:hover:not(:disabled) {
+  color: var(--kn-danger);
+  border-color: var(--kn-danger);
+}
+
+/* --- Run in progress: spinner ---------------------------------------------- */
+
+.kn-iconbtn--busy,
+.kn-iconbtn--busy:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.kn-iconbtn--primary.kn-iconbtn--busy {
+  animation: kn-pulse 1.6s ease-in-out infinite;
+}
+
+.kn-spin {
+  display: inline-grid;
+  animation: kn-spin 0.9s linear infinite;
+}
+
+@keyframes kn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes kn-hourglass {
+  0%,
+  65% {
+    transform: rotate(0deg);
+  }
+  85%,
+  100% {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes kn-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-accent-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 5px var(--color-accent-soft);
+  }
+}
+
+@keyframes kn-indeterminate {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kn-spin,
+  .kn-iconbtn--primary.kn-iconbtn--busy {
+    animation: none;
+  }
+}
+
+.kn-deploy__bad {
+  color: var(--kn-danger);
+  font-size: 0.85rem;
+  /* Errors carry paths without spaces: they break anywhere. */
+  overflow-wrap: anywhere;
+}
+
+.kn-m-0 {
+  margin: 0;
+}
+
+/* The license contract notice, above every view. */
+.kn-notice {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border-left: 4px solid currentColor;
+  font-weight: 500;
+}
+
+.kn-notice--warn {
+  color: var(--kn-warn);
+  background: var(--kn-warn-soft);
+}
+
+.kn-notice--bad {
+  color: var(--kn-danger);
+  background: var(--kn-danger-soft);
+}
+
+.kn-notice--info {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.kn-notice a {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* A flow's execution history: one bar per execution (Airflow style), its
+   height by duration and its color by state. */
+.kn-runs {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.kn-runs__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.kn-runs__summary strong {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.kn-runs__alert {
+  color: var(--kn-danger);
+  font-weight: 600;
+}
+
+.kn-runs__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.kn-runs__legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.kn-runs__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--kn-run-color);
+}
+
+.kn-runs__chart {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  height: 180px;
+}
+
+.kn-runs__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  /* The first and the last label, centered on their line. */
+  margin: -0.45em 0;
+}
+
+.kn-runs__plot {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  border-bottom: 1px solid var(--color-border);
+  /* Guide lines at the middle and the top. */
+  background:
+    linear-gradient(var(--color-border), var(--color-border)) 0 0 / 100% 1px no-repeat,
+    linear-gradient(var(--color-border), var(--color-border)) 0 50% / 100% 1px no-repeat;
+}
+
+/* The whole column is the click area: a short bar can be pointed at too. */
+.kn-runs__slot {
+  flex: 1 1 0;
+  max-width: 22px;
+  min-width: 3px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 3px 3px 0 0;
+  outline-offset: 2px;
+}
+
+.kn-runs__slot:hover,
+.kn-runs__slot--pointed {
+  background: var(--color-muted-soft, rgba(127, 127, 127, 0.12));
+}
+
+.kn-runs__fill {
+  display: block;
+  width: 100%;
+  /* An execution of seconds still shows. */
+  min-height: 4px;
+  border-radius: 3px 3px 0 0;
+  background: var(--kn-run-color);
+}
+
+.kn-runs__bar--succeeded {
+  --kn-run-color: var(--color-success, #067647);
+}
+
+.kn-runs__bar--failed,
+.kn-runs__bar--lost {
+  --kn-run-color: var(--kn-danger);
+}
+
+.kn-runs__bar--timed_out,
+.kn-runs__bar--cancelled {
+  --kn-run-color: var(--kn-warn);
+}
+
+.kn-runs__bar--running {
+  --kn-run-color: var(--color-accent);
+}
+
+.kn-runs__bar--queued {
+  --kn-run-color: var(--color-muted);
+}
+
+.kn-runs__bar--running .kn-runs__fill {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--kn-run-color) 0 6px,
+    color-mix(in srgb, var(--kn-run-color) 65%, transparent) 6px 12px
+  );
+  background-size: 17px 17px;
+  animation: kn-runs-stripes 1s linear infinite;
+}
+
+.kn-runs__bar--queued .kn-runs__fill {
+  opacity: 0.5;
+}
+
+@keyframes kn-runs-stripes {
+  to {
+    background-position: 17px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kn-runs__bar--running .kn-runs__fill {
+    animation: none;
+  }
+}
+
+.kn-runs__dates {
+  display: flex;
+  justify-content: space-between;
+  /* Aligned with the bars' area, not with the axis. */
+  padding-left: 3.5rem;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+/* The floating card over the pointed bar: above the chart, without covering
+   the bar or stealing its cursor. */
+.kn-runs__tip {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  width: 300px;
+  max-width: 100%;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.18);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.kn-runs__tip-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.kn-runs__tip dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.75rem;
+  margin: 0;
+}
+
+.kn-runs__tip dt {
+  color: var(--color-muted);
+}
+
+.kn-runs__tip dd {
+  margin: 0;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.kn-runs__tip-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kn-runs__tip-error {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0.5rem 0 0;
+  color: var(--kn-danger);
+}
+
+.kn-runs__tip-foot {
+  margin: 0.5rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+/* A chosen toggle button (e.g. the chart or the table view). */
+.kn-iconbtn--pressed,
+.kn-iconbtn--pressed:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* A view's header with actions to the right of the title (Run, Stop). */
+.kn-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.kn-page-head__text {
+  min-width: 0;
+}
+
+.kn-page-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.kn-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.kn-btn-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Schedules: their bar, the new-schedule form (if open) and the table, in one card. */
+.kn-schedules {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.kn-schedules__new {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* With actions (Run, Stop), the header stays on top while scrolling, below the
+   top bar (which is sticky too): at `top: 0` it covered it, and the account
+   menu with it. */
+.kn-page-head:has(.kn-page-head__actions) {
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 10;
+  margin-top: -0.75rem;
+  padding-block: 0.75rem;
+  background: var(--color-bg);
+  border-bottom: 1px solid transparent;
+}
+
+/* The flow's variables, inside its record. */
+.kn-vars {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.kn-vars h3 {
+  font-size: 1rem;
+}
+
+.kn-vars__panel {
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+/* A small table with a light gray ring. */
+.kn-vars__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 0.9rem;
+}
+
+.kn-vars__table th {
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  background: var(--color-muted-soft, rgba(127, 127, 127, 0.06));
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.kn-vars__table td {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+  vertical-align: middle;
+}
+
+.kn-vars__table tr:last-child td {
+  border-bottom: 0;
+}
+
+.kn-vars__table td:first-child {
+  width: 35%;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.kn-vars__table td:last-child {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.kn-vars__value {
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.kn-vars__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.kn-vars__chip {
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-muted-soft, rgba(127, 127, 127, 0.12));
+  font-size: 0.85rem;
+}
+
+/* The ones that did not exist: they are added. */
+.kn-vars__chip--new {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.kn-vars__errors {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--kn-danger);
+}
+
+.kn-vars__invalid {
+  color: var(--kn-danger);
+  font-size: 0.85rem;
+}
+
+.kn-vars__inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.kn-vars__inline input {
+  min-width: 0;
+  flex: 1 1 12rem;
+}
+
+/* A schedule in the style of the Windows Task Scheduler: the type on the left,
+   its detail on the right and the advanced settings below. */
+.kn-sched__main {
+  display: grid;
+  grid-template-columns: minmax(10rem, auto) 1fr;
+  gap: 1rem 1.5rem;
+}
+
+.kn-sched__kinds {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--color-border);
+}
+
+.kn-sched__detail {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.kn-sched__inline {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.kn-sched__inline input {
+  width: 5rem;
+}
+
+.kn-sched__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+}
+
+.kn-sched__months {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.kn-sched__advanced {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.kn-sched__advanced legend {
+  padding: 0 0.35rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.kn-sched__opt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.kn-sched__opt .kn-check {
+  min-width: 17rem;
+}
+
+.kn-sched__opt select,
+.kn-sched__opt input[type="date"],
+.kn-sched__opt input[type="time"] {
+  width: auto;
+}
+
+.kn-sched__summary {
+  flex: 1 1 18rem;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.kn-sched__summary--bad {
+  color: var(--kn-danger);
+}
+
+@media (max-width: 640px) {
+  .kn-sched__main {
+    grid-template-columns: 1fr;
+  }
+
+  .kn-sched__kinds {
+    padding-right: 0;
+    padding-bottom: 0.75rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .kn-sched__opt .kn-check {
+    min-width: 0;
+  }
+}
+
+/* --- Failure notify emails -------------------------------------------------- */
+
+.kn-notify {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.kn-notify legend {
+  padding: 0 var(--space-1);
+  font-size: 0.85rem;
+}
+
+.kn-notify > p {
+  margin: 0;
+}
+
+.kn-notify__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.kn-notify__area {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+.kn-notify .kn-check span {
+  overflow-wrap: anywhere;
+}
+
+/* Tabs with an icon (e.g. Areas and access): one section at a time. */
+.kn-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kn-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.kn-tabs__tab:hover {
+  color: var(--color-text);
+}
+
+.kn-tabs__tab[aria-selected="true"] {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
+}
+
+.kn-tabs__tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.kn-tabs__intro {
+  margin: 0 0 var(--space-3);
+}
+
+/* A form attached to its table: a single card, the form as its footer. */
+.card:has(+ .kn-card-foot) {
+  border-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: none;
+}
+
+.kn-card-foot {
+  border-top: 1px solid var(--color-border);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  background: var(--color-bg);
+}
+
+/* Importing notify emails from the LDAP groups. */
+.kn-import__intro {
+  flex: 1;
+  min-width: 16rem;
+  margin: 0;
+}
+
+.kn-import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+}
+
+.kn-import__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.kn-import__area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.kn-import__area legend {
+  padding: 0 var(--space-1);
+}
+
+.kn-import__person {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.kn-import__person > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.kn-import__role {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+/* Versions on the machine (the flow's record). */
+.kn-versions__title {
+  margin: 0 0 var(--space-2);
+  font-size: 1.05rem;
+}
+
+/* The timeline grows with every change: a fixed height and its own scroll, so
+   the record does not grow without end. */
+.kn-versions__list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0 var(--space-2) 0 0;
+  max-height: 480px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.kn-versions__event {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--kn-status-good);
+  overflow-wrap: anywhere;
+}
+.kn-versions__event--warn {
+  border-left-color: var(--kn-status-warning);
+}
+.kn-versions__event--bad {
+  border-left-color: var(--kn-status-critical);
+}
+.kn-versions__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/* Updates: the steps of one in progress and a version's notes. */
+.kn-update__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kn-update__steps li {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background: var(--color-surface-2, rgba(127, 127, 127, 0.12));
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.kn-update__steps li[aria-current="step"] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.kn-update__steps li.kn-update__done {
+  color: var(--color-success, #067647);
+}
+
+/* The bar of an update in progress: what is done, and the current phase's
+   stretch with a stripe running along it (the phase can take a while). */
+.kn-update__progress {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kn-update__progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.kn-update__bar {
+  position: relative;
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-surface-2, rgba(127, 127, 127, 0.15));
+}
+
+.kn-update__bar-done,
+.kn-update__bar-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  transition:
+    width 0.6s ease,
+    left 0.6s ease;
+}
+
+.kn-update__bar-done {
+  background: var(--color-accent);
+}
+
+.kn-update__bar-now {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--color-accent-soft),
+    var(--color-accent-soft) 0.4rem,
+    transparent 0.4rem,
+    transparent 0.8rem
+  );
+  background-size: 1.13rem 100%;
+  animation: kn-update-stripes 1s linear infinite;
+}
+
+.kn-update__progress--warn .kn-update__bar-done {
+  background: var(--kn-warn, #b54708);
+}
+
+.kn-update__progress--bad .kn-update__bar-done {
+  background: var(--kn-danger, #b42318);
+}
+
+.kn-update__progress--ok .kn-update__bar-done {
+  background: var(--color-success, #067647);
+}
+
+@keyframes kn-update-stripes {
+  to {
+    background-position: 1.13rem 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kn-update__bar-now {
+    animation: none;
+  }
+}
+
+.kn-update__notes {
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.kn-update__days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+@keyframes kn-skeleton {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* An LDAP group's permissions, one by one. */
+.kn-perms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.kn-perms legend {
+  padding: 0 var(--space-1);
+  font-weight: 600;
+}
+
+.kn-perms > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* In the flow page a bar or a row chooses the execution shown below it. */
+button.kn-runs__slot {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* A contact's events for its whole area: inside a table cell or the form,
+   without the picker's border. */
+.kn-notify--events {
+  border: 0;
+  padding: 0;
+}
+
+.kn-fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kn-fieldset legend {
+  padding: 0 var(--space-1);
+  font-size: 0.85rem;
+}
+
+.kn-fieldset > p {
+  margin: 0;
+}
+
+.kn-actions {
+  white-space: nowrap;
+}
+
+.kn-actions .fk-btn + .fk-btn {
+  margin-left: var(--space-1);
+}
+
+/* An application of this installation inside Quality Data (AppFrame): its
+   frame lives in a layer of its own (#app-frames, outside the app's tree)
+   and fills the page, under Quality Data's avatar. */
+#app-frames .app-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  border: 0;
+  background: var(--color-surface);
+}
+
+#app-frames .app-frame[hidden] {
+  display: none;
+}

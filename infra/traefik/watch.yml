@@ -1,0 +1,65 @@
+# Watch mode (compose.watch.yml, `task dev:watch`): the API, the web and the
+# docs run on this machine with their own watchers (watchexec + cargo, Vite,
+# watchexec + astro build) and Traefik sends https://localhost to them, as the
+# containers would.
+# Only loaded in that mode: compose.watch.yml mounts this file next to the
+# shared middlewares of ./dynamic.
+http:
+  routers:
+    # Not the machines' routes: those only on the internal entry point
+    # (internal.yml).
+    api-host:
+      rule: "Host(`localhost`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`)"
+      entryPoints: [websecure]
+      tls: {}
+      priority: 100
+      service: api-host
+      middlewares: [api-strip, security-headers]
+    # The live notices (SSE), uncompressed and without the in-flight limit.
+    api-events-host:
+      rule: "Host(`localhost`) && Path(`/api/events`)"
+      entryPoints: [websecure]
+      tls: {}
+      priority: 200
+      service: api-host
+      middlewares: [api-strip]
+    # Vite's dev server: hot reload over its websocket, without the web's CSP
+    # (it injects the styles from JavaScript).
+    web-host:
+      rule: "Host(`localhost`)"
+      entryPoints: [websecure]
+      tls: {}
+      priority: 1
+      service: web-host
+    # The docs at https://localhost/docs, only with a session (the API
+    # decides), built on every change and served as static files
+    # (`task dev:watch:docs`, tools/dev/docs.sh), with /docs in their paths.
+    # Not Astro's dev server: it asks for its modules at /@vite/client,
+    # /@id/…, /@fs/… and /src/… outside /docs, the same paths Vite's dev
+    # server answers for the web, and no setting moves them under /docs.
+    docs-host:
+      rule: "Host(`localhost`) && PathPrefix(`/docs`)"
+      entryPoints: [websecure]
+      tls: {}
+      priority: 50
+      service: docs-host
+      middlewares: [docs-auth-host]
+
+  middlewares:
+    docs-auth-host:
+      forwardAuth:
+        address: "http://host.docker.internal:8080/auth/docs"
+
+  services:
+    api-host:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8080"
+    web-host:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:5173"
+    docs-host:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:4321"

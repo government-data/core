@@ -1,0 +1,45 @@
+[package]
+name = "auth-gateway"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# Identity: the model and ports for signing in, and the use cases that wire
+# them. Its `domain` layer is as pure as the `domain` crate it builds on (the
+# shared kernel: ids, email, role, repository error, clock) — no web framework,
+# no database driver; `app` adds what the use cases need: the tenant in course
+# (`tenancy`), the texts of the account emails (`textos`), and `tokio` to send
+# a reset email without holding the request.
+[dependencies]
+async-trait.workspace = true
+# Capabilities globales (ADR 0013): `rbac::requiere`.
+iam.workspace = true
+domain.workspace = true
+tenancy.workspace = true
+texts.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+# `http`: the identity routes, on the same axum stack and error envelope as `api`.
+http-kit.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+time.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+utoipa.workspace = true
+# The Basic credentials of `/oauth/token`.
+base64.workspace = true
+
+[features]
+# In-memory doubles of the ports, for other crates' tests.
+testing = []
+
+[dev-dependencies]
+tokio.workspace = true

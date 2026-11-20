@@ -1,0 +1,619 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Generado desde infra/observability/grafana/definition con tools/grafana/dashboards.mjs: no se edita aquí ni en Grafana.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Qué registra una vista",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "content": "Los valores se muestran primero enmascarados; quien puede verlos completos los revela con un motivo. Cada revelado queda auditado como `records_viewed` con:\n\n- su **propósito**, de una lista fija, y su **referencia** (un número de ticket o de caso) cuando se dio;\n- su **trabajo**, cuántas **filas** mostró y los **nombres de los campos** que mostró: nunca un valor.\n\nLas vistas auditadas antes de que el revelado pidiera un motivo no tienen nada de esto y se leen como *no registrado*. Una lectura enmascarada no es una vista y no aparece. No existe ninguna forma de exportar datos personales. Una vista se conoce por su recurso y su forma, **no por qué clientes** mostró.",
+        "mode": "markdown"
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Vistas en el tiempo, por clase",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- Views of personal data over time, one series per kind of view (source, dataset, lake).\nSELECT $__timeGroupAlias(a.occurred_at, $__interval), split_part(a.resource, '/', 1) AS metric, count(*) AS value\nFROM public.admin_audit_events a\nWHERE $__timeFilter(a.occurred_at)\n  AND a.event_type = 'records_viewed'\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nGROUP BY 1, 2\nORDER BY 1, 2",
+          "refId": "A"
+        }
+      ],
+      "maxDataPoints": 100,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "barchart",
+      "title": "Por persona",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Views per person (the 20 with most).\nSELECT coalesce(u.display_name, u.email, a.service_account, '—') AS who, count(*) AS views\nFROM public.admin_audit_events a\nLEFT JOIN public.admin_users u ON u.id = a.admin_id\nWHERE $__timeFilter(a.occurred_at)\n  AND a.event_type = 'records_viewed'\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nGROUP BY 1\nORDER BY 2 DESC, 1\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Quién"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "who": "Quién",
+              "views": "Vistas"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "Por propósito",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Views per purpose (decision 0069); a view audited before reveals asked\n-- for one has none, '' here, and reads as not recorded.\nSELECT coalesce(a.purpose, '') AS purpose, count(*) AS views\nFROM public.admin_audit_events a\nWHERE $__timeFilter(a.occurred_at)\n  AND a.event_type = 'records_viewed'\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nGROUP BY 1\nORDER BY 2 DESC, 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Propósito"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "quality_review": {
+                        "index": 0,
+                        "text": "Revisión de la calidad de datos"
+                      },
+                      "rule_writing": {
+                        "index": 1,
+                        "text": "Escritura o prueba de reglas"
+                      },
+                      "remediation": {
+                        "index": 2,
+                        "text": "Corrección de datos"
+                      },
+                      "client_request": {
+                        "index": 3,
+                        "text": "Solicitud de un cliente"
+                      },
+                      "audit": {
+                        "index": 4,
+                        "text": "Auditoría o control interno"
+                      },
+                      "other": {
+                        "index": 5,
+                        "text": "Otro"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "No registrado"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "No registrado"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Propósito"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "purpose": "Propósito",
+              "views": "Vistas"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Por recurso (los 20 primeros)",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Views per resource viewed (the 20 with most).\nSELECT coalesce(a.resource, '—') AS resource, count(*) AS views\nFROM public.admin_audit_events a\nWHERE $__timeFilter(a.occurred_at)\n  AND a.event_type = 'records_viewed'\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nGROUP BY 1\nORDER BY 2 DESC, 1\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Vistas"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "resource": "Recurso",
+              "views": "Vistas"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Vistas",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Every view, newest first (at most 1000), with its reason and shape\n-- (decision 0069): '' as the purpose of a view audited before reveals asked\n-- for one, which reads as not recorded; never a value.\nSELECT a.occurred_at AS time, coalesce(u.display_name, u.email, a.service_account) AS who,\n  split_part(a.resource, '/', 1) AS kind, coalesce(a.purpose, '') AS purpose, a.reference,\n  a.rows_shown, array_to_string(a.fields_shown, ', ') AS fields_shown, a.resource,\n  a.job_id::text AS job_id\nFROM public.admin_audit_events a\nLEFT JOIN public.admin_users u ON u.id = a.admin_id\nWHERE $__timeFilter(a.occurred_at)\n  AND a.event_type = 'records_viewed'\n  AND ('__all' IN (${who:sqlstring}) OR a.admin_id::text IN (${who:sqlstring}))\n  AND (${resource:sqlstring} = '' OR strpos(a.resource, ${resource:sqlstring}) > 0)\nORDER BY a.occurred_at DESC, a.id\nLIMIT 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hora"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Quién"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Clase"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Propósito"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 210
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "quality_review": {
+                        "index": 0,
+                        "text": "Revisión de la calidad de datos"
+                      },
+                      "rule_writing": {
+                        "index": 1,
+                        "text": "Escritura o prueba de reglas"
+                      },
+                      "remediation": {
+                        "index": 2,
+                        "text": "Corrección de datos"
+                      },
+                      "client_request": {
+                        "index": 3,
+                        "text": "Solicitud de un cliente"
+                      },
+                      "audit": {
+                        "index": 4,
+                        "text": "Auditoría o control interno"
+                      },
+                      "other": {
+                        "index": 5,
+                        "text": "Otro"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "No registrado"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "No registrado"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Referencia"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Filas mostradas"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Campos mostrados"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Recurso"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "time": "Hora",
+              "who": "Quién",
+              "kind": "Clase",
+              "purpose": "Propósito",
+              "reference": "Referencia",
+              "rows_shown": "Filas mostradas",
+              "fields_shown": "Campos mostrados",
+              "resource": "Recurso",
+              "job_id": "Trabajo"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "quality-data",
+    "audit",
+    "personal-data"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "'__all'",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT id::text AS __value, coalesce(display_name, email) AS __text FROM public.admin_users ORDER BY 2, 1",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Quién",
+        "multi": true,
+        "name": "who",
+        "options": [],
+        "query": "SELECT id::text AS __value, coalesce(display_name, email) AS __text FROM public.admin_users ORDER BY 2, 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Recurso contiene",
+        "name": "resource",
+        "options": [],
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Acceso a datos personales",
+  "uid": "qd-personal-data-es",
+  "weekStart": ""
+}

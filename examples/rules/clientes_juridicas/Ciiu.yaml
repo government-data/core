@@ -1,0 +1,38 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-01
+    field: "Ciiu"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PJ-02
+    field: "Ciiu"
+    check: "domain"
+    not_in: ["9609"]
+    severity: major
+    cause: capture
+    alert: "Campo Errado"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: P-07
+    field: "Ciiu"
+    check: "expression"
+    fails: "Ciiu IN ('0', '0000', '?', '.') OR coalesce(DetCiiu, '') LIKE 'SIN IDENTIFICAR%'"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "CIIU sin identificar"
+    origin: { process: MVP }
+
+  - id: P-08
+    field: "Ciiu"
+    check: "format"
+    pattern: "\\d{4}"
+    severity: minor
+    cause: systemic
+    alert: "CIIU sin 4 dígitos en la fuente"
+    origin: { process: MVP }
+    note: "El flujo lo repara (ReparacionCI); se mide en la fuente para corregir la extracción.; measured on the source's code, before the flow repairs it (ReparacionCI)"

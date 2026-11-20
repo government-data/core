@@ -1,0 +1,6 @@
+dataset: clientes_juridicas
+rules:
+  - id: "V-PJ-15"
+    field: "ApeSocio"
+    extends: "V-PJ-13"
+    alert: "Campo vacío"

@@ -1,0 +1,12 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-47
+    field: "SegSocial"
+    check: "expression"
+    fails: "ActLaboral IN ('ASALARIADO') AND CodEmpresa IN ('596', '11270') AND SegSocial = 'Regimen Contributivo'"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "Error en seguridad social"
+    origin: { process: KNIME, node: "#1687" }
+    note: "Alerta cuando el régimen ES contributivo; probablemente la condición está invertida.; the flow alerts when the regime IS contributory; the condition is probably inverted"

@@ -1,0 +1,222 @@
+# The lake's replica (decisions 0027, 0028 and 0029, point 7; 0066 step 11
+# and the user's rulings of 2026-11-13): one server of role `lake-replica`,
+# which the application replicates every warehouse to. A server gets this
+# file from the install endpoint, against its join token, with the files it
+# names, and `infra/join/join.sh` writes them into its directory
+# (QD_JOIN_DIR, /opt/qd/lake-replica) and starts it:
+#
+#   compose.yml      this file
+#   drives.yml       written by join.sh: each drive (--drive PATH, a
+#                    filesystem of its own, empty at the first run) mounted
+#                    at /data/<n>, and RUSTFS_VOLUMES naming them
+#   root-keys.env    RustFS's root keys, made by the application (0600)
+#   rustfs-tls.sh    infra/rustfs/tls/entrypoint.sh
+#   lake-gate.sh     infra/rustfs/gate/entrypoint.sh
+#   lake-replica.alloy infra/observability/alloy/lake-replica.alloy (0071)
+#   otlp-token       written by join.sh: the token of RustFS's metrics push
+#                    to Alloy (0071), from the system's CSPRNG, kept on a
+#                    second run (RustFS's user's, 0600)
+#   ca.crt           the installation's CA, checked against --ca-sha256
+#   machine/         the node agent's directory (uid 10001, 0700)
+#   join/token       the join token, for the agent (uid 10001, 0600)
+#   .env             QD_MACHINE_NAME, QD_CA_SHA256, QD_PUBLIC_URL, APP_DOMAIN,
+#                    QD_JOIN_TOKEN_DIR, QD_LAKE_DRIVES; lines a person adds
+#                    are kept (INTERNAL_DOMAIN when it is not
+#                    internal.<APP_DOMAIN>, TRAEFIK_LAKEGATE_PORT, images)
+#
+# - `node`, the agent (`qd-node`, from the worker's image), runs as RustFS's
+#   user (uid 10001), so RustFS and the gate read its 0600 files as they
+#   are. It joins once with the token and renews the certificate every 8
+#   hours.
+# - `rustfs` serves TLS with the machine's certificate (rustfs-tls.sh, which
+#   also writes ca.crt: QD_RUSTFS_TLS_TRUST_CA) on a network of its own with
+#   the gate, publishing no port; it does not require client certificates,
+#   the gate does. No console and no sign-in with Quality Data: the replica
+#   is reached by the application and by the pool's replication alone. With
+#   the profile `metrics`, it pushes its metrics over OTLP to Alloy (0071).
+# - `gate`, as infra/rustfs/gate.yml: a client certificate of the
+#   installation's CA, and the API asked before each request
+#   (QD_LAKE_CHECK_URL). The pool's replication reaches it through a proxy
+#   that presents its node's machine.pem (ruling 3).
+# The object data cache (decision 0028, amended 2026-11-17; verified with
+# tools/verify/rustfs_cache.sh): whole objects up to 10 MiB kept in memory,
+# keyed by their version, so never stale. RustFS 1.0.5 has no metadata cache
+# (RUSTFS_OBJECT_CACHE_* are ignored). Each may be set in the node's .env
+# (join.sh keeps the lines a person adds):
+#   RUSTFS_OBJECT_DATA_CACHE_ENABLE          true (false turns it off)
+#   RUSTFS_OBJECT_DATA_CACHE_MODE            fill_materialize_enabled; RustFS's
+#                                            own default, fill_buffered_only,
+#                                            fills almost nothing
+#   RUSTFS_OBJECT_DATA_CACHE_MAX_BYTES       268435456 (256 MiB); the process
+#                                            grows up to ~170 MiB above it while
+#                                            filling, so leave the node room
+#   RUSTFS_OBJECT_DATA_CACHE_MAX_ENTRY_BYTES 10485760 (RustFS fills no larger)
+#   RUSTFS_OBJECT_DATA_CACHE_TTL_SECS        300
+# The root keys are used only to install: join.sh makes the platform's
+# admin user with them once, inside `rustfs`, and shows its keys on its
+# terminal alone; nothing uses the root keys after (decision 0028, point 2;
+# 0066 step 11, the user's ruling of 2026-11-13).
+name: qd-lake-replica
+
+services:
+  node:
+    image: ${QD_NODE_IMAGE:-qd-worker}
+    entrypoint: ["/usr/local/bin/qd-node"]
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    environment:
+      QD_AGENT_DIR: /var/lib/qd-node
+      QD_PUBLIC_URL: ${QD_PUBLIC_URL:?set QD_PUBLIC_URL}
+      QD_INTERNAL_URL: ${QD_INTERNAL_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}:9443/api}
+      QD_MACHINE_NAME: ${QD_MACHINE_NAME:?set QD_MACHINE_NAME}
+      QD_JOIN_TOKEN_FILE: /run/qd-join/token
+      QD_CA_SHA256: ${QD_CA_SHA256:?set QD_CA_SHA256}
+      QD_CA_FILE: /run/qd-ca/ca.crt
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - ./machine:/var/lib/qd-node
+      - ./join:/run/qd-join
+      - ./ca.crt:/run/qd-ca/ca.crt:ro
+      # Its metrics file (decision 0071, point 9), for the machine's Alloy
+      # (step 4); the image's folder is writable by its user and RustFS's.
+      - metrics:/run/qd-metrics
+
+  rustfs:
+    image: ${RUSTFS_IMAGE:-rustfs/rustfs:1.0.5}
+    restart: unless-stopped
+    # The watcher of rustfs-tls.sh is a child of this init, never of RustFS.
+    init: true
+    entrypoint: ["/etc/qd/rustfs/entrypoint.sh"]
+    command: ["server", "--address", ":9000"]
+    env_file: [./root-keys.env]
+    environment:
+      RUSTFS_OBS_LOGGER_LEVEL: ${RUSTFS_LOG_LEVEL:-warn}
+      # The object data cache: see this file's header.
+      RUSTFS_OBJECT_DATA_CACHE_ENABLE: ${RUSTFS_OBJECT_DATA_CACHE_ENABLE:-true}
+      RUSTFS_OBJECT_DATA_CACHE_MODE: ${RUSTFS_OBJECT_DATA_CACHE_MODE:-fill_materialize_enabled}
+      RUSTFS_OBJECT_DATA_CACHE_MAX_BYTES: ${RUSTFS_OBJECT_DATA_CACHE_MAX_BYTES:-268435456}
+      RUSTFS_OBJECT_DATA_CACHE_MAX_ENTRY_BYTES: ${RUSTFS_OBJECT_DATA_CACHE_MAX_ENTRY_BYTES:-10485760}
+      RUSTFS_OBJECT_DATA_CACHE_TTL_SECS: ${RUSTFS_OBJECT_DATA_CACHE_TTL_SECS:-300}
+      RUSTFS_TLS_PATH: /run/rustfs-tls
+      RUSTFS_TLS_RELOAD_ENABLE: "1"
+      RUSTFS_TLS_RELOAD_INTERVAL: "30"
+      RUSTFS_SERVER_MTLS_ENABLE: "0"
+      QD_RUSTFS_TLS_SOURCE: /run/qd-node
+      QD_RUSTFS_TLS_TRUST_CA: "1"
+      # Its metrics (decision 0071, step 4), when join.sh turns them on
+      # (QD_RUSTFS_METRICS, with --metrics-url): pushed over OTLP every 30 s
+      # to the machine's name, which on the network `otlp` is Alloy's, over
+      # HTTPS checked against the CA, with the node's token (read by
+      # rustfs-tls.sh, so it is in no setting). No traces, no logs.
+      RUSTFS_OBS_ENDPOINT: https://${QD_MACHINE_NAME:?set QD_MACHINE_NAME}:4318
+      RUSTFS_OBS_METRICS_EXPORT_ENABLED: ${QD_RUSTFS_METRICS:-false}
+      RUSTFS_OBS_TRACES_EXPORT_ENABLED: "false"
+      RUSTFS_OBS_LOGS_EXPORT_ENABLED: "false"
+      RUSTFS_OBS_METER_INTERVAL: "30"
+      RUSTFS_OBS_TLS_CA_FILE: /run/qd-node/ca.crt
+      QD_RUSTFS_OBS_TOKEN_FILE: /run/qd-otlp/token
+    tmpfs:
+      - /run/rustfs-tls:uid=10001,gid=10001,mode=0700
+    volumes:
+      - ./rustfs-tls.sh:/etc/qd/rustfs/entrypoint.sh:ro
+      - ./machine:/run/qd-node:ro
+      - ./otlp-token:/run/qd-otlp/token:ro
+    networks: [lake, otlp]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000"]
+      interval: 10s
+      retries: 40
+
+  gate:
+    image: ${TRAEFIK_IMAGE:-traefik:v3.6}
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    entrypoint: ["/etc/qd/gate/entrypoint.sh"]
+    environment:
+      QD_MACHINE_NAME: ${QD_MACHINE_NAME:?set QD_MACHINE_NAME}
+      QD_LAKE_CHECK_URL: ${QD_LAKE_CHECK_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}:${TRAEFIK_LAKEGATE_PORT:-9444}/api/internal/machines/lake/check}
+      QD_GATE_READ_TIMEOUT: 0s
+    tmpfs:
+      - /run/qd-gate:uid=10001,gid=10001,mode=0700
+    volumes:
+      - ./lake-gate.sh:/etc/qd/gate/entrypoint.sh:ro
+      - ./machine:/run/qd-node:ro
+    ports:
+      - "${RUSTFS_BIND:-0.0.0.0}:${RUSTFS_PORT:-9000}:9000"
+    networks: [lake, default]
+    depends_on:
+      rustfs:
+        condition: service_healthy
+
+  # Alloy (decision 0071, step 4), with the profile `metrics` (join.sh turns
+  # it on when its command names --metrics-url): it reads the agent's
+  # metrics file, receives RustFS's push and pushes them to Mimir with
+  # lake-replica.alloy, as the agent's user, presenting the machine's
+  # certificate. Its own server on its loopback; RustFS's receiver on the
+  # machine's name, an alias on the network `otlp` alone, which only RustFS
+  # shares, requiring TLS and the node's token; no port published. It also
+  # reads the machine's metrics (decision 0072, step 2): each drive at
+  # /host/watch/drive<n> (metrics.yml, as join.sh writes it from --drive)
+  # and the host's /proc/1/net, both read-only.
+  alloy-volume:
+    image: ${ALLOY_IMAGE:-grafana/alloy:v1.21.3}
+    profiles: [metrics]
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c", '[ "$$(stat -c %u /data)" = 10001 ] || chown 10001:10001 /data']
+    volumes:
+      - alloy-data:/data
+
+  alloy:
+    image: ${ALLOY_IMAGE:-grafana/alloy:v1.21.3}
+    profiles: [metrics]
+    user: "10001:10001"
+    restart: unless-stopped
+    read_only: true
+    # No capability, none gained (decision 0072, point 2, as V1 ran it).
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/var/lib/qd-alloy
+      - --disable-reporting
+      - /etc/qd-alloy
+    environment:
+      METRICS_PUSH_URL: ${METRICS_PUSH_URL:-}
+      METRICS_CA_FILE: /run/qd-node/ca.crt
+      METRICS_CERT_FILE: /run/qd-node/machine.pem
+      OBS_VM: ${OBS_VM:-dev}
+      OTLP_TOKEN_FILE: /run/qd-otlp/token
+    volumes:
+      - alloy-data:/var/lib/qd-alloy
+      - ./machine:/run/qd-node:ro
+      - metrics:/run/qd-metrics:ro
+      - ./lake-replica.alloy:/etc/qd-alloy/lake-replica.alloy:ro
+      - ./otlp-token:/run/qd-otlp/token:ro
+      # The host's interfaces: its init's network files alone, never the
+      # whole /proc (0072, point 2 as amended on 2026-11-16).
+      - /proc/1/net:/host/proc1/net:ro
+    networks:
+      default: {}
+      otlp:
+        aliases: ["${QD_MACHINE_NAME:?set QD_MACHINE_NAME}"]
+    depends_on:
+      alloy-volume:
+        condition: service_completed_successfully
+
+networks:
+  # RustFS and its gate alone.
+  lake:
+    internal: true
+  # RustFS and Alloy alone: RustFS's metrics push (0071).
+  otlp:
+    internal: true
+
+volumes:
+  metrics:
+  # What Alloy has not pushed yet (0071, point 5).
+  alloy-data:

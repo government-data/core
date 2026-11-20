@@ -1,0 +1,1 @@
+sum by (device, direction) (label_replace(rate(node_network_receive_bytes_total{job="host",vm="$vm"}[$__rate_interval]), "direction", "in", "", "") or label_replace(rate(node_network_transmit_bytes_total{job="host",vm="$vm"}[$__rate_interval]), "direction", "out", "", ""))

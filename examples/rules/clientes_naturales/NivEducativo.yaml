@@ -1,0 +1,30 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-83
+    field: "NivEducativo"
+    check: "required"
+    when: "NOT coalesce(TipIdnent, '') LIKE 'Registro Civil%'"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1611" }
+
+  - id: V-PN-84
+    field: "NivEducativo"
+    check: "placeholder"
+    when: "NOT coalesce(TipIdnent, '') LIKE 'Registro Civil%'"
+    values: ["ACTUALIZAR"]
+    severity: major
+    cause: capture
+    alert: "Actualizar no coincide"
+    origin: { process: KNIME, node: "#1611" }
+
+  - id: V-PN-85
+    field: "NivEducativo"
+    check: "expression"
+    fails: "coalesce(TipIdnent, '') LIKE 'Registro Civil%' AND NivEducativo IN ('TECNICO', 'TECNOLOGO', 'UNIVERSITARIO O MAYOR', 'ACTUALIZAR')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "Nivel educativo no coincide con tipo de documento"
+    origin: { process: KNIME, node: "#1611" }

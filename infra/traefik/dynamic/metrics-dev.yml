@@ -1,0 +1,44 @@
+# Development only (decision 0071): the services' metrics on the `metrics`
+# entry point over plain HTTP, for the dev Alloy, which shares this Traefik's
+# network namespace (infra/observability/compose.dev.yml) and so connects
+# from 127.0.0.1. Empty unless QD_TRAEFIK_METRICS is `plain`, which only
+# compose.override.yml sets; and even then only a client on Traefik's own
+# loopback is answered. An installation scrapes the same paths with its
+# machine certificate, through internal.yml's routers.
+{{ if eq (env "QD_TRAEFIK_METRICS") "plain" }}
+http:
+  routers:
+    metrics-dev-traefik:
+      rule: "ClientIP(`127.0.0.1`) && Path(`/metrics`)"
+      entryPoints: [metrics]
+      service: prometheus@internal
+      observability:
+        accessLogs: false
+    # Grafana's own basic auth still applies (GF_METRICS_BASIC_AUTH_*).
+    metrics-dev-grafana:
+      rule: "ClientIP(`127.0.0.1`) && Path(`/grafana/metrics`)"
+      entryPoints: [metrics]
+      service: grafana
+      observability:
+        accessLogs: false
+    # Dolt's plain metrics port, on Traefik's network in development
+    # (infra/dolt/compose.dev.yml).
+    metrics-dev-dolt:
+      rule: "ClientIP(`127.0.0.1`) && Path(`/dolt/metrics`)"
+      entryPoints: [metrics]
+      middlewares: [metrics-dev-dolt-strip]
+      service: metrics-dev-dolt
+      observability:
+        accessLogs: false
+
+  middlewares:
+    metrics-dev-dolt-strip:
+      stripPrefix:
+        prefixes: ["/dolt"]
+
+  services:
+    metrics-dev-dolt:
+      loadBalancer:
+        servers:
+          - url: "http://dolt:11228"
+{{ end }}

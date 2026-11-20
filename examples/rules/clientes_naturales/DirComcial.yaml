@@ -1,0 +1,42 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-51
+    field: "DirComcial"
+    check: "required"
+    when: "Correspondencia = 'Laboral'"
+    severity: blocking
+    cause: capture
+    alert: "No tiene dirección laboral"
+    origin: { process: KNIME, node: "#1677" }
+    note: "the flow never emits it: its condition contradicts itself; this is what it meant"
+
+  - id: V-PN-53
+    field: "DirComcial"
+    check: "length"
+    when: "ActLaboral IN ('ASALARIADO', 'TRABAJO ASOCIADO')"
+    min: "6"
+    on_empty: "fail"
+    severity: major
+    cause: capture
+    alert: "Dirección errada"
+    origin: { process: KNIME, node: "#1665" }
+
+  - id: V-PN-54
+    field: "DirComcial"
+    check: "required"
+    when: "ActLaboral IN ('ASALARIADO', 'TRABAJO ASOCIADO')"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1665" }
+
+  - id: V-PN-55
+    field: "DirComcial"
+    check: "expression"
+    fails: "regexp_like(trim(DirComcial), '[a-zñ].*')"
+    dimension: "consistency"
+    case: "exact"
+    severity: minor
+    cause: capture
+    alert: "Campo con minúsculas"
+    origin: { process: KNIME, node: "#1665" }

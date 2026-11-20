@@ -1,0 +1,64 @@
+# Development only. The dev domain is `localhost`, which inside a container
+# is the container itself: the four join the network namespace of the
+# application's Traefik, so Grafana reaches the OIDC provider at
+# https://localhost as the browser does, Traefik reaches Grafana at
+# http://127.0.0.1:3000 (the default `GRAFANA_URL`), and Loki and Mimir
+# reach the lake's S3 API at 127.0.0.1:9000. Ports in that namespace: 80 and
+# 443 (Traefik), 9000 and 9001 (RustFS), 3000 (Grafana), 3100 and 9095
+# (Loki), 9009, 9096 and 7946 (Mimir), 12345 (Alloy), 9445 (Traefik's
+# metrics entry point, plain here: dynamic/metrics-dev.yml). Grafana trusts the development CA
+# (infra/traefik/gen-dev-certs.sh). The stack stays apart, as on its own
+# servers; only the network is shared, and only here.
+services:
+  grafana:
+    network_mode: "container:${APP_STACK:-data-quality}-traefik-1"
+    environment:
+      GF_AUTH_GENERIC_OAUTH_TLS_CLIENT_CA: /etc/ssl/dev-ca.crt
+      LOKI_URL: http://127.0.0.1:${LOKI_HTTP_PORT:-3100}
+      MIMIR_URL: http://127.0.0.1:${MIMIR_HTTP_PORT:-9009}
+      # The dev database has no TLS; Traefik's namespace is on `backend`
+      # (compose.override.yml), where it is `postgres`.
+      GRAFANA_PG_HOST: postgres
+      GRAFANA_PG_SSLMODE: disable
+      # The alerts' mail to the application's Mailpit (compose.override.yml,
+      # also on `backend`): plain SMTP without a user, which Mailpit takes.
+      # Its inbox at http://127.0.0.1:8026; GRAFANA_ALERT_EMAILS from .env.
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: mailpit:1025
+      GF_SMTP_USER: ""
+      GF_SMTP_FROM_ADDRESS: grafana@example.org
+      GF_SMTP_STARTTLS_POLICY: NoStartTLS
+    volumes:
+      - ./infra/traefik/certs/dev-ca.crt:/etc/ssl/dev-ca.crt:ro
+      # The dev CA as PostgreSQL's (unused with `disable`), so the file is
+      # there as in production; GRAFANA_PG_CA_FILE in .env replaces it.
+      - ${GRAFANA_PG_CA_FILE:-./infra/traefik/certs/dev-ca.crt}:/etc/qd/postgres-ca.crt:ro
+
+  loki:
+    network_mode: "container:${APP_STACK:-data-quality}-traefik-1"
+    environment:
+      LOKI_S3_ENDPOINT: 127.0.0.1:9000
+      LOKI_S3_INSECURE: "true"
+
+  mimir:
+    network_mode: "container:${APP_STACK:-data-quality}-traefik-1"
+    environment:
+      MIMIR_S3_ENDPOINT: 127.0.0.1:9000
+      MIMIR_S3_INSECURE: "true"
+
+  alloy:
+    network_mode: "container:${APP_STACK:-data-quality}-traefik-1"
+    environment:
+      LOKI_PUSH_URL: http://127.0.0.1:${LOKI_HTTP_PORT:-3100}/loki/api/v1/push
+      # Every target on this namespace's loopback, over plain HTTP. No
+      # PostgreSQL here: its metrics' role signs in only with a machine
+      # certificate over TLS, which development's database has not.
+      METRICS_PUSH_URL: http://127.0.0.1:${MIMIR_HTTP_PORT:-9009}/api/v1/push
+      METRICS_ROUTER_ADDRESS: 127.0.0.1:9445
+      LOKI_METRICS_ADDRESS: 127.0.0.1:${LOKI_HTTP_PORT:-3100}
+      MIMIR_METRICS_ADDRESS: 127.0.0.1:${MIMIR_HTTP_PORT:-9009}
+    # Also the processes of watch mode, on this machine (alloy/dev-host.alloy),
+    # beside the files of docker-compose.yml in /etc/qd-alloy.
+    volumes:
+      - ./infra/observability/alloy/dev-host.alloy:/etc/qd-alloy/dev-host.alloy:ro
+      - ./.dev/logs:/var/log/qd-dev:ro

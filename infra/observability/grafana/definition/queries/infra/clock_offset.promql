@@ -1,0 +1,1 @@
+node_timex_offset_seconds{job="host",vm="$vm"}

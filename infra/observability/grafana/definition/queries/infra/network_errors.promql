@@ -1,0 +1,1 @@
+sum by (device) (rate({__name__=~"node_network_(receive|transmit)_(errs|drop)_total",job="host",vm="$vm"}[$__rate_interval]))

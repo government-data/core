@@ -1,0 +1,20 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-01
+    field: "ActLaboral"
+    check: "required"
+    when: "NOT ((ActLaboral IN ('ESTUDIANTE', 'MENOR') AND Cargo IN ('ESTUDIANTE', 'SIN IDENTIFICAR')) OR (ActLaboral = 'AMA DE CASA' AND Cargo = 'AMA DE CASA') OR (ActLaboral = 'DESEMPLEADO' AND Cargo = 'DESEMPLEADO'))"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1636" }
+
+  - id: V-PN-02
+    field: "ActLaboral"
+    check: "placeholder"
+    when: "NOT ((ActLaboral IN ('ESTUDIANTE', 'MENOR') AND Cargo IN ('ESTUDIANTE', 'SIN IDENTIFICAR')) OR (ActLaboral = 'AMA DE CASA' AND Cargo = 'AMA DE CASA') OR (ActLaboral = 'DESEMPLEADO' AND Cargo = 'DESEMPLEADO'))"
+    values: ["ACTUALIZAR"]
+    severity: major
+    cause: capture
+    alert: "Actualizar no coincide"
+    origin: { process: KNIME, node: "#1636" }

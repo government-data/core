@@ -1,0 +1,132 @@
+# Dev conveniences (bead authapp-a8f0ff). `docker compose` auto-loads this file,
+# so the dev workflow (`docker compose --profile dev up --build`) picks it up;
+# prod passes an explicit `-f compose.yml -f compose.prod.yml` list that omits
+# it. It only ADDS developer affordances — host port publishing and an admin
+# seed — never changing the security posture of the base stack.
+name: data-quality
+
+services:
+  # Publish Postgres to the loopback interface for local `psql`/inspection. This
+  # is an extra host bind for developers; the app still reaches it over the
+  # private `backend` network, and it is never exposed beyond 127.0.0.1.
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  # Trino's client protocol (HTTPS, a JWT on every statement; decision 0048):
+  # the coordinator shares Traefik's network, so its port is published here,
+  # to this machine only, for the worker on the host's network (and the API
+  # in watch mode). In both modes: without it no source can be read.
+  traefik:
+    ports:
+      - "127.0.0.1:8490:8490"
+    # The API runs on this machine's network (below, or on the host in watch
+    # mode): Traefik reaches it there, by its label or as `api` (the sign-in
+    # gate of the applications calls http://api:8080).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "api:host-gateway"
+    # The services' metrics over plain HTTP on the `metrics` entry point, to
+    # this namespace's own loopback alone, where the dev Alloy is
+    # (dynamic/metrics-dev.yml; decision 0071).
+    environment:
+      QD_TRAEFIK_METRICS: plain
+    # Grafana shares Traefik's network namespace in dev
+    # (infra/observability/compose.dev.yml) and reads the audit and run logs
+    # from `postgres` (decision 0026, point 6), which is only on `backend`.
+    # Traefik routes nothing new: its Docker provider exposes only labelled
+    # containers on `edge` (exposedByDefault: false) and neither `postgres`
+    # nor `mailpit` has a label. The other stacks in that namespace (RustFS,
+    # Trino, Loki, Alloy) can now open a connection to PostgreSQL, where they
+    # have no role. Joining a running Traefik needs no recreation:
+    #   docker network connect data-quality-backend data-quality-traefik-1
+    networks:
+      - edge
+      - backend
+
+  # The API on this machine's network, as tools/dev/api.sh runs it in watch
+  # mode: the dev certificate names only localhost, so the catalog (Dolt on
+  # 127.0.0.1:3307), the lake (https://localhost) and Trino (127.0.0.1:8490)
+  # are reached where they are published. It listens on 8080, as in watch
+  # mode. Pretty-printed, colored logs in dev.
+  api:
+    # The commit it is built from (`task dev` takes it from git), to see it at
+    # the foot of the menu: in dev the version does not tell which code runs.
+    build:
+      args:
+        ORQ_COMMIT: ${ORQ_COMMIT:-}
+    network_mode: host
+    networks: !reset []
+    expose: !reset []
+    environment:
+      LOG_FORMAT: pretty
+      DATABASE_URL: postgres://${APP_DB_USER:-knime_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=disable
+      DOLT_URL: mysql://qd_app:${DOLT_APP_PASSWORD:?run task catalog:up once}@127.0.0.1:${DOLT_PORT:-3307}
+      # The lake through Traefik, for the jobs' credentials (infra/rustfs/sts-issuer.sh).
+      LAKE_ENDPOINT: https://localhost
+      LAKE_CA_FILE: /etc/qd/dev-ca.crt
+      RUSTFS_STS_ISSUER_ACCESS_KEY: ${RUSTFS_STS_ISSUER_ACCESS_KEY:-}
+      RUSTFS_STS_ISSUER_SECRET_KEY: ${RUSTFS_STS_ISSUER_SECRET_KEY:-}
+      # A source on Trino keeps its catalog there, as the machine client qd-api.
+      QUALITY_TRINO_URL: https://127.0.0.1:8490
+      QUALITY_TRINO_CA_FILE: /etc/qd/dev-ca.crt
+      # The secret Trino reads its rules with (decision 0062); empty, the
+      # route is not served and Trino does not start.
+      QUALITY_TRINO_RULES_KEY: ${QUALITY_TRINO_RULES_KEY:-}
+    volumes:
+      - ./infra/traefik/certs/dev-ca.crt:/etc/qd/dev-ca.crt:ro
+
+  web:
+    build:
+      args:
+        ORQ_COMMIT: ${ORQ_COMMIT:-}
+    # The documentation through its own router, as in compose.local.yml: only
+    # with a session, and with docs-chain's CSP (Starlight's theme and
+    # language selectors are inline scripts the web's CSP blocks).
+    labels:
+      - "traefik.http.routers.docs.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/docs`)"
+      - "traefik.http.routers.docs.entrypoints=websecure"
+      - "traefik.http.routers.docs.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.docs.priority=50"
+      - "traefik.http.routers.docs.service=web"
+      - "traefik.http.routers.docs.middlewares=docs-chain@file"
+
+  # One-shot: create the first administrator from env, then exit. Runs once the
+  # database is healthy; `restart: no` so it does not loop after completing.
+  bootstrap:
+    profiles: ["dev"]
+    image: ${API_IMAGE:-data-quality-api:local}
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      args:
+        ORQ_COMMIT: ${ORQ_COMMIT:-}
+    command: ["bootstrap-admin"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${APP_DB_USER:-knime_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@postgres:5432/${POSTGRES_DB:-knime}?sslmode=disable
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-admin@example.com}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:?set ADMIN_BOOTSTRAP_PASSWORD in your environment}
+    networks:
+      - backend
+
+  # Mailpit (dev only): catches every email the platform sends, to see it
+  # without a real mailbox. In Configuración → Correo: SMTP, host `mailpit`,
+  # port 1025, no encryption. Its inbox (and its API, for the test rounds of
+  # development/testing) at http://127.0.0.1:8026 (8025 is often taken by another
+  # stack's Mailpit).
+  mailpit:
+    profiles: ["dev"]
+    image: axllent/mailpit:v1.20.4
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+      MP_MAX_MESSAGES: "2000"
+    ports:
+      - "127.0.0.1:8026:8025"
+    networks:
+      - backend

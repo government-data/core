@@ -1,0 +1,18 @@
+# The dashboards (decision 0026, point 8): JSON files shipped with the
+# installation, read from infra/observability/grafana/dashboards, mounted
+# read-only at /var/lib/grafana-dashboards. Each subdirectory becomes a
+# folder. They are changed in the repository, never in Grafana's UI: a
+# change made there cannot be saved over the file, and removing a file does
+# not delete its dashboard from Grafana (disableDeletion).
+apiVersion: 1
+
+providers:
+  - name: quality-data
+    orgId: 1
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: /var/lib/grafana-dashboards
+      foldersFromFilesStructure: true

@@ -1,0 +1,13 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-29
+    field: "Pasivo"
+    check: "expression"
+    when: "BalIniciacion = 'NO' AND coalesce(TipoPerJur, '') <> 'NO DETERMINADA'"
+    fails: "is_empty(Pasivo) OR Pasivo = 0"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1702" }
+    note: "pendiente de verificación"

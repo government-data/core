@@ -1,0 +1,23 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-72
+    field: "GtoArriendo"
+    check: "expression"
+    when: "TipIdnent = 'Cédula de Ciudadanía' AND TipVivienda = 'ARRENDADA'"
+    fails: "GtoArriendo = 0"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1648" }
+
+  - id: V-PN-73
+    field: "GtoArriendo"
+    check: "expression"
+    fails: "GtoArriendo > 0 AND TipVivienda IN ('AMIGOS', 'FAMILIAR', 'PADRES', 'PROPIA')"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo Errado"
+    origin: { process: KNIME, node: "#1648" }
+    note: "KNIME la clasifica como Completitud; es Consistencia."

@@ -1,0 +1,27 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-29
+    field: "CiuExpedicion"
+    check: "domain"
+    not_in: { "list": "departamentos" }
+    severity: major
+    cause: capture
+    alert: "Departamento en ciudad"
+    origin: { process: KNIME, node: "#1600" }
+
+  - id: V-PN-30
+    field: "CiuExpedicion"
+    check: "placeholder"
+    values: ["ACTUALIZAR"]
+    severity: major
+    cause: capture
+    alert: "Actualizar"
+    origin: { process: KNIME, node: "#1600" }
+
+  - id: V-PN-31
+    field: "CiuExpedicion"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1600" }

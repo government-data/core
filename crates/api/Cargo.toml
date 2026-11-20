@@ -1,0 +1,86 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The API layer is the HTTP boundary. It depends on `application` (to invoke use
+# cases) and `domain` (for its types), plus `axum` for routing. It holds no
+# business logic and no storage concerns — it only translates HTTP to/from the
+# application layer.
+[dependencies]
+# Service accounts' expiry dates at the HTTP boundary.
+chrono.workspace = true
+async-trait.workspace = true
+application.workspace = true
+domain.workspace = true
+auth-gateway.workspace = true
+http-kit.workspace = true
+# The payments bounded context's own types (payment status, money, query) cross
+# the transactions HTTP boundary, the same way `domain`'s types do elsewhere.
+payments.workspace = true
+# The platform's records (secrets) cross the HTTP boundary.
+platform.workspace = true
+# The lake replica's state test checks the signature its stand-in gate got.
+sigv4.workspace = true
+# Actions, policies and the Actor (ADR 0016).
+iam.workspace = true
+tenancy.workspace = true
+texts.workspace = true
+serde_json.workspace = true
+axum.workspace = true
+time.workspace = true
+# JSON request/response bodies at the HTTP boundary.
+serde.workspace = true
+# OpenAPI derivation for the JSON API (the contract the TS client is generated
+# from).
+utoipa.workspace = true
+# Explicit-allowlist CORS layer (never a wildcard).
+tower-http.workspace = true
+# Request-scoped spans and structured log events (the request-id middleware and
+# every handler's error/warn logging).
+tracing.workspace = true
+# `tokio::task_local!` backs the request-id the error type reads; only the macro
+# is used here, not a runtime (the server owns that).
+tokio = { workspace = true, features = ["sync", "time"] }
+
+[dev-dependencies]
+# The admin-access test includes the server's updates wiring, which uses it.
+chrono.workspace = true
+# Test-only: `ServiceExt::oneshot` drives the router directly in cors.rs's own
+# HTTP-level tests, without binding a real socket. `infrastructure`/`testkit`
+# back the `*_it.rs` end-to-end suites with a real, ephemeral Postgres instead
+# of fakes.
+tower.workspace = true
+# The lines a request writes (tenancy.rs's tests).
+logging.workspace = true
+infrastructure.workspace = true
+testkit.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+# The oauth end-to-end test drives the real OidcProvider against a fake
+# `HttpClient` (async-trait to implement it) and builds a fake id_token
+# (base64url). The payments-webhook test signs a body with HMAC-SHA256.
+async-trait.workspace = true
+base64.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+# Signing requests of keys made in the machines test (0066).
+rcgen.workspace = true
+# The node agent's library, driven against the real join and renew routes
+# (0066 step 6); a test dependency only, so the API never depends on it.
+node-agent.workspace = true
+# A read-only license in the machines' renew test: a fake cloud and store.
+license-model.workspace = true
+# Check the OIDC provider's signatures as a relying party would.
+ring.workspace = true
+platform.workspace = true
+# The lake replica's state test checks the signature its stand-in gate got.
+sigv4.workspace = true

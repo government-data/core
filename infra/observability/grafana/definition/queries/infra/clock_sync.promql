@@ -1,0 +1,1 @@
+node_timex_sync_status{job="host",vm="$vm"}

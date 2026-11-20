@@ -1,0 +1,115 @@
+# Traefik v3, online edition: it is infra/traefik/traefik.yml plus trusting
+# CloudFront's headers. A change in one goes in the other too.
+#
+# Traefik v3 static configuration — the single entry point for the stack.
+#
+# Everything Traefik must know at startup lives here: entry points, the ACME
+# (Let's Encrypt) certificate resolver, and the providers it watches. Per-service
+# routing (which host/path maps to which container) is NOT here — it is
+# discovered from Docker labels — and the reusable middlewares come from the
+# file provider under ./dynamic.
+
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# Entry points:
+#   web       :80   — plain HTTP, only ever used to redirect to HTTPS and to
+#                     answer the ACME HTTP-01 challenge.
+#   websecure :443  — TLS traffic; every router defaults to the letsencrypt
+#                     resolver so certificates are issued automatically.
+#   traefik   :8080 — internal-only, backs the container healthcheck (/ping).
+#                     Not published to the host.
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+    # So a slow connection (slowloris) does not hold the server:
+    #   readTimeout  reading the whole request, body included. An upload chunk
+    #                is 16 MB: 120 s are enough from ~1.1 Mbps.
+    #   writeTimeout no cap: large downloads (of several GB) take their time.
+    #   idleTimeout  a keep-alive connection without requests is closed.
+    # Behind CloudFront: the visitor's IP arrives in X-Forwarded-For
+    # (CloudFront appends it on the right) and the limits take it from there.
+    # Trusting the header is safe because no router answers without the secret
+    # only CloudFront sets (see compose.online.yml).
+    forwardedHeaders:
+      insecure: true
+    transport:
+      respondingTimeouts:
+        readTimeout: 120s
+        writeTimeout: 0s
+        idleTimeout: 90s
+  # The machines' entry point (decision 0066, point 5), as in
+  # infra/traefik/traefik.yml: never behind CloudFront, and nothing answers
+  # until dynamic/internal.yml exists.
+  internal:
+    address: ":9443"
+    transport:
+      respondingTimeouts:
+        readTimeout: 30s
+        writeTimeout: 30s
+        idleTimeout: 90s
+  traefik:
+    address: ":8080"
+
+# Providers: Docker (routers/services from container labels) and the file
+# provider (reusable middlewares + TLS options under ./dynamic, hot-reloaded).
+# `exposedByDefault: false` keeps a container off the proxy until it opts in
+# with `traefik.enable=true`.
+providers:
+  docker:
+    exposedByDefault: false
+    watch: true
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+# Let's Encrypt. HTTP-01 is the default challenge and works with only ports
+# 80/443 reachable. For wildcard certificates, or when port 80 cannot be
+# exposed, switch to the DNS-01 block below and provide the DNS provider
+# credentials through the environment.
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      # Placeholder; overridden at runtime by
+      # TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL (see compose).
+      email: "codecsrayo@gmail.com"
+      storage: /letsencrypt/acme.json
+      # Online the certificate is a wildcard (*.domain): CloudFront forwards the
+      # visitor's Host and validates against it. It only comes through DNS-01,
+      # here with Route 53 (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY /
+      # AWS_HOSTED_ZONE_ID in Traefik's environment, or the instance's role).
+      dnsChallenge:
+        provider: route53
+        resolvers:
+          - "1.1.1.1:53"
+
+# Health probe for the container healthcheck, bound to the internal entry point.
+ping:
+  entryPoint: traefik
+
+# The dashboard/API stays off by default; enable only behind authentication.
+api:
+  dashboard: false
+
+# JSON, like every service of the installation (decision 0026, point 1):
+# `level`, `time`, `message`. The access log too, one object per request
+# (`level`, `RouterName`, `RequestPath` with its query, `DownstreamStatus`,
+# `Duration` in ns, the client's address), without request headers; a
+# router with `observability.accessLogs: false` writes none.
+log:
+  level: INFO
+  format: json
+accessLog:
+  format: json

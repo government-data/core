@@ -1,0 +1,6 @@
+dataset: clientes_juridicas
+rules:
+  - id: "V-PJ-21"
+    field: "CiuComsoc"
+    extends: "V-PJ-13"
+    alert: "Campo vacío"

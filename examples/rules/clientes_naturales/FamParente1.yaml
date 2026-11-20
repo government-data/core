@@ -1,0 +1,12 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-102
+    field: "FamParente1"
+    check: "expression"
+    when: "NOT ((RefRelacion1 = 'Ninguno' AND FamParente1 = 'Ninguno') OR (is_empty(RefRelacion1) AND is_empty(FamParente1)) OR (RefRelacion1 = 'Ninguno' AND is_empty(FamParente1)))"
+    fails: "RefRelacion1 = 'Ninguno'"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "AlertasPN › ParentescoRef1" }

@@ -1,0 +1,30 @@
+-- A console statement's result (decision 0054): what its `query` job read
+-- over the tenant's lake, kept a short time for whoever asked it, then
+-- purged. It holds values: served only behind quality:ViewPersonalData and
+-- masked otherwise, every read audited.
+-- Each check is replaced in one statement, only widened: the previous
+-- version writes no `query` job, and everything it writes still holds.
+ALTER TABLE quality.jobs
+    DROP CONSTRAINT jobs_kind_check,
+    ADD CONSTRAINT jobs_kind_check
+        CHECK (kind IN ('map', 'extract', 'evaluate', 'test_rule', 'maintain', 'tables',
+                        'lake_tables', 'records', 'query'));
+ALTER TABLE quality.jobs
+    DROP CONSTRAINT jobs_dataset_needed,
+    ADD CONSTRAINT jobs_dataset_needed
+        CHECK (dataset IS NOT NULL OR kind IN ('maintain', 'tables', 'lake_tables', 'records', 'query'));
+
+CREATE TABLE quality.console_results (
+    tenant_id uuid DEFAULT public.current_tenant() NOT NULL,
+    job uuid NOT NULL,
+    result jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    PRIMARY KEY (tenant_id, job),
+    FOREIGN KEY (tenant_id, job) REFERENCES quality.jobs (tenant_id, id) ON DELETE CASCADE
+);
+
+ALTER TABLE quality.console_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quality.console_results FORCE ROW LEVEL SECURITY;
+CREATE POLICY isolation ON quality.console_results
+    USING (tenant_id = public.current_tenant())
+    WITH CHECK (tenant_id = public.current_tenant());

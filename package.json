@@ -1,0 +1,42 @@
+{
+  "name": "quality-data-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Quality Data core: platform and the data quality module",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "gen:openapi": "cargo run --quiet -p server -- openapi > openapi.json",
+    "gen:api-client": "pnpm --filter @knime-orchestador/api-client run generate",
+    "gen:api": "pnpm run gen:openapi && pnpm run gen:api-client",
+    "check:api": "pnpm run gen:api && git diff --exit-code -- openapi.json packages/api-client/src/schema.ts",
+    "gen:grafana": "node tools/grafana/dashboards.mjs && node tools/grafana/alerts.mjs",
+    "check:grafana": "pnpm run gen:grafana && git diff --exit-code -- infra/observability/grafana/dashboards infra/observability/grafana/provisioning/alerting && git ls-files --others --exclude-standard -- infra/observability/grafana/dashboards infra/observability/grafana/provisioning/alerting | (! grep .)"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "globals": "^15.15.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-astro": "~1.1.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^4.1.12"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss-nested": "^7.0.2"
+    }
+  }
+}

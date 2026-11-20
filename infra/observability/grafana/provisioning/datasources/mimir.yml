@@ -1,0 +1,21 @@
+# The services' metrics over time (decision 0071, point 12): Mimir, read as
+# a Prometheus datasource at its /prometheus API. Its URL comes from the
+# container's environment (MIMIR_URL); with TLS (certificate.yml) the
+# entrypoint adds the machine's certificate, and MIMIR_SERVER_NAME is the
+# name Mimir's certificate is checked against. Loki stays the default.
+apiVersion: 1
+
+datasources:
+  - name: Mimir
+    uid: mimir
+    type: prometheus
+    access: proxy
+    url: $MIMIR_URL/prometheus
+    isDefault: false
+    editable: false
+    jsonData:
+      prometheusType: Mimir
+      httpMethod: POST
+      # Alloy's scrape interval (decision 0071, point 2).
+      timeInterval: 30s
+      serverName: $MIMIR_SERVER_NAME

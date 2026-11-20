@@ -1,0 +1,62 @@
+# The applications of the installation that run on their own servers
+# (decisions 0018, 0029): the application's Traefik routes to them by URL,
+# never by Docker labels, which only work on one machine. Each URL comes from
+# the Traefik container's environment, with the development default.
+#
+# A new application adds its routers and service here, under the same rules:
+# a path of its own, the frame policy `app-frame-headers`, priority above the
+# web's catch-all.
+{{ $domain := env "APP_DOMAIN" | default "localhost" }}
+http:
+  routers:
+    # RustFS (infra/rustfs): its console, which also serves the admin API and
+    # the OIDC callback.
+    rustfs:
+      rule: "Host(`{{ $domain }}`) && PathPrefix(`/rustfs`)"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      priority: 10
+      service: rustfs
+      middlewares: [app-frame-headers]
+    # The console's static files, named by a hash of their content: kept by
+    # the browser (`app-static-immutable`). Its pages, route payloads, admin
+    # API and OIDC callback stay on `rustfs`; signed S3 requests on
+    # `rustfs-s3`, above this one.
+    rustfs-static:
+      rule: "Host(`{{ $domain }}`) && PathPrefix(`/rustfs/console/_next/static/`)"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      priority: 50
+      service: rustfs
+      middlewares: [app-frame-headers, app-static-immutable]
+    # The S3 API: the signed requests (SigV4 header or a presigned URL),
+    # whatever their path; Quality Data's own requests use Bearer tokens.
+    rustfs-s3:
+      rule: "Host(`{{ $domain }}`) && (HeaderRegexp(`Authorization`, `^AWS4-HMAC-SHA256 `) || QueryRegexp(`X-Amz-Algorithm`, `^AWS4-HMAC-SHA256$`))"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      priority: 100
+      service: rustfs
+    # The Iceberg REST catalog.
+    rustfs-iceberg:
+      rule: "Host(`{{ $domain }}`) && PathPrefix(`/iceberg`)"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      priority: 10
+      service: rustfs
+
+  services:
+    # With LAKE_TRANSPORT (`lake@file`, internal.yml), RustFS is reached
+    # through its gate, presenting the application VM's certificate
+    # (decision 0066, point 10).
+    rustfs:
+      loadBalancer:
+{{- if env "LAKE_TRANSPORT" }}
+        serversTransport: "{{ env "LAKE_TRANSPORT" }}"
+{{- end }}
+        servers:
+          - url: "{{ env "RUSTFS_URL" | default "http://127.0.0.1:9001" }}"

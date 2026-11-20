@@ -1,0 +1,55 @@
+[package]
+name = "quality"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The quality core (decision 0020 onwards). For now the dataset's mapping:
+# which source column each field reads, its type and semantic type, read
+# from YAML so it is versioned with the rules. Its migrations, router and
+# use cases come with M2: the module (contracts) carries its migrations.
+[dependencies]
+contracts.workspace = true
+# Schedules (src/schedule.rs): cron in the schedule's timezone.
+chrono.workspace = true
+chrono-tz.workspace = true
+croner.workspace = true
+# Triggers in the style of the Windows Task Scheduler (decision 0035).
+schedule-core.workspace = true
+# The workers' routes (src/worker_api.rs): the job's tenant for row security.
+axum.workspace = true
+async-trait.workspace = true
+tenancy.workspace = true
+tracing.workspace = true
+# The sources' routes in the OpenAPI document (src/source_api.rs).
+utoipa.workspace = true
+# The queue: the module's own adapter on PostgreSQL (src/queue.rs).
+serde_json.workspace = true
+sqlx.workspace = true
+uuid = { workspace = true, features = ["serde"] }
+quality-rules.workspace = true
+# The rule editor's messages in the request's language (src/rules_text.rs).
+texts.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
+# The queue's gauges in the API's metrics file (decision 0071).
+prometheus-client.workspace = true
+
+[dev-dependencies]
+# The module's migrations applied on an ephemeral PostgreSQL (testkit).
+infrastructure.workspace = true
+testkit.workspace = true
+sqlx.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+# The workers' routes driven without a socket (tests/worker_api.rs).
+tower.workspace = true
+# The lines a job's route writes (src/job_span/tests.rs).
+logging.workspace = true

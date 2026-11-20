@@ -1,0 +1,25 @@
+[package]
+name = "schedule-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# When a schedule fires next: 5-field cron or Windows-Task-Scheduler-style
+# triggers, evaluated in the schedule's time zone and returned in UTC. Pure
+# computation, no I/O.
+[dependencies]
+chrono.workspace = true
+chrono-tz.workspace = true
+croner.workspace = true
+serde.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -1,0 +1,528 @@
+# The mapping of clientes_naturales (decision 0020): the catalog's field names
+# to the source's columns, as the KNIME flow renames them (Column
+# Rename #1033 and #1034); `por confirmar` marks what the flow does not.
+dataset: clientes_naturales
+description: "Clientes personas naturales de la cooperativa: identificación, contacto, actividad laboral, finanzas y referencias, como los entrega la fuente en cada corte."
+source: clientes_naturales
+key: [Nit]
+fields:
+  ActLaboral:
+    column: ActLaboral
+    type: text
+    description: "Actividad laboral declarada: asalariado, independiente, pensionado, ama de casa, estudiante, entre otras."
+  TotActivos:
+    column: TotActivos
+    type: number
+    semantic: amount
+    description: "Total de activos declarados."
+  ActivosTotales:
+    column: ActivosTotales
+    type: number
+    semantic: amount
+    description: "Activos totales de la información financiera del negocio."
+  Ahorros:
+    column: Ahorros
+    type: number
+    semantic: amount
+    description: "Activos en ahorros."
+  Asesor:
+    column: Asesor
+    type: text
+    description: "Nombre del asesor comercial del cliente."
+  Asesoria:
+    column: Asesoria
+    type: number
+  Cargo:
+    column: Cargo
+    type: text
+    description: "Cargo u ocupación del cliente."
+  CARGOPEPS:
+    column: CARGOPEPS
+    type: text
+    description: "Cargo público que hace al cliente PEP."
+  CenPoblado:
+    column: CenPoblado
+    type: text
+    description: "Centro poblado de residencia (en personas jurídicas el flujo lo toma de la ciudad de residencia, CiuResid)."
+  CiuExpedicion:
+    column: CiuExpedicion
+    type: text
+    description: "Ciudad de expedición del documento de identidad."
+  CiuLaboral:
+    column: CiuLaboral
+    type: text
+    description: "Ciudad del lugar de trabajo."
+  RefCiudad1:
+    column: RefCiudad1
+    type: text
+    description: "Ciudad de la primera referencia."
+  RefCiudad2:
+    column: RefCiudad2
+    type: text
+    description: "Ciudad de la segunda referencia."
+  CiuResid:
+    column: CiuResid
+    type: text
+    description: "Ciudad de residencia del cliente."
+  IdActivo:
+    column: IdActivo
+    type: text
+    semantic: flag
+    description: "Si el cliente está activo en la cooperativa (SI/NO)."
+  CodAsesor:
+    column: CodAsesor
+    type: text
+    semantic: code
+    description: "Código del asesor comercial del cliente; enlaza con el maestro de asesores."
+  Ciiu:
+    column: Ciiu
+    type: text
+    semantic: code
+    description: "Código CIIU de la actividad económica."
+  CodCiuRes:
+    column: CodCiuRes
+    type: text
+    semantic: code
+    description: "Código DIVIPOLA de la ciudad de residencia."
+  CodEmpresa:
+    column: CodEmpresa
+    type: text
+    semantic: code
+    description: "Código de la empresa empleadora en la fuente (11, 21, 121 y 0 son códigos genéricos)."
+  Oficina:
+    column: Oficina
+    type: text
+    description: "Código de la oficina del cliente."
+  Contrato:
+    column: Contrato
+    type: text
+    description: "Tipo de contrato laboral."
+  ContratoEEUU:
+    column: ContratoEEUU
+    type: text
+    description: "Si el cliente tiene contrato en Estados Unidos (FATCA)."
+  Correspondencia:
+    column: Correspondencia
+    type: text
+    description: "Dónde quiere recibir la correspondencia: residencia, laboral, correo electrónico u otra dirección."
+  VehPropiedad:
+    column: VehPropiedad
+    type: number
+    semantic: amount
+    description: "Valor de los vehículos y propiedades."
+  CuotaAdicional:
+    column: CuotaAdicional
+    type: number
+    semantic: amount
+    description: "Cuota adicional mensual."
+  Deducciones:
+    column: Deducciones
+    type: number
+    semantic: amount
+    description: "Deducciones de nómina."
+  DeptoComcial:
+    column: DeptoComcial
+    type: text
+    description: "Departamento del lugar de trabajo."
+  DeptoRes:
+    column: DeptoRes
+    type: text
+    description: "Departamento de residencia del cliente."
+  DeudaFinanciera:
+    column: DeudaFinanciera
+    type: number
+    semantic: amount
+    description: "Deudas con entidades financieras."
+  DeudaTerceros:
+    column: DeudaTerceros
+    type: number
+    semantic: amount
+    description: "Deudas con terceros."
+  DedLegales:
+    column: DedLegales
+    type: number
+    semantic: amount
+    description: "Deducciones legales de nómina."
+  DirLaboral:
+    column: DirLaboral
+    type: text
+    description: "Dirección laboral registrada en la fuente; el flujo usa DirComcial como DireccionLaboral."
+  DirComcial:
+    column: DirComcial
+    type: text
+    description: "Dirección del lugar de trabajo (el flujo la toma de DirComcial)."
+  DirResid:
+    column: DirResid
+    type: text
+    description: "Dirección de residencia (en personas jurídicas, la dirección comercial: el flujo renombra DirComerc)."
+  Email:
+    column: Email
+    type: text
+    semantic: email
+    description: "Correo electrónico del cliente."
+  Estado:
+    column: Estado
+    type: text
+    description: "Estado del cliente en la fuente."
+  EstadoCivil:
+    column: EstadoCivil
+    type: text
+    description: "Estado civil del cliente."
+  Estrato:
+    column: Estrato
+    type: number
+    description: "Estrato socioeconómico de la vivienda."
+  ExpPublicaPEPS:
+    column: ExpPublicaPEPS
+    type: text
+    semantic: flag
+    description: "Si el cliente es persona expuesta políticamente, PEP (SI/NO)."
+  FecCorte:
+    column: FecCorte
+    type: date
+    description: "Fecha de corte que la fuente registra por cliente (varía entre registros)."
+  FecCreacion:
+    column: FecCreacion
+    type: date
+    description: "Fecha en que se creó el cliente."
+  FecDesembolso:
+    column: FecDesembolso
+    type: date
+    description: "Fecha de desembolso del último crédito del cliente."
+  FecExpedicion:
+    column: FecExpedicion
+    type: date
+    description: "Fecha de expedición del documento de identidad."
+  FecIngreso:
+    column: FecIngreso
+    type: date
+    description: "Fecha de ingreso del cliente a la cooperativa."
+  FecIngEmpresa:
+    column: FecIngEmpresa
+    type: date
+    description: "Fecha de ingreso del cliente a la empresa donde trabaja."
+  FecInicioLocal:
+    column: FecInicioLocal
+    type: date
+    description: "Fecha desde la que el negocio ocupa su local."
+  FecIniOperacion:
+    column: FecIniOperacion
+    type: date
+    description: "Fecha de inicio de operación del negocio."
+  FecNacimiento:
+    column: FecNacimiento
+    type: date
+    description: "Fecha de nacimiento del cliente."
+  FecProceso:
+    column: FecProceso
+    type: date
+    description: "Fecha en que la fuente procesó el extracto: el corte."
+  FecUltActualiza:
+    column: FecUltActualiza
+    type: date
+    description: "Fecha de la última actualización de los datos del cliente."
+  Gastos:
+    column: Gastos
+    type: number
+    semantic: amount
+    description: "Gastos del negocio del cliente."
+  GtoArriendo:
+    column: GtoArriendo
+    type: number
+    semantic: amount
+    description: "Gasto mensual en arriendo."
+  GtoFamiliares:
+    column: GtoFamiliares
+    type: number
+    semantic: amount
+    description: "Gastos familiares mensuales."
+  GiroExterior:
+    column: GiroExterior
+    type: text
+    description: "Si el cliente recibe o envía giros al exterior."
+  IdClientesNaturales:
+    column: IdClientesNaturales
+    type: text
+    description: "Identificador interno del registro en la fuente."
+  IdRiesgoLavado:
+    column: IdRiesgoLavado
+    type: text
+    description: "Calificación de riesgo de lavado de activos (SARLAFT)."
+  CiuNacito:
+    column: CiuNacito
+    type: text
+    description: "Ciudad de nacimiento del cliente."
+  ManejaMoneExt:
+    column: ManejaMoneExt
+    type: text
+    description: "Si el cliente maneja moneda extranjera."
+  ManejaTIN:
+    column: ManejaTIN
+    type: text
+    description: "Si el cliente tiene número de identificación tributaria extranjero (TIN)."
+  Nacionalidad:
+    column: Nacionalidad
+    type: text
+    description: "Nacionalidad del cliente."
+  FamNit1:
+    column: FamNit1
+    type: text
+    semantic: document
+    description: "Documento del primer familiar registrado."
+  FamNit2:
+    column: FamNit2
+    type: text
+    semantic: document
+    description: "Documento del segundo familiar registrado."
+  NivEducativo:
+    column: NivEducativo
+    type: text
+    description: "Máximo nivel educativo alcanzado."
+  Nombre:
+    column: Nombre
+    type: text
+    description: "Nombres del cliente."
+  DetCiiu:
+    column: DetCiiu
+    type: text
+    description: "Descripción del código CIIU."
+  NombreEmp:
+    column: NombreEmp
+    type: text
+    description: "Nombre de la empresa donde trabaja el cliente."
+  FamNombre1:
+    column: FamNombre1
+    type: text
+    description: "Nombre del primer familiar registrado."
+  FamNombre2:
+    column: FamNombre2
+    type: text
+    description: "Nombre del segundo familiar registrado."
+  NomOficina:
+    column: NomOficina
+    type: text
+    description: "Nombre de la oficina del cliente."
+  RefNombre1:
+    column: RefNombre1
+    type: text
+    description: "Nombre de la primera referencia personal."
+  RefNombre2:
+    column: RefNombre2
+    type: text
+    description: "Nombre de la segunda referencia personal."
+  NroPasaporte:
+    column: NroPasaporte
+    type: text
+    description: "Número de pasaporte."
+  NroTIN:
+    column: NroTIN
+    type: text
+    description: "Número de identificación tributaria extranjero."
+  NroTrabajadores:
+    column: NroTrabajadores
+    type: number
+    semantic: amount
+    description: "Número de trabajadores del negocio."
+  Celular:
+    column: Celular
+    type: text
+    semantic: mobile
+    description: "Número de teléfono celular del cliente."
+  Nit:
+    column: Nit
+    type: text
+    semantic: document
+    description: "Número del documento de identidad del cliente (NIT en personas jurídicas)."
+  NumHijos:
+    column: NumHijos
+    type: number
+    description: "Número de hijos declarado."
+  OtrosActivos:
+    column: OtrosActivos
+    type: number
+    semantic: amount
+    description: "Otros activos."
+  OtrosGastos:
+    column: OtrosGastos
+    type: number
+    semantic: amount
+    description: "Otros gastos mensuales."
+  OtrIngresos:
+    column: OtrIngresos
+    type: number
+    semantic: amount
+    description: "Otros ingresos mensuales declarados."
+  OtrosPasivos:
+    column: OtrosPasivos
+    type: number
+    semantic: amount
+    description: "Otros pasivos."
+  PagaIndCccio:
+    column: PagaIndCccio
+    type: text
+  PagoDeudas:
+    column: PagoDeudas
+    type: number
+    semantic: amount
+    description: "Pago mensual de deudas."
+  PaisContrato:
+    column: PaisContrato
+    type: text
+    description: "País del contrato en el exterior."
+  PaisPermanancia:
+    column: PaisPermanancia
+    type: text
+    description: "País de permanencia en el exterior."
+  FamParente1:
+    column: FamParente1
+    type: text
+    description: "Parentesco con el primer familiar registrado (el flujo lo toma de FamParente1)."
+  FamParente2:
+    column: FamParente2
+    type: text
+    description: "Parentesco con el segundo familiar registrado (el flujo lo toma de FamParente2)."
+  TotPasivos:
+    column: TotPasivos
+    type: number
+    semantic: amount
+    description: "Total de pasivos declarados."
+  PasivosTotales:
+    column: PasivosTotales
+    type: number
+    semantic: amount
+    description: "Pasivos totales de la información financiera del negocio."
+  Patriminio:
+    column: Patriminio
+    type: number
+    semantic: amount
+    description: "Patrimonio de la información financiera (así se llama la columna en la fuente)."
+  TotPatrimonio:
+    column: TotPatrimonio
+    type: number
+    semantic: amount
+    description: "Patrimonio declarado: activos menos pasivos."
+  Periodo:
+    column: Periodo
+    type: number
+  PermanenciaEEUU:
+    column: PermanenciaEEUU
+    type: text
+    description: "Si el cliente tiene permanencia en Estados Unidos (FATCA)."
+  PerAcargo:
+    column: PerAcargo
+    type: number
+    description: "Número de personas a cargo del cliente."
+  PriApellido:
+    column: PriApellido
+    type: text
+    description: "Primer apellido del cliente."
+  Profesion:
+    column: Profesion
+    type: text
+    description: "Profesión u oficio del cliente."
+  PropiedadRaiz:
+    column: PropiedadRaiz
+    type: text
+    description: "Si el cliente tiene propiedad raíz."
+  RegCamaraCcio:
+    column: RegCamaraCcio
+    type: text
+    description: "Si el negocio tiene registro en cámara de comercio."
+  Relacion:
+    column: Relacion
+    type: text
+  RefRelacion1:
+    column: RefRelacion1
+    type: text
+    description: "Relación del cliente con la primera referencia."
+  RefRelacion2:
+    column: RefRelacion2
+    type: text
+    description: "Relación del cliente con la segunda referencia."
+  ReqVisita:
+    column: ReqVisita
+    type: text
+    description: "Si el cliente requiere visita."
+  Salario:
+    column: Salario
+    type: number
+    semantic: amount
+    description: "Salario mensual declarado."
+  Sector:
+    column: Sector
+    type: text
+  Segmento:
+    column: Segmento
+    type: text
+    description: "Segmento comercial del cliente."
+  SdoApellido:
+    column: SdoApellido
+    type: text
+    description: "Segundo apellido del cliente."
+  SegSocial:
+    column: SegSocial
+    type: text
+    description: "Régimen de seguridad social del cliente."
+  Sexo:
+    column: Sexo
+    type: text
+    description: "Sexo del cliente."
+  TelComcial:
+    column: TelComcial
+    type: text
+    description: "Teléfono del lugar de trabajo o del negocio."
+  RefTelefono1:
+    column: RefTelefono1
+    type: text
+    description: "Teléfono de la primera referencia."
+  RefTelefono2:
+    column: RefTelefono2
+    type: text
+    description: "Teléfono de la segunda referencia."
+  TelResid:
+    column: TelResid
+    type: text
+    description: "Teléfono fijo de la residencia."
+  Vehiculo:
+    column: Vehiculo
+    type: text
+    description: "Si el cliente tiene vehículo."
+  TipIdnent:
+    column: TipIdnent
+    type: text
+    description: "Tipo de documento de identidad: cédula de ciudadanía, cédula de extranjería, tarjeta de identidad, registro civil, NIT."
+  TipoLocal:
+    column: TipoLocal
+    type: text
+    description: "Tenencia del local del negocio."
+  TipoOperaciN:
+    column: TipoOperación
+    type: text
+    description: "Tipo de operación en moneda extranjera."
+  TipVivienda:
+    column: TipVivienda
+    type: text
+    description: "Tenencia de la vivienda: propia, arrendada, familiar, de amigos o de los padres."
+  TotEgresos:
+    column: TotEgresos
+    type: number
+    semantic: amount
+    description: "Total de egresos declarados (en personas jurídicas, el total que calcula el flujo)."
+  TotIngresos:
+    column: TotIngresos
+    type: number
+    semantic: amount
+    description: "Total de ingresos declarados (en personas jurídicas, el total que calcula el flujo)."
+  Ubicacion:
+    column: Ubicacion
+    type: text
+  Utilidad:
+    column: Utilidad
+    type: number
+    semantic: amount
+    description: "Utilidad del negocio del cliente."
+  VentasNetas:
+    column: VentasNetas
+    type: number
+    semantic: amount
+    description: "Ventas netas del negocio del cliente."

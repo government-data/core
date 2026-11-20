@@ -1,0 +1,32 @@
+**/dist/**
+**/node_modules/**
+**/coverage/**
+pnpm-lock.yaml
+
+# Generated from the backend OpenAPI spec (`pnpm gen:api`). Formatted by their
+# generators (utoipa / openapi-typescript), not Prettier — reformatting them
+# here would drift from the generator output and break the CI staleness check.
+openapi.json
+packages/api-client/src/schema.ts
+# Generated from quality-rules' types; its test checks it is current.
+crates/quality-rules-model/rules.schema.json
+crates/quality/mapping.schema.json
+# Generated from infra/observability/grafana/definition (`pnpm gen:grafana`).
+infra/observability/grafana/dashboards/*/*.json
+# And the alerting provisioning, from definition/alerts.json and crates/texts
+# (`pnpm gen:grafana`, decision 0072).
+infra/observability/grafana/provisioning/alerting/*.yml
+
+# Agent / harness files (not part of the app)
+.claude/
+.gt-config/
+.mcp.json
+CLAUDE.md
+
+**/.astro/
+
+# Go templates of Traefik's file provider: not plain YAML.
+infra/traefik/dynamic/apps*.yml
+infra/traefik/dynamic/metrics-dev.yml
+infra/traefik/internal.yml
+infra/traefik/dynamic/internal.yml

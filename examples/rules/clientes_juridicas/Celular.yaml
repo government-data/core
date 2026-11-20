@@ -1,0 +1,39 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-03
+    field: "Celular"
+    check: "length"
+    in: ["10"]
+    on_empty: "fail"
+    severity: major
+    cause: capture
+    alert: "Celular errado"
+    origin: { process: KNIME, node: "#1674" }
+    note: "Un celular vacío tiene largo 0 y también se alerta."
+
+  - id: P-18
+    field: "Celular"
+    check: "unique"
+    severity: minor
+    cause: capture
+    alert: "Celular compartido con otro cliente"
+    origin: { process: MVP }
+
+  - id: P-22
+    field: "Celular"
+    check: "format"
+    pattern: "3\\d{9}"
+    severity: major
+    cause: capture
+    alert: "Celular no colombiano (3 + 9 dígitos)"
+    origin: { process: MVP }
+
+  - id: P-23
+    field: "Celular"
+    check: "length"
+    min: "1"
+    on_empty: "fail"
+    severity: major
+    cause: capture
+    alert: "Celular vacío"
+    origin: { process: MVP }

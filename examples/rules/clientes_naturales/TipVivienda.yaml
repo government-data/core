@@ -1,0 +1,39 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-74
+    field: "TipVivienda"
+    check: "expression"
+    fails: "(TipVivienda = 'ARRENDADA' AND GtoArriendo <= 0) OR (coalesce(TipVivienda, '') NOT IN ('ARRENDADA') AND GtoArriendo > 0)"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "vivienda no coincide con gasto arriendo"
+    origin: { process: KNIME, node: "#1617" }
+
+  - id: V-PN-75
+    field: "TipVivienda"
+    check: "placeholder"
+    values: ["ACTUALIZAR"]
+    severity: major
+    cause: capture
+    alert: "Actualizar"
+    origin: { process: KNIME, node: "#1617" }
+
+  - id: V-PN-76
+    field: "TipVivienda"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1617" }
+    note: "KNIME la etiqueta «Complectitud»."
+
+  - id: V-PN-77
+    field: "TipVivienda"
+    check: "expression"
+    fails: "TipIdnent IN ('Registro Civil*', 'Tarjeta de Identidad*') AND TipVivienda IN ('PROPIA', 'ARRENDADA', 'AMIGOS')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "Vivienda no coincide con tipo de documento"
+    origin: { process: KNIME, node: "#1617" }

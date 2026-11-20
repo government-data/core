@@ -1,0 +1,50 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-52
+    field: "DirResid"
+    check: "required"
+    when: "Correspondencia = 'Residencia'"
+    severity: blocking
+    cause: capture
+    alert: "No tiene dirección residencial"
+    origin: { process: KNIME, node: "#1677" }
+    note: "the flow never emits it: its condition contradicts itself; this is what it meant"
+
+  - id: V-PN-56
+    field: "DirResid"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1663" }
+
+  - id: V-PN-57
+    field: "DirResid"
+    check: "expression"
+    fails: "regexp_like(trim(DirResid), '[a-zñ].*')"
+    dimension: "consistency"
+    case: "exact"
+    severity: minor
+    cause: capture
+    alert: "Campo con minúsculas"
+    origin: { process: KNIME, node: "#1663" }
+
+  - id: V-PN-58
+    field: "DirResid"
+    check: "length"
+    min: "6"
+    severity: major
+    cause: capture
+    alert: "Dirección errada"
+    origin: { process: KNIME, node: "#1663" }
+
+  - id: P-14
+    field: "DirResid"
+    check: "format"
+    pattern: "(?:CL|CLL|CALLE|CR|CRA|KR|CARRERA|AV|AVENIDA|AK|AC|TV|TR|TRANSVERSAL|DG|DIAGONAL|CIR|CQ|KM|VDA|VEREDA|VER|MZ|MANZANA|FINCA|FCA|BRR|BARRIO|SECTOR|CORREGIMIENTO|CORR|LOTE|PARCELA|URB|CONJ)\\b.*"
+    case: "exact"
+    severity: major
+    cause: capture
+    alert: "Dirección sin nomenclatura reconocible"
+    origin: { process: MVP }
+    note: "Valida que empiece por CL, CR, KR, AV, TV, DG, KM, VDA, MZ…"

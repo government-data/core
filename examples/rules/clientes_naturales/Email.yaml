@@ -1,0 +1,44 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-49
+    field: "Email"
+    check: "required"
+    when: "Correspondencia = 'E-Mail'"
+    severity: blocking
+    cause: capture
+    alert: "No coincide con el campo email"
+    origin: { process: KNIME, node: "#1677" }
+    note: "the flow never emits it: its condition contradicts itself; this is what it meant"
+
+  - id: V-PN-59
+    field: "Email"
+    check: "expression"
+    when: "NOT is_empty(Email) AND Email <> 'notiene@notiene.com'"
+    fails: "regexp_like(trim(Email), '.*(notengo@|notiene@|@@).*') OR NOT regexp_like(trim(Email), '[A-Za-z0-9.!#$%&''*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+')"
+    dimension: "accuracy"
+    case: "exact"
+    severity: major
+    cause: capture
+    alert: "Email Errado"
+    origin: { process: KNIME, node: "#1628" }
+    note: "El flujo excluye notiene@notiene.com, justo el correo genérico más común."
+
+  - id: P-24
+    field: "Email"
+    check: "expression"
+    fails: "regexp_like(lower(trim(Email)), '.*(notiene|no\\s?tiene|sincorreo|noaplica|ninguno|correo@).*')"
+    dimension: "accuracy"
+    case: "exact"
+    severity: major
+    cause: capture
+    alert: "Correo genérico de relleno"
+    origin: { process: MVP }
+
+  - id: P-25
+    field: "Email"
+    check: "unique"
+    when: "regexp_like(lower(trim(Email)), '.*@.*') AND NOT regexp_like(lower(trim(Email)), '.*(notiene|sincorreo).*')"
+    severity: minor
+    cause: capture
+    alert: "Correo compartido con otro cliente"
+    origin: { process: MVP }

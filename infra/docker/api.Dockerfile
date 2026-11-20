@@ -1,0 +1,76 @@
+# Backend image (bead authapp-3cb595): a multi-stage build that compiles the
+# `server` binary and ships it on a distroless, non-root base.
+#
+# Build context is the repo root (see infra/traefik/docker-compose.yml):
+#   docker build -f infra/docker/api.Dockerfile -t data-quality-api .
+#
+# `cargo-chef` splits dependency compilation from the application build so an
+# edit that touches only our crates reuses the cached dependency layer — the
+# slow part — and rebuilds incrementally.
+#
+# The runtime is `gcr.io/distroless/cc-debian12:nonroot`: glibc + libgcc and
+# nothing else (no shell, no package manager), running as an unprivileged user.
+# We link TLS through rustls/ring (see the workspace Cargo.toml), so no OpenSSL
+# is needed at runtime, and sqlx embeds the migrations at compile time
+# (`sqlx::migrate!`), so the binary is fully self-contained.
+
+FROM rust:1.90-bookworm AS chef
+RUN cargo install cargo-chef --locked
+WORKDIR /app
+
+# Plan: capture the dependency graph as a recipe, so the cook stage below is
+# invalidated only when dependencies actually change.
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Build: cook the dependencies from the recipe (cached across app-only edits),
+# then compile just the server binaries.
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+COPY . .
+# The public key the binary verifies licenses with (the production one is
+# passed when building the customers' images; without it, the development one).
+ARG ORQ_LICENSE_PUBKEY=""
+# The tag's version (domain::VERSION); without it, the crate's.
+ARG ORQ_VERSION=""
+ARG ORQ_COMMIT=""
+RUN if [ -n "$ORQ_LICENSE_PUBKEY" ]; then export ORQ_LICENSE_PUBKEY; else unset ORQ_LICENSE_PUBKEY; fi; \
+    if [ -n "$ORQ_VERSION" ]; then export ORQ_VERSION; else unset ORQ_VERSION; fi; \
+    if [ -n "$ORQ_COMMIT" ]; then export ORQ_COMMIT; else unset ORQ_COMMIT; fi; \
+    cargo build --release --locked -p server -p licensing -p account
+# The folder of the key that encrypts the Settings secrets: the final image
+# has no shell to create it, and a new volume inherits its owner. The same
+# for the metrics file's folder (decision 0071), shared with Alloy.
+RUN mkdir -p /out/settings /out/qd-metrics
+
+# The licensing cloud (another image, same build):
+#   docker build -f infra/docker/api.Dockerfile --target licencias -t orquestador-licencias .
+FROM gcr.io/distroless/cc-debian12:nonroot AS licencias
+COPY --from=builder /app/target/release/licensing /usr/local/bin/licensing
+EXPOSE 8090
+USER nonroot
+ENTRYPOINT ["/usr/local/bin/licensing"]
+
+# The cloud's common account (cuenta.<domain>; another image, same build):
+#   docker build -f infra/docker/api.Dockerfile --target cuenta -t orquestador-cuenta .
+FROM gcr.io/distroless/cc-debian12:nonroot AS cuenta
+COPY --from=builder /app/target/release/account /usr/local/bin/account
+EXPOSE 8080
+USER nonroot
+ENTRYPOINT ["/usr/local/bin/account"]
+
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+WORKDIR /app
+COPY --from=builder /app/target/release/server /usr/local/bin/server
+# The key that encrypts the Settings secrets (SETTINGS_KEY_FILE).
+COPY --from=builder --chown=nonroot:nonroot /out/settings /var/lib/orquestador/settings
+COPY --from=builder --chown=nonroot:nonroot /out/qd-metrics /run/qd-metrics
+# The app binds APP_HOST:APP_PORT; the compose files set 0.0.0.0:8080.
+EXPOSE 8080
+# distroless:nonroot already runs as an unprivileged user (uid 65532); make it
+# explicit for readers and for a read-only root filesystem at deploy time.
+USER nonroot
+ENTRYPOINT ["/usr/local/bin/server"]
+CMD ["serve"]

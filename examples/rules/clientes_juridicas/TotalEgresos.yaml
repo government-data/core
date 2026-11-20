@@ -1,0 +1,23 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-27
+    field: "TotalEgresos"
+    check: "expression"
+    when: "BalIniciacion = 'NO' AND coalesce(TipoPerJur, '') <> 'NO DETERMINADA'"
+    fails: "is_empty(TotalEgresos) OR TotalEgresos = 0"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1700" }
+    note: "pendiente de verificación"
+
+  - id: P-12
+    field: "TotalEgresos"
+    check: "expression"
+    fails: "TotalIngresos > 0 AND TotalEgresos > 1.5 * TotalIngresos"
+    dimension: "accuracy"
+    severity: minor
+    cause: capture
+    alert: "Egresos muy superiores a ingresos"
+    origin: { process: MVP }

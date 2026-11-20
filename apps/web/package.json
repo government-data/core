@@ -1,0 +1,30 @@
+{
+  "name": "@knime-orchestador/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@knime-orchestador/api-client": "workspace:*",
+    "@knime-orchestador/feature-kit": "workspace:*",
+    "@knime-orchestador/feature-platform": "workspace:*",
+    "@knime-orchestador/feature-quality": "workspace:*",
+    "@knime-orchestador/feature-settings": "workspace:*",
+    "@knime-orchestador/i18n": "workspace:*",
+    "@knime-orchestador/query": "workspace:*",
+    "@knime-orchestador/shared": "workspace:*",
+    "@solidjs/router": "^0.15.4",
+    "@tanstack/solid-query": "^5.104.4",
+    "solid-js": "^1.9.17"
+  },
+  "devDependencies": {
+    "vite": "^6.4.4",
+    "vite-plugin-solid": "^2.11.14"
+  }
+}

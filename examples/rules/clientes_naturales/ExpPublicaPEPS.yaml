@@ -1,0 +1,11 @@
+dataset: clientes_naturales
+rules:
+  - id: P-19
+    field: "ExpPublicaPEPS"
+    check: "domain"
+    in: ["SI", "NO"]
+    on_empty: "fail"
+    severity: blocking
+    cause: capture
+    alert: "Marca PEP fuera de dominio"
+    origin: { process: MVP }

@@ -1,0 +1,11 @@
+dataset: clientes_naturales
+rules:
+  - id: P-15
+    field: "CodCiuRes"
+    check: "format"
+    pattern: "\\d{8}"
+    on_empty: "fail"
+    severity: blocking
+    cause: capture
+    alert: "Código DIVIPOLA inválido"
+    origin: { process: MVP }

@@ -1,0 +1,33 @@
+# The application VM's first certificate (decision 0066, point 16): an
+# overlay of docker-compose.yml and tls.yml for the installer alone, with
+# the one-shot `app-machine`, `server app-machine` from the API's image:
+#
+#   docker compose -f infra/postgres/docker-compose.yml -f infra/postgres/tls.yml \
+#     -f infra/postgres/app-machine.yml run --rm app-machine --name <machine> --dir /run/qd-node
+#
+# It runs in PostgreSQL's network namespace and reaches it on 127.0.0.1, as
+# the application's role with its password, so nothing it sends leaves
+# that namespace: during the first start PostgreSQL listens there alone and
+# without TLS (tls/entrypoint.sh), and later, run again, it speaks TLS over
+# the same loopback (`sslmode=prefer`; the server's name is not what is
+# reached there, as with Dolt's one-shot `sql`). It writes the node agent's
+# files into QD_MACHINE_DIR as the image's user, the agent's (uid 65532),
+# and reads the CA as `serve` does; its key must be readable by that user.
+# Run twice it changes nothing (`unchanged`).
+#
+# Required environment, besides tls.yml's:
+#   QD_CA_DIR   the installation's CA (`server ca-init`): ca.crt and ca.key
+# Optional: API_IMAGE (data-quality-api:local).
+services:
+  app-machine:
+    image: ${API_IMAGE:-data-quality-api:local}
+    profiles: ["app-machine"]
+    network_mode: "service:postgres"
+    entrypoint: ["/usr/local/bin/server", "app-machine"]
+    environment:
+      DATABASE_URL: postgres://${APP_DB_USER:-knime_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=prefer
+      CA_CERT_FILE: /run/qd-ca/ca.crt
+      CA_KEY_FILE: /run/qd-ca/ca.key
+    volumes:
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node
+      - ${QD_CA_DIR:?set QD_CA_DIR to the installation's CA directory}:/run/qd-ca:ro

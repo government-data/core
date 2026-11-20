@@ -1,0 +1,14 @@
+# Development only. The dev domain is `localhost`, which inside a container
+# is the container itself: RustFS joins the network namespace of the
+# application's Traefik, so https://localhost reaches the OIDC provider as in
+# the browser, and Traefik reaches RustFS at http://127.0.0.1:9001 (the
+# default `RUSTFS_URL`). It trusts the development CA
+# (infra/traefik/gen-dev-certs.sh). Its stack stays apart, as on its own
+# servers; only the network is shared, and only here.
+services:
+  rustfs:
+    network_mode: "container:${APP_STACK:-data-quality}-traefik-1"
+    environment:
+      SSL_CERT_FILE: /etc/ssl/dev-ca.crt
+    volumes:
+      - ./infra/traefik/certs/dev-ca.crt:/etc/ssl/dev-ca.crt:ro

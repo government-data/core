@@ -1,0 +1,68 @@
+//! The authentication gateway: signing people in — with a password, the
+//! company directory or an external OAuth/OIDC provider — and keeping their
+//! sessions. Embedded in each installation's server today; the same crate is
+//! meant to run on its own as the cloud's identity provider.
+//!
+//! Layered like the rest of the backend: [`domain`] holds the model and the
+//! ports, which `infrastructure` implements.
+
+pub mod app;
+pub mod domain;
+pub mod http;
+
+pub use self::app::{
+    AccessError, AdminAccess, AuditService, AuthenticatedSession, BeginOutcome, BootstrapError,
+    BootstrapOutcome, BootstrapService, CentralLoginService, CompleteOutcome, CreatedUser,
+    DirectoryLogin, DirectorySlot, Entry, IssuedSession, LoginError, LoginRequest, LoginService,
+    MailLoader, MailNotice, MailSlot, MailTone, Mailer, NewUser, OAuthAuthenticatedAdmin,
+    OAuthLoginService, OutgoingMail, PasswordResetService, ResetError, SessionError,
+    SessionService, UserChanges, UsersError, UsersService, ACTIVATION_FORM_PATH, ACTIVATION_TTL,
+    ASSIGNABLE_ROLES, DIRECTORY_USER_ROLE, HANDOFF_PATH, HANDOFF_TTL, RESET_FORM_PATH,
+};
+pub use self::app::{
+    AuthorizationServer, AuthorizeOutcome, AuthorizeRequest, TokenError, TokenRequest,
+    TokenResponse,
+};
+pub use self::domain::{
+    is_join_token, CertificateSigner, CertificateTerm, JoinTokenMint, Machine, MachineChange,
+    MachineId, MachineRegistry, MachineRole, MachineState, NewJoinToken, RedeemRefusal,
+    SignedCertificate, SigningRefusal, JOIN_TOKEN_LEN, JOIN_TOKEN_PREFIX,
+};
+pub use self::domain::{
+    AccountPolicies, AuthorizationCode, AuthorizationCodeStore, ClientAuth, ClientId,
+    ClientIdError, ClientSettings, ListedApp, OidcClient, OidcClientRegistry, SigningAlg,
+    TokenSigner,
+};
+pub use self::domain::{
+    AccountStatus, AccountSummary, AdminAccount, AdminRepository, AuthorizeParams, CsrfToken,
+    DirectoryAccounts, DirectoryAuthenticator, DirectoryError, DirectoryUser, ExchangeRequest,
+    IpLockoutStore, LinkedIdentity, LockoutPolicy, LockoutState, LoginHandoffStore, NewAdmin,
+    OAuthError, OAuthIdentity, OAuthIdentityRepository, OAuthProvider, OAuthSecretGenerator,
+    PasswordHash, PasswordHashError, PasswordHasher, PasswordPolicy, PasswordPolicyError,
+    PasswordRequirement, PasswordResetStore, PendingAuthStore, PendingAuthorization, PkcePair,
+    ProfilePicture, ProviderId, ResetTokenGenerator, ServicePrincipal, ServiceTokens, Session,
+    SessionPolicy, SessionRepository, SessionToken, SessionTokenGenerator,
+};
+pub use self::domain::{
+    AlertChange, AlertKey, AlertSeverity, FiringAlert, MachineAlertStore, ALERTING_HEARTBEAT,
+};
+pub use self::domain::{
+    CertificateReader, MachineCertificate, MachineSessions, MACHINE_ORGANIZATION,
+};
+pub use self::domain::{
+    InstallFile, InstallFiles, JoinGrant, JoinTokenCheck, Lake, LakeRootKeyStore, LakeRootKeys,
+    MAIN_POOL,
+};
+pub use self::domain::{LakeAdmin, LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept, LakeProbe};
+pub use self::domain::{
+    LakePool, LakePoolStore, PoolLayout, PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES,
+    MIN_POOL_NODES, REPLICATION_ALIAS, RUSTFS_PEER_PORT,
+};
+pub use self::domain::{
+    LakeReplication, LakeWarehouses, ReplicationOutcome, ReplicationStateStore, ReplicationStep,
+    WarehouseOutcome, WarehouseReplication, WarehouseState, Warehouses, REPLICATION_PROXY_PORT,
+    REPLICA_RETENTION_DAYS, SOURCE_NONCURRENT_DAYS,
+};
+pub use self::domain::{
+    Line, MachineCharts, MachineSeries, SeriesRange, SeriesUnavailable, SeriesWindow,
+};

@@ -1,0 +1,10 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-118
+    field: "TelResid"
+    check: "length"
+    in: ["7", "10"]
+    severity: major
+    cause: capture
+    alert: "Teléfono Errado"
+    origin: { process: KNIME, node: "#1622" }

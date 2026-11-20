@@ -1,0 +1,11 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-81
+    field: "PerAcargo"
+    check: "expression"
+    fails: "PerAcargo > 0 AND NOT TipIdnent IN ('Cédula de Ciudadanía', 'Cédula de Extranjería', 'Nit')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "Menor con personas a cargo"
+    origin: { process: KNIME, node: "#1691" }

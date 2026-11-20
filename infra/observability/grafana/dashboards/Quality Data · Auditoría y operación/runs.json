@@ -1,0 +1,644 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Generado desde infra/observability/grafana/definition con tools/grafana/dashboards.mjs: no se edita aquí ni en Grafana.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Ejecuciones: cada corte con sus trabajos, resumen y conformidad",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Each run of a cut: its two jobs (a finished job keeps no worker: the\n-- queue clears it), its summary and the conformity of its rules. The\n-- hidden log_from and log_to give the link to logs by run its time range:\n-- ten minutes either side of the run.\nSELECT\n  c.fired_at AS fired,\n  c.dataset,\n  c.cut::text AS cut,\n  c.run,\n  c.state,\n  extract(epoch FROM c.fired_at - c.due_at) AS lateness,\n  ev.engine,\n  ev.state AS evaluate_state,\n  ev.worker,\n  ev.attempts,\n  extract(epoch FROM ex.finished_at - ex.started_at) AS extract_time,\n  extract(epoch FROM ev.finished_at - ev.started_at) AS evaluate_time,\n  r.records,\n  r.duration_ms AS duration,\n  r.igcd,\n  q.conformity,\n  (extract(epoch FROM c.fired_at) * 1000)::bigint - 600000 AS log_from,\n  (extract(epoch FROM coalesce(greatest(ex.finished_at, ev.finished_at), now())) * 1000)::bigint\n    + 600000 AS log_to\nFROM quality.cuts c\nLEFT JOIN quality.jobs ex ON ex.id = c.extract_job\nLEFT JOIN quality.jobs ev ON ev.id = c.evaluate_job\nLEFT JOIN quality.run_summary r ON r.dataset = c.dataset AND r.cut = c.cut\nLEFT JOIN LATERAL (\n  SELECT 1 - sum(rr.failures)::double precision / nullif(sum(rr.applies), 0) AS conformity\n  FROM quality.rule_results rr\n  WHERE rr.dataset = c.dataset AND rr.cut = c.cut\n) q ON true\nWHERE $__timeFilter(c.fired_at)\n  AND ('__all' IN (${dataset:sqlstring}) OR c.dataset IN (${dataset:sqlstring}))\nORDER BY c.fired_at DESC\nLIMIT 500",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Disparado"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Conjunto de datos"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Corte"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Logs de esta ejecución",
+                    "url": "/d/qd-run-logs-es?var-dataset=${__data.fields.dataset}&var-cut=${__data.fields.cut}&from=${__data.fields.log_from}&to=${__data.fields.log_to}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ejecución"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Estado"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Retraso"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Motor"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Evaluación"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Ranura del worker"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 150
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Intentos"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Extracción"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tiempo de evaluación"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duración"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IGCD"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Conformidad"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "log_from"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "log_to"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "fired": "Disparado",
+              "dataset": "Conjunto de datos",
+              "cut": "Corte",
+              "run": "Ejecución",
+              "state": "Estado",
+              "lateness": "Retraso",
+              "engine": "Motor",
+              "evaluate_state": "Evaluación",
+              "worker": "Ranura del worker",
+              "attempts": "Intentos",
+              "extract_time": "Extracción",
+              "evaluate_time": "Tiempo de evaluación",
+              "records": "Registros",
+              "duration": "Duración",
+              "igcd": "IGCD",
+              "conformity": "Conformidad"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Ejecuciones disparadas, por estado actual",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- Runs fired per interval, by their state now.\nSELECT\n  $__timeGroupAlias(c.fired_at, $__interval),\n  count(*) FILTER (WHERE c.state = 'extracting') AS extracting,\n  count(*) FILTER (WHERE c.state = 'evaluating') AS evaluating,\n  count(*) FILTER (WHERE c.state = 'done') AS done,\n  count(*) FILTER (WHERE c.state = 'failed') AS failed\nFROM quality.cuts c\nWHERE $__timeFilter(c.fired_at)\n  AND ('__all' IN (${dataset:sqlstring}) OR c.dataset IN (${dataset:sqlstring}))\nGROUP BY 1\nORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "maxDataPoints": 100,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "extracting": "Extrayendo",
+              "evaluating": "Evaluando",
+              "done": "Terminados",
+              "failed": "Fallidos"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Duración y registros por ejecución",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- Each reported run: how long its evaluation took and how many records it\n-- read, at the time it reported.\nSELECT\n  r.reported_at AS time,\n  r.duration_ms AS duration,\n  r.records\nFROM quality.run_summary r\nWHERE $__timeFilter(r.reported_at)\n  AND ('__all' IN (${dataset:sqlstring}) OR r.dataset IN (${dataset:sqlstring}))\nORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "maxDataPoints": 100,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "always",
+            "spanNulls": true
+          },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duración"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "duration": "Duración",
+              "records": "Registros"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Tiempo por etapa de la evaluación",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "-- Time per stage of each reported run's evaluation, at the time it\n-- reported; a stage's name as the worker reports it.\nSELECT\n  r.reported_at AS time,\n  s.stage AS metric,\n  s.ms AS value\nFROM quality.job_stats s\nJOIN quality.run_summary r ON r.dataset = s.dataset AND r.cut = s.cut\nWHERE $__timeFilter(r.reported_at)\n  AND ('__all' IN (${dataset:sqlstring}) OR r.dataset IN (${dataset:sqlstring}))\nORDER BY 1, s.position",
+          "refId": "A"
+        }
+      ],
+      "maxDataPoints": 100,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 1,
+            "showPoints": "always",
+            "spanNulls": true
+          },
+          "min": 0,
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "text",
+      "title": "Aún no se muestra",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "options": {
+        "content": "El tiempo por etapa es todo lo que los workers reportan hoy: los **bytes leídos y desbordados a disco por etapa** están por venir (`0020_job_stats.sql`). Un trabajo terminado no conserva su worker: la cola lo borra, así que _Ranura del worker_ solo se llena mientras un trabajo corre. Abra el **corte** de una ejecución para ver sus logs.",
+        "mode": "markdown"
+      }
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "quality-data",
+    "runs"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "'__all'",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT DISTINCT dataset FROM quality.cuts ORDER BY 1",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Conjunto de datos",
+        "multi": true,
+        "name": "dataset",
+        "options": [],
+        "query": "SELECT DISTINCT dataset FROM quality.cuts ORDER BY 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Ejecuciones",
+  "uid": "qd-runs-es",
+  "weekStart": ""
+}

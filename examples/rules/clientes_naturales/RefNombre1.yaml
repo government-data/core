@@ -1,0 +1,10 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-100
+    field: "RefNombre1"
+    check: "required"
+    when: "NOT ((RefNombre1 = 'Ninguno' AND RefRelacion1 = 'Ninguno') OR (is_empty(RefNombre1) AND is_empty(RefRelacion1)) OR (RefRelacion1 = 'Ninguno' AND FamParente1 = 'Ninguno'))"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "AlertasPN › NombreRef1" }

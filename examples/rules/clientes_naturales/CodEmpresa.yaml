@@ -1,0 +1,41 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-17
+    field: "CodEmpresa"
+    check: "expression"
+    fails: "CodEmpresa IN ('21', '11', '0') AND (in_list(ActLaboral, 'independientes') OR ActLaboral = 'RENTISTA DE CAPITAL')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1671" }
+
+  - id: V-PN-18
+    field: "CodEmpresa"
+    check: "expression"
+    fails: "CodEmpresa IN ('121', '11', '0') AND ActLaboral IN ('ASALARIADO')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1671" }
+
+  - id: V-PN-19
+    field: "CodEmpresa"
+    check: "expression"
+    fails: "CodEmpresa IN ('121', '21', '0') AND ActLaboral IN ('TRABAJO ASOCIADO', 'EMPLEADO INFORMAL', 'JUBILADO/PENSIONADO')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1671" }
+
+  - id: V-PN-20
+    field: "CodEmpresa"
+    check: "expression"
+    fails: "CodEmpresa IN ('11', '21', '121', '0') AND NombreEmp IN ('COLPENSIONES', 'SEGURO SOCIAL')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "No coincide con nombre Empresa"
+    origin: { process: KNIME, node: "#1671" }

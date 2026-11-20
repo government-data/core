@@ -1,0 +1,45 @@
+[package]
+name = "node-agent"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# `qd-node` (decisions 0029, 0030, 0066): the agent every machine runs. It
+# joins with its token, keeps its certificate renewed and writes the files
+# its services read. Its own composition root, like the worker; the library
+# holds the logic behind ports (the API, the clock, the commands), so it
+# depends on no crate of the workspace but the `logging` leaf (allowed by the
+# user on 2026-11-13) and stays small: no `quality`, no `infrastructure`, no
+# DuckDB.
+[[bin]]
+name = "qd-node"
+path = "src/main.rs"
+
+[dependencies]
+async-trait.workspace = true
+# The key and the signing request, over ring (as `infrastructure::ca`).
+rcgen.workspace = true
+# Joining and renewing, with rustls; the machine's certificate as identity.
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# The CA's fingerprint (0029's `--ca-sha256`).
+sha2.workspace = true
+# The hooks and the readiness check are commands.
+tokio = { workspace = true, features = ["process"] }
+tracing.workspace = true
+# Its lines as every service's (decision 0026): flat JSON, redacted fields.
+logging.workspace = true
+# Its metrics file (decision 0071).
+prometheus-client.workspace = true
+# Reading back a certificate's dates and key.
+x509-parser.workspace = true
+# The jitter of the renewals.
+ring.workspace = true

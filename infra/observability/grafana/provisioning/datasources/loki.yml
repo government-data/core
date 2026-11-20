@@ -1,0 +1,49 @@
+# The technical logs (decision 0026): Loki, read-only from Grafana. Its URL
+# comes from the container's environment (LOKI_URL).
+#
+# Correlation (decision 0026, point 1): a line carrying a request, job, run
+# or Trino query id links to every line with that id, from any service and
+# VM. The services log them through crates/logging: `"request_id":"…"` (the
+# API's `request` span; the worker's calls send `<job id>.<hex>`),
+# `"job_id":"…"`, `"run_id":"…"` (the cut's id) and the worker's
+# `"trino_query_id":"…"` in JSON, `key=…` with colour codes when
+# LOG_FORMAT=pretty. The link matches the id as text, so it also finds lines
+# naming it without the field, such as Trino's own `TIMELINE: Query <id>`.
+# `$$` is a literal `$`: Grafana expands `$NAME` here from the environment.
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: $LOKI_URL
+    isDefault: true
+    editable: false
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        - name: request_id
+          matcherType: regex
+          matcherRegex: 'request_id(?:\x1b\[[0-9;]*m)*(?:":"|=)(?:\x1b\[[0-9;]*m)*([^"\s\x1b}]+)'
+          datasourceUid: loki
+          url: '{vm=~".+"} |= "$${__value.raw}"'
+          urlDisplayLabel: Every line of this request
+        - name: job_id
+          matcherType: regex
+          matcherRegex: 'job_id(?:\x1b\[[0-9;]*m)*(?:":"|=)(?:\x1b\[[0-9;]*m)*([^"\s\x1b}]+)'
+          datasourceUid: loki
+          url: '{vm=~".+"} |= "$${__value.raw}"'
+          urlDisplayLabel: Every line of this job
+        - name: run_id
+          matcherType: regex
+          matcherRegex: 'run_id(?:\x1b\[[0-9;]*m)*(?:":"|=)(?:\x1b\[[0-9;]*m)*([^"\s\x1b}]+)'
+          datasourceUid: loki
+          url: '{vm=~".+"} |= "$${__value.raw}"'
+          urlDisplayLabel: Every line of this run
+        - name: trino_query_id
+          matcherType: regex
+          matcherRegex: 'trino_query_id(?:\x1b\[[0-9;]*m)*(?:":"|=)(?:\x1b\[[0-9;]*m)*([^"\s\x1b}]+)'
+          datasourceUid: loki
+          url: '{vm=~".+"} |= "$${__value.raw}"'
+          urlDisplayLabel: Every line of this Trino query

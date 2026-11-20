@@ -1,0 +1,18 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-70
+    field: "FecNacimiento"
+    check: "placeholder"
+    values: ["1900-01-01"]
+    severity: major
+    cause: capture
+    alert: "Fecha errada"
+    origin: { process: KNIME, node: "#1602" }
+
+  - id: V-PN-71
+    field: "FecNacimiento"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1602" }

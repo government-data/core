@@ -1,0 +1,273 @@
+# https://taskfile.dev
+version: "3"
+
+# The watch mode runs three processes at once: each line says whose it is.
+output: prefixed
+
+vars:
+  DC: docker compose
+  # The watch mode's stack: Traefik, Postgres and Mailpit (compose.watch.yml).
+  DC_WATCH: docker compose -f compose.yml -f compose.override.yml -f compose.watch.yml
+  # The applications on their own servers (infra/<app>): each its own stack.
+  DC_APP: docker compose --project-directory . --env-file .env
+  DC_LAKE: "{{.DC_APP}} -p data-quality-lake -f infra/rustfs/docker-compose.yml -f infra/rustfs/compose.dev.yml"
+  DC_OBS: "{{.DC_APP}} -p data-quality-observability -f infra/observability/docker-compose.yml -f infra/observability/compose.dev.yml"
+  DC_CATALOG: "{{.DC_APP}} -p data-quality-dolt -f infra/dolt/docker-compose.yml -f infra/dolt/compose.dev.yml"
+  DC_TRINO: "{{.DC_APP}} -p data-quality-trino -f infra/trino/docker-compose.yml -f infra/trino/compose.dev.yml"
+  DC_WORKER: "{{.DC_APP}} -p data-quality-worker -f infra/worker/docker-compose.yml -f infra/worker/compose.dev.yml"
+
+tasks:
+  # ---------------------------------------------------------------------------
+  # Dev
+  # ---------------------------------------------------------------------------
+  dev:
+    desc: Start the full dev stack (build + bootstrap)
+    env:
+      ORQ_COMMIT:
+        sh: git rev-parse HEAD
+    cmds:
+      - "{{.DC}} --profile dev up -d --build"
+      - tools/dev/rejoin.sh
+
+  # Watch mode: the API (watchexec + cargo) and the web (Vite)
+  # on this machine, rebuilt or hot-reloaded on every change, behind
+  # the same https://localhost. Ctrl+C stops them; `task dev` goes back to
+  # the containers.
+  dev:watch:
+    desc: Run the API and web on this machine with watchers, behind https://localhost
+    cmds:
+      - mkdir -p .dev/traefik && cp infra/traefik/dynamic/*.yml infra/traefik/watch.yml .dev/traefik/
+      # The internal entry point's certificates, once gen-dev-internal.sh made them.
+      - find infra/traefik/dynamic -maxdepth 1 \( -name '*.crt' -o -name '*.key' \) -exec cp {} .dev/traefik/ \;
+      - "{{.DC_WATCH}} stop api web 2>/dev/null || true"
+      - "{{.DC_WATCH}} --profile dev up -d"
+      - tools/dev/rejoin.sh --no-wait
+      - task: dev:watch:run
+
+  dev:watch:run:
+    internal: true
+    deps: [dev:watch:api, dev:watch:web]
+
+  dev:watch:api:
+    desc: The API on this machine, rebuilt on every change (watch mode)
+    cmds:
+      - tools/dev/api.sh
+
+  dev:watch:web:
+    desc: The web's Vite dev server (watch mode)
+    dir: apps/web
+    env:
+      DEV_HMR_CLIENT_PORT: "443"
+    cmds:
+      - node_modules/.bin/vite --host 0.0.0.0 --strictPort
+
+  dev:check:
+    desc: Check that watch mode's API, web and docs answer, directly and through Traefik
+    cmds:
+      - tools/verify/dev_watch_check.sh
+
+  dev:logs:
+    desc: Follow all dev logs
+    cmds:
+      - "{{.DC}} --profile dev logs -f"
+
+  dev:logs:api:
+    desc: Follow API logs only
+    cmds:
+      - "{{.DC}} logs -f api"
+
+  down:
+    desc: Stop and remove all containers
+    cmds:
+      - "{{.DC}} -p data-quality down"
+
+  restart:
+    desc: Restart the dev stack (down + up)
+    cmds:
+      - task: down
+      - task: dev
+
+  # ---------------------------------------------------------------------------
+  # Floci (local AWS, infra/floci)
+  # ---------------------------------------------------------------------------
+  lake:up:
+    desc: Start the lake (RustFS) as its own stack, as on its own servers, and make its platform admin user (its keys shown once)
+    cmds:
+      - "{{.DC_LAKE}} up -d"
+      - sh infra/rustfs/admin-user.sh
+
+  lake:down:
+    desc: Stop the lake's stack (its data stays in its volume)
+    cmds:
+      - "{{.DC_LAKE}} down"
+
+  lake:logs:
+    desc: Follow the lake's logs
+    cmds:
+      - "{{.DC_LAKE}} logs -f"
+
+  catalog:up:
+    desc: Start the catalog (Dolt) as its own stack
+    cmds:
+      - "{{.DC_CATALOG}} up -d"
+
+  catalog:down:
+    desc: Stop the catalog's stack (its data stays in its volume)
+    cmds:
+      - "{{.DC_CATALOG}} down"
+
+  catalog:logs:
+    desc: Follow the catalog's logs
+    cmds:
+      - "{{.DC_CATALOG}} logs -f"
+
+  catalog:tenant:
+    desc: "Create or remove a tenant's database in Dolt, as root (task catalog:tenant -- add <id>)"
+    cmds:
+      - infra/dolt/tenant.sh {{.CLI_ARGS}}
+
+  catalog:backup:
+    desc: Back up every tenant's Dolt database and copy it to the lake
+    cmds:
+      - infra/dolt/backup.sh
+
+  trino:lake-user:
+    desc: Create Trino's own RustFS user and the dev warehouse (once, with the lake up)
+    cmds:
+      - sh infra/trino/lake-user.sh
+
+  trino:up:
+    desc: Start the Trino cluster (coordinator + worker) as its own stack, as on its own servers
+    cmds:
+      - "{{.DC_TRINO}} up -d"
+
+  trino:down:
+    desc: Stop the Trino cluster (its catalogs stay in its volume)
+    cmds:
+      - "{{.DC_TRINO}} down"
+
+  trino:logs:
+    desc: Follow the Trino cluster's logs
+    cmds:
+      - "{{.DC_TRINO}} logs -f"
+
+  sqlserver:load:
+    desc: "Dev SQL Server source: start it, load tmp/datos into it and point the source sqlserver_dev at it (0048)"
+    cmds:
+      - uv run --quiet tools/dev/sqlserver_source.py
+
+  sqlserver:down:
+    desc: Stop the dev SQL Server (its data stays in its volume)
+    cmds:
+      - "{{.DC_APP}} -p data-quality-sqlserver -f infra/sqlserver/docker-compose.yml down"
+
+  worker:up:
+    desc: Build and start a DuckDB worker as its own stack, as on its own server
+    cmds:
+      - "{{.DC_WORKER}} up -d --build"
+
+  worker:down:
+    desc: Stop the DuckDB worker
+    cmds:
+      - "{{.DC_WORKER}} down"
+
+  worker:logs:
+    desc: Follow the DuckDB worker's logs
+    cmds:
+      - "{{.DC_WORKER}} logs -f"
+
+  obs:up:
+    desc: Start observability (Grafana, Loki, Mimir, Alloy) as its own stack; needs the lake up
+    cmds:
+      - infra/observability/setup-storage.sh
+      - infra/observability/setup-secrets.sh
+      # Grafana's read-only PostgreSQL role (needs the API's migrations).
+      - tools/dev/grafana-role.sh
+      # Alloy reads watch mode's logs there (alloy/dev-host.alloy); made here
+      # so Docker does not make it as root.
+      - mkdir -p .dev/logs && chmod 755 .dev/logs
+      - "{{.DC_OBS}} up -d"
+
+  obs:down:
+    desc: Stop the observability stack (Grafana's data stays in its volume, the logs in the lake)
+    cmds:
+      - "{{.DC_OBS}} down"
+
+  obs:logs:
+    desc: Follow the observability stack's logs
+    cmds:
+      - "{{.DC_OBS}} logs -f"
+
+  obs:check:
+    desc: Check the observability stack end to end
+    cmds:
+      - tools/verify/observability_check.sh
+
+  floci:
+    desc: Start Floci (local AWS) and seed what infra/aws creates
+    cmds:
+      - docker start floci 2>/dev/null || {{.DC}} -f infra/floci/compose.yml up -d
+      - until curl -fsS http://localhost:4566/_floci/health >/dev/null 2>&1; do sleep 1; done
+      - infra/floci/seed.sh
+
+  floci:logs:
+    desc: Follow Floci logs
+    cmds:
+      - docker logs -f --tail 50 floci
+
+  # ---------------------------------------------------------------------------
+  # Build
+  # ---------------------------------------------------------------------------
+  build:
+    desc: Build all images
+    cmds:
+      - "{{.DC}} build"
+
+  build:api:
+    desc: Build only the API image
+    cmds:
+      - "{{.DC}} build api"
+
+  build:web:
+    desc: Build only the web image
+    cmds:
+      - "{{.DC}} build web"
+
+  build:clean:
+    desc: Build all images without cache
+    cmds:
+      - "{{.DC}} build --no-cache"
+
+  # ---------------------------------------------------------------------------
+  # Status
+  # ---------------------------------------------------------------------------
+  ps:
+    desc: Show running containers
+    cmds:
+      - "{{.DC}} ps"
+
+  # ---------------------------------------------------------------------------
+  # Database
+  # ---------------------------------------------------------------------------
+  db:shell:
+    desc: Open a psql shell into the dev database
+    cmds:
+      - "{{.DC}} exec postgres psql -U ${APP_DB_USER:-knime_app} -d ${POSTGRES_DB:-knime}"
+
+  db:logs:
+    desc: Follow Postgres logs
+    cmds:
+      - "{{.DC}} logs -f postgres"
+
+  # ---------------------------------------------------------------------------
+  # Production
+  # ---------------------------------------------------------------------------
+  prod:
+    desc: Start the production stack
+    cmds:
+      - "{{.DC}} -f compose.yml -f compose.prod.yml --profile prod up -d"
+
+  prod:down:
+    desc: Stop the production stack
+    cmds:
+      - "{{.DC}} -f compose.yml -f compose.prod.yml --profile prod down"

@@ -1,0 +1,13 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-28
+    field: "TotalIngresos"
+    check: "expression"
+    when: "BalIniciacion = 'NO' AND coalesce(TipoPerJur, '') <> 'NO DETERMINADA'"
+    fails: "is_empty(TotalIngresos) OR TotalIngresos = 0"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1699" }
+    note: "pendiente de verificación"

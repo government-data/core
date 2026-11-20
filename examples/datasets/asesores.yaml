@@ -1,0 +1,25 @@
+# The advisors' master (decision 0020), as the clients' rules reference it:
+# the clients' CodAsesor matches its CodigoEscalaAsesor (88 % of a real cut).
+dataset: asesores
+description: "Maestro de asesores comerciales, con su código y su estado; los clientes lo referencian por su asesor."
+source: asesores
+key: [CodigoEscalaAsesor]
+fields:
+  CodigoEscalaAsesor:
+    column: CodigoEscalaAsesor
+    type: text
+    semantic: code
+    description: "Código del asesor; los clientes lo llevan en CodigoAsesor."
+  EstadoAsesor:
+    column: EstadoAsesor
+    type: text
+    description: "Estado del asesor: ACTIVO o INACTIVO."
+  CedulaAsesor: { column: "CedulaAsesor", type: text }
+  NombreAsesor: { column: "NombreAsesor", type: text }
+  CargoAsesor: { column: "CargoAsesor", type: text }
+  CorreoAsesor: { column: "CorreoAsesor", type: text }
+  AreaAsesor: { column: "AreaAsesor", type: text }
+  ZonaAsesor: { column: "ZonaAsesor", type: number }
+  OficinaActualAsesor: { column: "OficinaActualAsesor", type: text }
+  NombreAgenciaAsesor: { column: "NombreAgenciaAsesor", type: text }
+  cut: { column: "cut", type: date }

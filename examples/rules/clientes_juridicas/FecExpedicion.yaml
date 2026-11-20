@@ -1,0 +1,10 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-12
+    field: "FecExpedicion"
+    check: "required"
+    when: "coalesce(TipIdnent, '') <> 'Cédula de Extranjería'"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1597" }

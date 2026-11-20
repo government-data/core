@@ -1,0 +1,386 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Generated from infra/observability/grafana/definition by tools/grafana/dashboards.mjs: not edited here or in Grafana.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "How lines are matched",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "content": "Lines are matched by the **run's id** (`run_id`, its cut's id) or **one of its jobs' ids** (its extraction and its evaluation, `job_id`), as text, in any service of the platform over the time range shown. The API and the worker log these ids as fields; matching their text also finds older lines and other services' lines that name them (such as Traefik's access log of the worker's calls), and shows a line that names one for another reason. Trino's own lines carry only its query id: the worker's `trino query started` line ties a `trino_query_id` to the job, and that id's link opens Trino's lines for the query. The run's id is shared by the cut's replacement runs, so their lines are shown too; only the latest run's jobs are listed. The observability stack's own lines (Grafana, Loki, Alloy) are left out: they log the search itself.",
+        "mode": "markdown"
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "The run's jobs",
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- The run's jobs: its extraction and its evaluation (a finished job keeps\n-- no worker: the queue clears it).\nSELECT\n  j.kind,\n  j.state,\n  j.engine,\n  j.worker,\n  j.attempts,\n  j.started_at AS started,\n  j.finished_at AS finished,\n  extract(epoch FROM j.finished_at - j.started_at) AS took\nFROM quality.cuts c\nJOIN quality.jobs j ON j.id IN (c.extract_job, c.evaluate_job)\nWHERE c.dataset = ${dataset:sqlstring}\n  AND c.cut::text = ${cut:sqlstring}\nORDER BY j.created_at",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Kind"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Engine"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Worker slot"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Attempts"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 95
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Started"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Finished"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 200
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Took"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "kind": "Kind",
+              "state": "State",
+              "engine": "Engine",
+              "worker": "Worker slot",
+              "attempts": "Attempts",
+              "started": "Started",
+              "finished": "Finished",
+              "took": "Took"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Lines per service",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "sum by (service) (count_over_time({compose_project=~\"data-quality.*\", service!~\"grafana|loki|alloy\"} |~ `${run_id:raw}|${jobs:raw}` [$__auto]))",
+          "legendFormat": "{{service}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "maxDataPoints": 100,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            }
+          },
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "Log lines naming the run or its jobs",
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "editorMode": "code",
+          "expr": "{compose_project=~\"data-quality.*\", service!~\"grafana|loki|alloy\"} |~ `${run_id:raw}|${jobs:raw}`",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "quality-data",
+    "runs",
+    "logs"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT DISTINCT dataset FROM quality.cuts ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Dataset",
+        "multi": false,
+        "name": "dataset",
+        "options": [],
+        "query": "SELECT DISTINCT dataset FROM quality.cuts ORDER BY 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT cut::text FROM quality.cuts WHERE dataset IN (${dataset:sqlstring}) ORDER BY cut DESC LIMIT 60",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Cut",
+        "multi": false,
+        "name": "cut",
+        "options": [],
+        "query": "SELECT cut::text FROM quality.cuts WHERE dataset IN (${dataset:sqlstring}) ORDER BY cut DESC LIMIT 60",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT coalesce(string_agg(x.id::text, '|' ORDER BY x.id::text), '[^\\x00-\\x{10FFFF}]') FROM quality.cuts c CROSS JOIN LATERAL (VALUES (c.extract_job), (c.evaluate_job)) x(id) WHERE c.dataset IN (${dataset:sqlstring}) AND c.cut::text IN (${cut:sqlstring}) AND x.id IS NOT NULL",
+        "hide": 2,
+        "includeAll": false,
+        "label": "The run's jobs",
+        "multi": false,
+        "name": "jobs",
+        "options": [],
+        "query": "SELECT coalesce(string_agg(x.id::text, '|' ORDER BY x.id::text), '[^\\x00-\\x{10FFFF}]') FROM quality.cuts c CROSS JOIN LATERAL (VALUES (c.extract_job), (c.evaluate_job)) x(id) WHERE c.dataset IN (${dataset:sqlstring}) AND c.cut::text IN (${cut:sqlstring}) AND x.id IS NOT NULL",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT coalesce(string_agg(c.id::text, '|' ORDER BY c.id::text), '[^\\x00-\\x{10FFFF}]') FROM quality.cuts c WHERE c.dataset IN (${dataset:sqlstring}) AND c.cut::text IN (${cut:sqlstring})",
+        "hide": 2,
+        "includeAll": false,
+        "label": "The run's id",
+        "multi": false,
+        "name": "run_id",
+        "options": [],
+        "query": "SELECT coalesce(string_agg(c.id::text, '|' ORDER BY c.id::text), '[^\\x00-\\x{10FFFF}]') FROM quality.cuts c WHERE c.dataset IN (${dataset:sqlstring}) AND c.cut::text IN (${cut:sqlstring})",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Logs by run",
+  "uid": "qd-run-logs-en",
+  "weekStart": ""
+}

@@ -1,0 +1,23 @@
+# Grafana (infra/observability, decision 0026): the installation's tool to
+# read its logs and audit, on its own server and reached by URL. Same rules
+# as apps.yml: a path of its own, the frame policy `app-frame-headers`,
+# priority above the web's catch-all. Loki and Alloy are not routed: nothing
+# outside their stack talks to them.
+{{ $domain := env "APP_DOMAIN" | default "localhost" }}
+http:
+  routers:
+    # Grafana serves from its subpath (serve_from_sub_path): no prefix strip.
+    grafana:
+      rule: "Host(`{{ $domain }}`) && PathPrefix(`/grafana`)"
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+      priority: 10
+      service: grafana
+      middlewares: [app-frame-headers]
+
+  services:
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "{{ env "GRAFANA_URL" | default "http://127.0.0.1:3000" }}"

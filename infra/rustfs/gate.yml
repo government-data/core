@@ -1,0 +1,62 @@
+# The lake's gate (decision 0066, point 10): an overlay of docker-compose.yml
+# and certificate.yml for an installation whose machines have certificates.
+# Development does not use it.
+#
+#   docker compose --project-directory . -p data-quality-lake \
+#     -f infra/rustfs/docker-compose.yml -f infra/rustfs/certificate.yml \
+#     -f infra/rustfs/gate.yml up -d
+#
+# - RustFS publishes no port and sits on a network of its own with the gate:
+#   nothing else reaches it. It keeps serving TLS with the node's
+#   certificate and does not require client certificates itself
+#   (RUSTFS_MTLS=0): the gate does.
+# - The gate, a Traefik on the port RustFS had (RUSTFS_PORT, 9000), requires
+#   a client certificate of the installation's CA and asks the API before
+#   each request whether that machine may pass (gate/entrypoint.sh): an
+#   approved or draining machine, its serial in use. With the API down
+#   nothing passes. The job's STS credentials stay what RustFS checks.
+# - RustFS's console, on its own port (9001), is served by the gate on the
+#   same port as the rest, for the paths under /rustfs/console, under the
+#   same check: people reach it through the application's Traefik, which
+#   presents the application VM's certificate (LAKE_TRANSPORT).
+# - It runs as the node agent's user (uid 10001) and reads the agent's
+#   files as they are; a renewed machine.pem is taken without a restart.
+#
+# Required environment, besides those files':
+#   QD_MACHINE_NAME     the lake node's name, as in its certificate
+#   QD_LAKE_CHECK_URL   https://<internal domain>:<TRAEFIK_LAKEGATE_PORT>
+#                       /api/internal/machines/lake/check
+# Optional: TRAEFIK_IMAGE (traefik:v3.6), QD_GATE_CHECK_EVERY (30, seconds),
+# QD_GATE_READ_TIMEOUT (0s: an upload takes what it takes).
+#
+# Verified with tools/verify/rustfs_lake_gate_api.sh.
+services:
+  rustfs:
+    ports: !reset []
+    networks: [lake]
+  gate:
+    image: ${TRAEFIK_IMAGE:-traefik:v3.6}
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    entrypoint: ["/etc/qd/gate/entrypoint.sh"]
+    environment:
+      QD_MACHINE_NAME: ${QD_MACHINE_NAME:?set QD_MACHINE_NAME to the lake node's name}
+      QD_LAKE_CHECK_URL: ${QD_LAKE_CHECK_URL:?set QD_LAKE_CHECK_URL to the API's lake check}
+      QD_GATE_CHECK_EVERY: ${QD_GATE_CHECK_EVERY:-30}
+      QD_GATE_READ_TIMEOUT: ${QD_GATE_READ_TIMEOUT:-0s}
+    tmpfs:
+      - /run/qd-gate:uid=10001,gid=10001,mode=0700
+    volumes:
+      - ./infra/rustfs/gate/entrypoint.sh:/etc/qd/gate/entrypoint.sh:ro
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
+    ports:
+      - "${RUSTFS_BIND:-0.0.0.0}:${RUSTFS_PORT:-9000}:9000"
+    networks: [lake, default]
+    depends_on:
+      rustfs:
+        condition: service_healthy
+networks:
+  # RustFS and its gate alone.
+  lake:
+    internal: true

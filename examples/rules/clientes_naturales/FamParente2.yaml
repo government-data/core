@@ -1,0 +1,12 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-108
+    field: "FamParente2"
+    check: "expression"
+    when: "NOT ((RefRelacion2 = 'Ninguno' AND FamParente2 = 'Ninguno') OR (is_empty(RefRelacion2) AND is_empty(FamParente2)) OR (RefRelacion2 = 'Ninguno' AND is_empty(FamParente2)))"
+    fails: "RefRelacion2 = 'Ninguno'"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "No Coincide con Relación"
+    origin: { process: KNIME, node: "AlertasPN › ParentescoRef2" }

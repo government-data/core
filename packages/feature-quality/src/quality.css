@@ -1,0 +1,1832 @@
+/* The quality screens (decision 0040): the theme's tokens only. */
+
+.qd-page h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.qd-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.qd-hint {
+  margin: var(--space-1) 0 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.qd-ok,
+.qd-error {
+  margin: var(--space-2) 0;
+  font-size: 0.875rem;
+}
+
+.qd-ok {
+  color: var(--color-success);
+}
+
+.qd-error,
+.qd-bad {
+  color: var(--status-critical);
+}
+
+.qd-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.qd-table td {
+  height: var(--row-height);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.qd-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  align-items: center;
+  height: var(--row-height);
+}
+
+.qd-form {
+  display: grid;
+  gap: var(--space-3);
+  min-width: min(28rem, 80vw);
+}
+
+.qd-field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+}
+
+.qd-field small {
+  color: var(--color-muted);
+}
+
+.qd-field input,
+.qd-field select {
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.qd-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+.qd-tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.qd-tab {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.qd-tab[aria-selected="true"] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.qd-tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.qd-card-head,
+.qd-run {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.qd-run {
+  justify-content: flex-start;
+}
+
+.qd-card-head,
+.qd-run {
+  flex-wrap: wrap;
+}
+
+.qd-card-head .fk-btn,
+.qd-run .fk-btn {
+  white-space: nowrap;
+}
+
+.qd-card-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.qd-inline {
+  grid-template-columns: max-content auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.qd-right {
+  text-align: right;
+}
+
+.qd-pill {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.qd-cut-manifest {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qd-table td.qd-wrap {
+  white-space: normal;
+}
+
+.qd-check {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.qd-scroll {
+  overflow-x: auto;
+}
+
+.qd-run select {
+  max-width: 18rem;
+}
+
+.qd-back {
+  margin-bottom: var(--space-3);
+}
+
+.qd-section {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 0.9375rem;
+}
+
+.qd-file {
+  border-top: 1px solid var(--color-border);
+}
+
+.qd-file summary {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: var(--row-height);
+  cursor: pointer;
+}
+
+.qd-yaml {
+  max-height: 24rem;
+  overflow: auto;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-muted-soft);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.qd-file summary::before {
+  content: "▸";
+  color: var(--color-muted);
+  transition: transform 0.15s;
+}
+
+.qd-file[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.qd-lint-icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.qd-lint-icon--error {
+  color: var(--status-critical);
+}
+
+.qd-lint-icon--warning {
+  color: var(--status-warning);
+}
+
+.qd-code {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.qd-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) repeat(3, minmax(9rem, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.qd-file-errors {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0 0 var(--space-2);
+}
+
+.qd-clamp {
+  display: -webkit-box;
+  max-width: 32rem;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* One card: the editor above, a bar to drag, its panel of tabs below
+   (Problems, Style, As read). */
+.qd-editing {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 12rem);
+  min-height: 28rem;
+  padding: 0;
+  overflow: hidden;
+}
+
+.qd-splitter {
+  flex: none;
+  height: 5px;
+  margin: -2px 0;
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--color-border);
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.qd-splitter:hover,
+.qd-splitter:focus-visible,
+.qd-splitter:active {
+  border-top: 3px solid var(--color-accent);
+  outline: none;
+}
+
+.qd-editor-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.qd-editor {
+  flex: 1;
+  min-height: 6rem;
+}
+
+/* The editors' colours, the rules' and the console's (0054). */
+.qd-editor,
+.qd-console__sql {
+  /* YAML colours: keys, quoted text, block markers and tags, comments. */
+  --qd-syntax-key: var(--color-accent);
+  --qd-syntax-string: #1a7a4a;
+  --qd-syntax-special: #8a3fb8;
+  --qd-syntax-comment: var(--color-muted);
+  --qd-syntax-punctuation: var(--color-muted);
+  /* By meaning: the dataset's fields, allowed values, SQL functions. */
+  --qd-syntax-field: #a14a00;
+  --qd-syntax-value: #0b6e66;
+  --qd-syntax-function: #a1366b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .qd-editor,
+  :root:not([data-theme="light"]) .qd-console__sql {
+    --qd-syntax-string: #5cc995;
+    --qd-syntax-special: #c597ea;
+    --qd-syntax-field: #f0a35c;
+    --qd-syntax-value: #4fc1b5;
+    --qd-syntax-function: #ee7fb5;
+  }
+}
+
+:root[data-theme="dark"] .qd-editor,
+:root[data-theme="dark"] .qd-console__sql {
+  --qd-syntax-string: #5cc995;
+  --qd-syntax-special: #c597ea;
+  --qd-syntax-field: #f0a35c;
+  --qd-syntax-value: #4fc1b5;
+  --qd-syntax-function: #ee7fb5;
+}
+
+.qd-panel {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.qd-panel__tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.qd-panel__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.qd-panel__tab:hover {
+  color: var(--color-text);
+}
+
+.qd-panel__tab[aria-selected="true"] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.qd-panel__count {
+  min-width: 1.25rem;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: var(--color-muted-soft);
+  color: var(--color-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.qd-panel__status {
+  margin-left: auto;
+  font-size: 0.8125rem;
+}
+
+.qd-panel__body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+}
+
+.qd-findings {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+/* One finding a row, as an editor's problems: icon, message, code, line. */
+.qd-finding {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+  padding: 0.25rem var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qd-finding:hover:not(:disabled) {
+  background: var(--color-muted-soft);
+}
+
+.qd-finding:disabled {
+  cursor: default;
+}
+
+.qd-finding__message {
+  flex: 1;
+  min-width: 0;
+}
+
+.qd-rule-read {
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.875rem;
+}
+
+.qd-rule-read h3 {
+  margin: 0 0 var(--space-1);
+  font-size: 0.875rem;
+}
+
+.qd-rule-read p {
+  margin: 0 0 var(--space-1);
+}
+
+.qd-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.qd-link:hover {
+  text-decoration: underline;
+}
+
+.qd-savebar {
+  align-items: center;
+  margin-top: 0;
+}
+
+/* A draft as a branch (decision 0021): its commits on a line, newest first,
+   down to where it left main; what the one chosen changed, beside. */
+.qd-history {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 64rem) {
+  .qd-history {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.qd-graph {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qd-graph::before {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  bottom: 1rem;
+  left: calc(var(--space-2) + 4px);
+  width: 2px;
+  background: var(--color-accent);
+}
+
+.qd-graph__node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A source's tables (decision 0042): a list to search and pick from. */
+.qd-table-list {
+  max-height: 22rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.qd-table-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.qd-table-list button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.qd-table-list button:hover,
+.qd-table-list button:focus-visible {
+  background: var(--color-accent-soft);
+}
+
+.qd-table-list small {
+  color: var(--color-muted);
+}
+
+.qd-table-list .qd-hint {
+  padding: var(--space-2) var(--space-3);
+}
+
+/* A listing on its way: each step fades in as the last one goes. */
+.qd-step {
+  animation: qd-step-in 0.4s ease-out;
+}
+
+@keyframes qd-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qd-step {
+    animation: none;
+  }
+}
+
+/* A source's engine, after a database icon. */
+.qd-driver {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.qd-driver svg {
+  flex: none;
+  color: var(--color-muted);
+}
+
+.qd-graph__node > :not(.qd-graph__dot) {
+  grid-column: 2;
+}
+
+.qd-graph__node:hover,
+.qd-graph__node[aria-pressed="true"] {
+  background: var(--color-accent-soft);
+}
+
+.qd-graph__node--base {
+  cursor: default;
+  color: var(--color-muted);
+}
+
+.qd-graph__node--base:hover {
+  background: none;
+}
+
+.qd-graph__dot {
+  grid-row: 1 / span 3;
+  width: 0.625rem;
+  height: 0.625rem;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.qd-graph__node--all .qd-graph__dot {
+  background: var(--color-accent);
+}
+
+.qd-graph__node--base .qd-graph__dot {
+  border-color: var(--color-muted);
+}
+
+.qd-graph__message {
+  font-weight: 600;
+}
+
+.qd-history__changes {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.qd-diff {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.qd-diff__head {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-muted-soft);
+  font-size: 0.875rem;
+}
+
+.qd-diff__added {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.qd-diff__removed {
+  color: var(--status-critical);
+  font-weight: 600;
+}
+
+.qd-diff__lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.qd-diff__lines td {
+  padding: 0 var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.qd-diff__no {
+  width: 2.5rem;
+  color: var(--color-muted);
+  text-align: right;
+  user-select: none;
+}
+
+.qd-diff__add {
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.qd-diff__del {
+  background: color-mix(in srgb, var(--status-critical) 12%, transparent);
+}
+
+/* What changed inside a line: stronger than its line's colour. */
+.qd-diff__mark {
+  border-radius: 2px;
+  color: inherit;
+}
+
+.qd-diff__add .qd-diff__mark {
+  background: color-mix(in srgb, var(--color-success) 38%, transparent);
+}
+
+.qd-diff__del .qd-diff__mark {
+  background: color-mix(in srgb, var(--status-critical) 38%, transparent);
+}
+
+/* A side with no line, where the other has one. */
+.qd-diff__none {
+  background: repeating-linear-gradient(-45deg, transparent 0 4px, var(--color-muted-soft) 4px 8px);
+}
+
+/* Two copies: the same width each, a line between them. */
+.qd-diff__lines--split {
+  table-layout: fixed;
+}
+
+.qd-diff__lines--split .qd-diff__no {
+  width: 2.5rem;
+}
+
+.qd-diff__lines--split td:nth-child(3) {
+  border-left: 1px solid var(--color-border);
+}
+
+.qd-diff__modes {
+  display: inline-flex;
+  justify-self: end;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.qd-diff__mode {
+  padding: 0.25rem 0.75rem;
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.qd-diff__mode[aria-pressed="true"] {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.qd-diff__gap td {
+  color: var(--color-muted);
+  text-align: center;
+  background: var(--color-muted-soft);
+}
+
+/* _Result_ (decision 0043): a rule's counts, then its records by outcome. */
+.qd-test-layout {
+  display: grid;
+  grid-template-columns: minmax(9rem, max-content) 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.qd-test-layout--one {
+  grid-template-columns: 1fr;
+}
+
+.qd-test-rules {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qd-test-choice {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 4px 4px 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.qd-test-choice:hover {
+  background: var(--color-muted-soft);
+}
+
+.qd-test-choice[aria-selected="true"] {
+  border-left-color: var(--color-accent);
+  background: var(--color-muted-soft);
+  font-weight: 600;
+}
+
+.qd-test-rule {
+  min-width: 0;
+}
+
+.qd-test-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.qd-test-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.qd-test-counts b {
+  color: var(--color-text);
+}
+
+.qd-test-filter,
+.qd-test-pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+/* The outcome and column icons, at the row's end. */
+.qd-test-filter__icons {
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.qd-test-filter .fk-btn[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.qd-test-table {
+  font-size: 0.8125rem;
+}
+
+/* A field's name as the mapping writes it. */
+.qd-test-table th.qd-mono {
+  text-transform: none;
+}
+
+.qd-outcome::before {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: var(--space-2);
+  border-radius: 999px;
+  background: var(--color-muted);
+  content: "";
+}
+
+.qd-outcome--fails::before {
+  background: var(--status-critical);
+}
+
+.qd-outcome--passes::before {
+  background: var(--status-good);
+}
+
+/* A test on its way: the spiral, what it does and for how long. */
+.qd-test-waiting {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.qd-test-waiting p {
+  margin: 0;
+}
+
+.qd-test-spiral {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+}
+
+.qd-spiral-sm {
+  width: 1rem;
+  height: 1rem;
+  margin-right: var(--space-2);
+  vertical-align: -0.2rem;
+}
+
+/* The explorer (decision 0043): a tree as a database client shows one,
+   in the sidebar's panel. */
+.qd-explorer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+}
+
+.qd-explorer__filter {
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.qd-tree summary,
+.qd-tree-rule,
+.qd-tree-leaf,
+li.qd-tree-column {
+  white-space: nowrap;
+}
+
+.qd-tree,
+.qd-tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qd-tree ul {
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-border);
+  margin-left: var(--space-2);
+}
+
+.qd-tree .qd-mono,
+.qd-tree-rule,
+.qd-tree-leaf {
+  font-size: 0.875rem;
+}
+
+.qd-tree summary {
+  padding: var(--space-1) 0;
+  cursor: pointer;
+}
+
+.qd-tree-rule,
+.qd-tree-leaf,
+.qd-tree-note,
+li.qd-tree-column,
+.qd-tree li > .qd-hint {
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+}
+
+.qd-tree-source > summary {
+  font-weight: 600;
+}
+
+.qd-tree--unread > summary,
+li.qd-tree--unread {
+  color: var(--color-muted);
+}
+
+.qd-tree--gone > summary .qd-mono {
+  text-decoration: line-through;
+}
+
+.qd-mark {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-muted-soft);
+}
+
+.qd-mark--gone {
+  color: var(--status-critical);
+}
+
+.qd-mark--gap {
+  color: var(--status-warning);
+}
+
+.qd-tested--passes {
+  color: var(--color-success);
+}
+
+.qd-tested--fails {
+  color: var(--status-critical);
+}
+
+/* The work area's tabs (decision 0043): one a file open. */
+.qd-file-tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.qd-file-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  white-space: nowrap;
+}
+
+.qd-file-tab a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.qd-file-tab--current {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  margin-bottom: -1px;
+}
+
+.qd-file-tab__unsaved {
+  color: var(--status-warning);
+}
+
+.qd-file-tab__close {
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.qd-file-tab__close:hover {
+  color: var(--color-text);
+}
+
+/* A table's or column's properties, opened from the tree's ⓘ. */
+.qd-tree-info {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.qd-tree-info:hover {
+  color: var(--color-accent);
+}
+
+/* A source's table linking to the dataset that reads it (decision 0049). */
+.qd-tree-goto {
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.qd-row--chosen td,
+li.qd-row--chosen {
+  background: var(--color-accent-soft);
+}
+
+.qd-table-list li {
+  padding: var(--space-1) var(--space-3);
+}
+
+/* The tree's header: its sources, and + for a new one. */
+.qd-explorer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.qd-explorer__add {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.qd-explorer__add:hover {
+  border-color: var(--color-accent);
+}
+
+.qd-tree-icon {
+  display: inline-flex;
+  margin-right: var(--space-1);
+  vertical-align: -2px;
+}
+
+.qd-tree-note .fk-btn + .fk-btn {
+  margin-left: var(--space-1);
+}
+
+/* _+_ beside a field of the tree: a rule for it in the editor. */
+.qd-tree-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 4px;
+  color: inherit;
+  opacity: 0.55;
+  text-decoration: none;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* The same _+_ as a button (a schedule's form over the tree). */
+button.qd-tree-add {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.qd-tree-add:hover,
+.qd-tree-add:focus-visible {
+  opacity: 1;
+  background: var(--color-sidebar-hover, rgba(127, 127, 127, 0.2));
+}
+
+/* A source table's records (decision 0049): its controls in a row, the grid
+   scrolling inside the card. */
+.qd-records__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+/* A view's values shown with a reason (decision 0069): the button, or the reason kept. */
+.qd-reveal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.qd-reveal:empty {
+  display: none;
+}
+
+.qd-reveal .qd-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.qd-records__pages {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.qd-records td {
+  white-space: nowrap;
+}
+
+/* A schedule's form, as knime-orchestador's (decision 0035): how often on
+   the left, its detail on the right, then the advanced settings. */
+.qd-sched__main {
+  display: grid;
+  grid-template-columns: minmax(10rem, auto) 1fr;
+  gap: 1rem 1.5rem;
+}
+
+.qd-sched__kinds {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  padding-right: 1.5rem;
+  border-right: 1px solid var(--color-border);
+}
+
+.qd-sched__detail {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.qd-sched__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.qd-sched__inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qd-sched__inline input {
+  width: 5rem;
+}
+
+.qd-sched__checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.9rem;
+}
+
+.qd-sched__months {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.qd-sched__advanced {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.qd-sched__advanced legend {
+  padding: 0 0.35rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.qd-sched__opt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.qd-sched__opt .qd-check {
+  min-width: 15rem;
+}
+
+.qd-sched__opt select,
+.qd-sched__opt input[type="date"],
+.qd-sched__opt input[type="time"] {
+  width: auto;
+}
+
+.qd-sched__summary {
+  flex: 1 1 18rem;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.qd-sched__summary--bad {
+  color: var(--color-danger, #b42318);
+}
+
+@media (max-width: 640px) {
+  .qd-sched__main {
+    grid-template-columns: 1fr;
+  }
+
+  .qd-sched__kinds {
+    padding-right: 0;
+    border-right: 0;
+  }
+}
+
+/* A column's branch (decision 0050): its history, marked while it has an
+   open draft, with how many. */
+.qd-tree-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0 0.2rem;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.qd-tree-branch:hover,
+.qd-tree-branch:focus-visible {
+  opacity: 1;
+  background: var(--color-sidebar-hover, rgba(127, 127, 127, 0.2));
+}
+
+.qd-tree-branch--open {
+  color: var(--color-accent);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.qd-tree-branch__count {
+  font-size: 0.75em;
+}
+
+.qd-history-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+/* The editor's history (decision 0050): a button, its ⎇ and its name. */
+.qd-history-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* A sortable header (the rules of a dataset): the header's text, a button. */
+.qd-sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+/* A wide dialog's content scrolls itself (feature-kit's wide body does
+   not); its actions stay in sight at the bottom. */
+.qd-modal-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.qd-sticky-actions {
+  position: sticky;
+  bottom: 0;
+  justify-content: flex-end;
+  padding: 0.75rem 0;
+  background: var(--color-surface, #fff);
+  border-top: 1px solid var(--color-border, #d0d5dd);
+}
+
+/* A table being mapped and collected (decision 0053): a turning circle. */
+.qd-spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-inline-end: 0.3em;
+  vertical-align: -0.1em;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: qd-spin 0.8s linear infinite;
+}
+
+@keyframes qd-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qd-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* The table last opened (decision 0049): its row and its columns marked. */
+.qd-tree--selected > summary {
+  padding-left: var(--space-2);
+  background: var(--color-accent-soft);
+  border-radius: 4px;
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.qd-tree--selected > ul {
+  border-left: 2px solid var(--color-accent);
+  margin-left: 2px;
+}
+
+/* _Columns_ beside a test's result (decision 0043, point 3): two lists. */
+.qd-picker__search {
+  width: 100%;
+  margin-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.qd-picker__lists {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-2);
+}
+
+.qd-picker__side ul {
+  height: 18rem;
+  overflow: auto;
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.qd-picker__side li {
+  padding: 2px var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.qd-picker__side li[aria-selected="true"] {
+  background: var(--color-accent-soft);
+}
+
+.qd-picker__moves {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.qd-picker__moves .fk-btn.fk-btn--sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 0;
+  padding: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+/* The console over the lake (decision 0054). */
+.qd-console-button {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.qd-console__sql {
+  width: 100%;
+}
+
+.qd-console__rows {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+/* In the dialog: as tall as the screen leaves under the statement. */
+.fk-modal .qd-console__rows {
+  max-height: calc(92vh - 24rem);
+  min-height: 12rem;
+}
+
+.qd-console__rows thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+}
+
+/* A row's menu in the tree, where it was right-clicked. */
+.qd-tree-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 11rem;
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 22%);
+}
+
+.qd-tree-menu button {
+  display: block;
+  width: 100%;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.qd-tree-menu button:hover,
+.qd-tree-menu button:focus-visible {
+  background: var(--color-accent-soft);
+}
+
+.qd-console__kept {
+  margin: var(--space-2) 0;
+}
+
+.qd-console__kept ul {
+  max-height: 9rem;
+  overflow: auto;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qd-console__kept li {
+  padding: 2px var(--space-2);
+  font-size: 0.8125rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qd-console__kept--shown {
+  background: var(--color-accent-soft);
+}
+
+/* The rule and a query side by side (decision 0054). */
+.qd-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.qd-column-splitter {
+  position: relative;
+  width: 1px;
+  background: var(--color-border);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+/* A line to see, wider to take hold of. */
+.qd-column-splitter::before {
+  position: absolute;
+  inset: 0 -4px;
+  content: "";
+}
+
+.qd-column-splitter:hover,
+.qd-column-splitter:focus-visible,
+.qd-column-splitter:active {
+  background: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+  outline: none;
+}
+
+.qd-console-dock {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 12rem);
+  min-height: 28rem;
+  overflow: hidden;
+}
+
+/* The rows fill what the column leaves: both scrollbars always in sight. */
+.qd-console-dock .qd-console {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.qd-console-dock__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.qd-console-dock__head h2 {
+  margin: 0;
+}
+
+.qd-console-dock .qd-console__rows {
+  flex: 1;
+  min-height: 8rem;
+  max-height: none;
+}
+
+.qd-console-button[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* A table of records, as wide as its columns: scrolled sideways (0043, 0054). */
+.qd-wide {
+  max-width: 100%;
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.qd-wide thead th {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  background: var(--color-surface);
+}
+
+.qd-wide > table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.qd-wide th,
+.qd-wide td {
+  white-space: nowrap;
+}
+
+/* A button that is an icon: its words in its title (0043, 0054). */
+.fk-btn.qd-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 var(--space-2);
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.qd-icon-btn__count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.qd-icon-btn--fails svg {
+  color: var(--status-critical);
+}
+
+.qd-icon-btn--passes svg {
+  color: var(--status-good);
+}
+
+/* A rule's failures by shape (decision 0043, point 3). */
+.qd-fail-groups ul {
+  max-height: 12rem;
+  overflow: auto;
+  margin: var(--space-1) 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.qd-fail-groups li {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6rem 4rem;
+  gap: var(--space-2);
+  padding: 2px var(--space-2);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.qd-fail-groups li[aria-selected="true"] {
+  background: var(--color-accent-soft);
+}
+
+.qd-fail-groups__shape {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qd-fail-groups__count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Its share of the failures, under the row. */
+.qd-fail-groups__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--status-critical);
+  opacity: 0.6;
+}
+
+/* The name to delete and to type again (decision 0055). */
+.qd-delete-name {
+  padding: 1px 6px;
+  border: 1px solid var(--status-critical);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--status-critical) 12%, transparent);
+  color: var(--status-critical);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+/* A narrow screen: the editor's bar smaller. */
+@media (max-width: 1100px) {
+  .qd-editor-tools {
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .qd-editor-tools .fk-btn {
+    padding: 2px var(--space-2);
+    font-size: 0.8125rem;
+  }
+}
+
+/* The branch icon of a history: drawn, the same size on every screen. */
+.qd-branch-glyph {
+  display: inline-flex;
+  vertical-align: -0.15em;
+}
+
+.qd-branch-glyph svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+/* Nothing open in the work area (decision 0043). */
+.qd-nothing {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.qd-nothing__title {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* A dataset's dashboard (decision 0031): every figure a card of the same
+   size, two side by side at most, one on a narrow screen, so the grid has
+   no blanks. A drawing is scaled to the room its title, note and legend
+   leave; the table opened scrolls inside its card. A chart drawn once per
+   dimension gives a card each. */
+.qd-dashboard {
+  --qd-gap: var(--space-4);
+  --qd-card: 30rem;
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(max(min(100%, 26rem), calc((100% - var(--qd-gap)) / 2)), 1fr)
+  );
+  grid-auto-rows: var(--qd-card);
+  gap: var(--qd-gap);
+}
+
+.qd-dashboard > .qd-field,
+.qd-dashboard > .qd-hint {
+  grid-column: 1 / -1;
+  align-self: start;
+}
+
+.qd-dashboard:has(> .qd-field) {
+  grid-template-rows: auto;
+}
+
+.qd-dashboard .qd-chart,
+.qd-dashboard .qd-chart > div {
+  display: contents;
+}
+
+.qd-dashboard .viz,
+.qd-dashboard .qd-chart > .qd-hint {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.qd-dashboard .viz > .viz-svg {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.qd-dashboard .viz:has(> .viz-table[open]) {
+  overflow: auto;
+}
+
+.qd-dashboard .viz:has(> .viz-table[open]) > .viz-svg {
+  flex: none;
+  height: calc(var(--qd-card) * 0.6);
+}
+
+/* The remediation queues' SLAs below the dashboard (decision 0059): a
+   dimension's default, then its groups in rows of value, days and ×. */
+.qd-slas {
+  margin-top: var(--space-4);
+}
+
+.qd-slas-dimension {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0;
+}
+
+.qd-slas-row {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+}

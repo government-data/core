@@ -1,0 +1,60 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-94
+    field: "TipIdnent"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1590" }
+
+  - id: V-PN-95
+    field: "TipIdnent"
+    check: "expression"
+    fails: "TipIdnent = 'Cédula de Ciudadanía' AND Edad < 18"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Menor con CC"
+    origin: { process: KNIME, node: "#1590" }
+    note: "Edad has decimals as in the flow, counted to the cut where the flow counts to the day it runs"
+
+  - id: V-PN-96
+    field: "TipIdnent"
+    check: "expression"
+    fails: "AnnosExpedicionCedula >= 90"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Error entre fecha de nacimiento y fecha de expedición"
+    origin: { process: KNIME, node: "#1590" }
+
+  - id: V-PN-97
+    field: "TipIdnent"
+    check: "expression"
+    fails: "Edad > 18 AND TipIdnent IN ('Registro Civil*', 'Tarjeta de Identidad*')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Mayor con TI"
+    origin: { process: KNIME, node: "#1590" }
+
+  - id: V-PN-98
+    field: "TipIdnent"
+    check: "expression"
+    fails: "coalesce(TipIdnent, '') LIKE 'Registro Civil%' AND NumHijos > 0"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Menor con hijos"
+    origin: { process: KNIME, node: "#1590" }
+
+  - id: V-PN-99
+    field: "TipIdnent"
+    check: "expression"
+    fails: "TipIdnent IN ('Registro Civil*', 'Tarjeta de Identidad*') AND TipVivienda = 'ARRENDADA'"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Menor con obligaciones"
+    origin: { process: KNIME, node: "#1590" }

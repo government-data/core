@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quality Data dataset mapping",
+  "type": "object",
+  "properties": {
+    "dataset": {
+      "description": "The dataset, as its rules name it.",
+      "type": "string"
+    },
+    "description": {
+      "description": "What the dataset holds, for whoever reads its rules.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fields": {
+      "description": "Field → where it comes from and what it is.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/FieldMapping"
+      }
+    },
+    "from": {
+      "description": "Where an extraction reads it: a source by name and its table\n(decision 0036).",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReadFrom"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "key": {
+      "description": "The fields that identify a record.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "string"
+      }
+    },
+    "source": {
+      "description": "The source's extract the dataset reads (its bronze table).",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "dataset",
+    "source",
+    "fields"
+  ],
+  "$defs": {
+    "FieldMapping": {
+      "type": "object",
+      "properties": {
+        "active_values": {
+          "description": "On the field holding the `active` role, the values that make a\nrecord active, compared trimmed and in upper case (decision 0058).",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "column": {
+          "description": "The source's column.",
+          "type": "string"
+        },
+        "description": {
+          "description": "What the field holds: the dataset's documentation, field by field.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expires": {
+          "description": "Its value loses validity over time (contact, income): timeliness\ncounts in its ICD (decision 0057).",
+          "type": "boolean",
+          "default": false
+        },
+        "priority": {
+          "description": "How much the field weighs in a record's ICD (decision 0057).",
+          "$ref": "#/$defs/Priority"
+        },
+        "roles": {
+          "description": "What the field is for in the charts (decision 0031): proposed by the\nmap job, confirmed by a steward with the mapping.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FieldRole"
+          }
+        },
+        "semantic": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Semantic"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "$ref": "#/$defs/Kind"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "column",
+        "type"
+      ]
+    },
+    "FieldRole": {
+      "description": "A field's role, which switches charts on (decision 0031).",
+      "oneOf": [
+        {
+          "description": "Part of the key of the entity the dataset describes (decision 0022).",
+          "type": "string",
+          "const": "entity"
+        },
+        {
+          "description": "A grouping dimension: office, advisor, product, channel.",
+          "type": "string",
+          "const": "dimension"
+        },
+        {
+          "description": "The segment: client type, loan type. One field.",
+          "type": "string",
+          "const": "segment"
+        },
+        {
+          "description": "The date of the last update. One field, a date.",
+          "type": "string",
+          "const": "updated"
+        },
+        {
+          "description": "The amount outliers are sought in. One field, a number.",
+          "type": "string",
+          "const": "outlier_amount"
+        },
+        {
+          "description": "A variable whose drift between cuts is measured; a number.",
+          "type": "string",
+          "const": "drift"
+        },
+        {
+          "description": "Takes part in the SFC indicator: a cell (decision 0058).",
+          "type": "string",
+          "const": "sfc"
+        },
+        {
+          "description": "Says whether a record is active, by its `active_values`: the SFC\nindicator's population. One field, text.",
+          "type": "string",
+          "const": "active"
+        }
+      ]
+    },
+    "Kind": {
+      "description": "The field's type in silver: what its values are compared as.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "number",
+            "date",
+            "boolean"
+          ]
+        },
+        {
+          "description": "Codes are text, so their leading zeros survive (decision 0033).",
+          "type": "string",
+          "const": "text"
+        }
+      ]
+    },
+    "Priority": {
+      "description": "A field's priority: its weight in a record's ICD (decision 0057).",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "low"
+          ]
+        },
+        {
+          "description": "Until a steward sets one: every field weighs the same.",
+          "type": "string",
+          "const": "medium"
+        }
+      ]
+    },
+    "ReadFrom": {
+      "description": "A source's table, as an extraction reads it.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "The source's name (Settings → Sources).",
+          "type": "string"
+        },
+        "table": {
+          "description": "`table`, `schema.table` or `database.schema.table`, as the source\nnames it.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "table"
+      ]
+    },
+    "Semantic": {
+      "description": "What the values mean, inferred by the map job and confirmed by people.",
+      "type": "string",
+      "enum": [
+        "document",
+        "email",
+        "mobile",
+        "amount",
+        "code",
+        "free_text",
+        "flag"
+      ]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+dataset: clientes_naturales
+rules:
+  - id: P-31
+    field: "Segmento"
+    check: "required"
+    when: "Relacion = 'ASOCIADO'"
+    severity: major
+    cause: systemic
+    alert: "Campo vacío"
+    origin: { process: MVP }

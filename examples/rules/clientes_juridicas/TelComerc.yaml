@@ -1,0 +1,11 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-30
+    field: "TelComerc"
+    check: "length"
+    in: ["7", "10"]
+    on_empty: "fail"
+    severity: major
+    cause: capture
+    alert: "Campo errado"
+    origin: { process: KNIME, node: "#1705" }

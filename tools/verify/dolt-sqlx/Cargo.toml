@@ -1,0 +1,12 @@
+[package]
+name = "dolt-sqlx"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "mysql", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+# Standalone: not part of the application workspace.
+[workspace]

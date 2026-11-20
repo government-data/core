@@ -1,0 +1,18 @@
+[package]
+name = "quality-rules-tree"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The neutral expression tree of the rule language (decision 0019, point 3):
+# rule text in, only the closed grammar out. Pure; depends on the model.
+[dependencies]
+quality-rules-model.workspace = true
+sqlparser.workspace = true

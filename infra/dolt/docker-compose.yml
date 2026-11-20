@@ -1,0 +1,70 @@
+# Dolt (MySQL-compatible, Apache-2.0): the versioned catalog (decision 0021),
+# one database per tenant (`tenant_<id>`), drafts as branches, approvals as
+# merges. Its own stack, not part of the application's compose: in
+# production it runs next to PostgreSQL on the application VM; in
+# development it stands for it.
+#
+# Only the application talks to it, by URL (`DOLT_URL`), as `qd_app`: no UI,
+# no Traefik route, no sign-in for people. Root stays inside the container
+# (`localhost` only), for the init script and the backups.
+#
+#   task catalog:up | catalog:down | catalog:logs
+#   infra/dolt/tenant.sh add <id>   a tenant's database, granted to qd_app
+#   infra/dolt/backup.sh            Dolt backups, then copied to the lake
+#
+# Required environment (in the repo `.env`):
+#   DOLT_ROOT_PASSWORD   root, used only from inside the container
+#   DOLT_APP_PASSWORD    the application's user, `qd_app`
+# For the copy of the backups to the lake (infra/dolt/lake-backup-user.sh):
+#   DOLT_BACKUP_S3_ACCESS_KEY, DOLT_BACKUP_S3_SECRET_KEY
+name: data-quality-dolt # `-p` in the tasks: .env sets COMPOSE_PROJECT_NAME for the app
+
+volumes:
+  dolt-data:
+    name: ${APP_STACK:-data-quality}_dolt-data
+  # Dolt's own backups (`file://`), one directory per tenant database.
+  dolt-backups:
+    name: ${APP_STACK:-data-quality}_dolt-backups
+
+services:
+  dolt:
+    image: ${DOLT_IMAGE:-dolthub/dolt-sql-server:2.6.1}
+    restart: unless-stopped
+    environment:
+      DOLT_ROOT_PASSWORD: ${DOLT_ROOT_PASSWORD:?set DOLT_ROOT_PASSWORD in .env}
+      DOLT_ROOT_HOST: localhost
+      DOLT_APP_USER: qd_app
+      DOLT_APP_PASSWORD: ${DOLT_APP_PASSWORD:?set DOLT_APP_PASSWORD in .env}
+      # Read by config.yaml.
+      DOLT_LOG_LEVEL: ${DOLT_LOG_LEVEL:-warning}
+      DOLT_MAX_CONNECTIONS: ${DOLT_MAX_CONNECTIONS:-200}
+    volumes:
+      - dolt-data:/var/lib/dolt
+      - dolt-backups:/backups
+      - ./infra/dolt/config.yaml:/etc/dolt/servercfg.d/config.yaml:ro
+      - ./infra/dolt/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "dolt", "sql", "-q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
+
+  # The copy of the backups to the lake's backup bucket (decision 0021, point
+  # 8), run by infra/dolt/backup.sh after each Dolt backup. A one-shot.
+  backup-sync:
+    image: ${RCLONE_IMAGE:-rclone/rclone:1.75.2}
+    profiles: ["backup"]
+    command: ["sync", "/backups", "lake:${DOLT_BACKUP_BUCKET:-qd-backups}/dolt", "--checksum"]
+    environment:
+      RCLONE_CONFIG_LAKE_TYPE: s3
+      RCLONE_CONFIG_LAKE_PROVIDER: Other
+      RCLONE_CONFIG_LAKE_ENDPOINT: ${DOLT_BACKUP_S3_URL:-http://127.0.0.1:9000}
+      RCLONE_CONFIG_LAKE_REGION: us-east-1
+      RCLONE_CONFIG_LAKE_FORCE_PATH_STYLE: "true"
+      # The bucket is made by lake-backup-user.sh; this user cannot.
+      RCLONE_CONFIG_LAKE_NO_CHECK_BUCKET: "true"
+      RCLONE_CONFIG_LAKE_ACCESS_KEY_ID: ${DOLT_BACKUP_S3_ACCESS_KEY:-}
+      RCLONE_CONFIG_LAKE_SECRET_ACCESS_KEY: ${DOLT_BACKUP_S3_SECRET_KEY:-}
+    volumes:
+      - dolt-backups:/backups:ro

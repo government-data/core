@@ -1,0 +1,85 @@
+# PostgreSQL with TLS and the machines' certificates (decisions 0023, 0066
+# points 7 and 12; step 8). An overlay of docker-compose.yml, beside it, for
+# an installation whose machines have certificates; development does not
+# use it (it keeps the queue's password and no TLS):
+#
+#   docker compose -f infra/postgres/docker-compose.yml -f infra/postgres/tls.yml up -d
+#
+# or, in a root file, `include: [{path: [infra/postgres/docker-compose.yml,
+# infra/postgres/tls.yml]}]` (paths here are relative to infra/postgres).
+#
+# - TLS is on, with the application VM's machine certificate (its node
+#   agent's `machine.pem`, renewed every 8 hours) and the installation's CA
+#   as `ssl_ca_file`; tls/entrypoint.sh copies them for PostgreSQL and
+#   reloads it when the agent renews them.
+# - tls/pg_hba.conf: nothing over TCP without TLS; the queue's role only
+#   with a worker's certificate (tls/pg_ident.conf), and without a password
+#   (initdb/20-queue-role.sh, QD_QUEUE_AUTH=certificate); other roles with
+#   their password over TLS.
+# - Machines and the API reach it by the name its certificate carries,
+#   POSTGRES_SERVER_NAME: the application VM's machine name (the CA gives a
+#   machine its name as its only DNS name), which the workers' network
+#   resolves to the application VM, and an alias on `backend` for the API
+#   and the backups. The API's URL is then
+#   postgres://<APP_DB_USER>:<password>@<POSTGRES_SERVER_NAME>:5432/<db>?sslmode=verify-full&sslrootcert=<the CA's file>
+# - Before the agent's machine.pem is there (the installation's first
+#   start), PostgreSQL serves on its loopback alone and without TLS, for
+#   `server app-machine` (app-machine.yml) to sign it; it goes on with TLS
+#   once the file is there (tls/entrypoint.sh). It is healthy only with TLS
+#   on, so nothing that waits for it starts in between.
+#
+# Required environment, besides docker-compose.yml's (but QD_QUEUE_PASSWORD):
+#   QD_MACHINE_DIR         the application VM's node agent directory (QD_AGENT_DIR)
+#   POSTGRES_SERVER_NAME   the name in its certificate (its machine name)
+# Optional: POSTGRES_BIND (0.0.0.0) and POSTGRES_PORT (5432), where the
+# workers reach it; QD_PG_TLS_CHECK_EVERY (30), seconds between looks at the
+# agent's files.
+#
+# Verified with tools/verify/postgres_stack_tls.sh.
+services:
+  postgres:
+    # The watcher of tls/entrypoint.sh is a child of this init, never of
+    # PostgreSQL.
+    init: true
+    entrypoint: ["/etc/qd/postgres/entrypoint.sh"]
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/tls/machine.pem
+      - -c
+      - ssl_key_file=/var/lib/postgresql/tls/machine.pem
+      - -c
+      - ssl_ca_file=/var/lib/postgresql/tls/ca.crt
+      - -c
+      - hba_file=/var/lib/postgresql/tls/pg_hba.conf
+      - -c
+      - ident_file=/var/lib/postgresql/tls/pg_ident.conf
+    environment:
+      QD_QUEUE_AUTH: certificate
+      QD_QUEUE_PASSWORD: ""
+      QD_PG_TLS_CHECK_EVERY: ${QD_PG_TLS_CHECK_EVERY:-30}
+    volumes:
+      - ./tls:/etc/qd/postgres:ro
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
+    ports:
+      - "${POSTGRES_BIND:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
+    networks:
+      backend:
+        aliases:
+          - ${POSTGRES_SERVER_NAME:?set POSTGRES_SERVER_NAME to the name in PostgreSQL's certificate}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          '[ "$$(psql -XAtq -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "show ssl" 2>/dev/null)" = on ]',
+        ]
+
+  postgres-backup:
+    environment:
+      PGHOST: ${POSTGRES_SERVER_NAME:?set POSTGRES_SERVER_NAME to the name in PostgreSQL's certificate}
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /run/qd-node/ca.crt
+    volumes:
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro

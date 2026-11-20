@@ -1,0 +1,101 @@
+// Grafana Alloy (decision 0026): reads the output of this machine's
+// containers and pushes it to Loki. Labels: container, service and
+// compose_project (from Docker Compose), vm, and level (JSON lines and
+// PostgreSQL's text).
+// Only the compose projects in OBS_LOG_PROJECTS are collected: other stacks
+// on the same Docker may carry data that is not this installation's.
+
+// Its own logs: JSON, like every service of the installation; warnings up.
+logging {
+  level  = "warn"
+  format = "json"
+}
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = coalesce(sys.env("OBS_LOG_PROJECTS"), "data-quality|data-quality-.+")
+    action        = "keep"
+  }
+  // A different product that shares the prefix.
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = "calidad-datos.*"
+    action        = "drop"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.relabel.containers.output
+  relabel_rules = discovery.relabel.containers.rules
+  forward_to    = [loki.process.containers.receiver]
+}
+
+loki.process "containers" {
+  stage.static_labels {
+    values = { vm = coalesce(sys.env("OBS_VM"), "dev") }
+  }
+
+  // JSON lines: the level becomes a label, the rest stays in the line, to be
+  // read with `| json` in Grafana. `level` in the Rust services (`INFO`),
+  // Traefik and its access log, Dolt (`warning`), Trino (`WARN`), Grafana,
+  // Loki and Alloy; `lvl` in others.
+  stage.json {
+    expressions = { level = "level", lvl = "lvl" }
+  }
+  // PostgreSQL logs text only: `<date> <time> <zone> [<pid>] LOG:  …`.
+  stage.match {
+    selector = "{service=\"postgres\"}"
+
+    stage.regex {
+      expression = "^\\S+ \\S+ \\S+ \\[\\d+\\] (?P<pg_level>[A-Z]+):  "
+    }
+  }
+  // One of a fixed set, lowercase: trace, debug, info, warn, error, fatal.
+  // Anything else (PostgreSQL's DETAIL or STATEMENT, a text line) gets none.
+  stage.template {
+    source   = "level"
+    template = `{{ $l := "" }}{{ if .level }}{{ $l = ToLower .level }}{{ else if .lvl }}{{ $l = ToLower .lvl }}{{ else if .pg_level }}{{ $l = ToLower .pg_level }}{{ end }}{{ if eq $l "trace" "debug" "info" "warn" "error" "fatal" }}{{ $l }}{{ else if eq $l "warning" }}warn{{ else if eq $l "log" "notice" }}info{{ else if eq $l "panic" }}fatal{{ end }}`
+  }
+  stage.labels {
+    values = { level = "" }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// With certificate.yml, over HTTPS: Loki verified against the installation's
+// CA, this machine's certificate presented (decision 0066, point 12), both
+// read again when the node agent renews them. Unset (development), empty.
+loki.write "default" {
+  endpoint {
+    url = coalesce(sys.env("LOKI_PUSH_URL"), "http://loki:3100/loki/api/v1/push")
+
+    tls_config {
+      ca_file   = sys.env("LOKI_CA_FILE")
+      cert_file = sys.env("LOKI_CLIENT_CERT_FILE")
+      key_file  = sys.env("LOKI_CLIENT_CERT_FILE")
+    }
+  }
+}

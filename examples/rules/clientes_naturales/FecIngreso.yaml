@@ -1,0 +1,6 @@
+dataset: clientes_naturales
+rules:
+  - id: "V-PN-07"
+    field: "FecIngreso"
+    extends: "V-PN-08"
+    alert: "Fecha Ingreso Cliente Errada"

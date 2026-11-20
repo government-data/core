@@ -1,0 +1,81 @@
+# Dolt with TLS and the machines' certificates (decisions 0021, 0066 point
+# 11; step 10). An overlay of docker-compose.yml for an installation whose
+# machines have certificates; development does not use it (it keeps
+# compose.dev.yml: no TLS, root's own `dolt sql` inside the container):
+#
+#   docker compose --project-directory . -p data-quality-dolt \
+#     -f infra/dolt/docker-compose.yml -f infra/dolt/certificate.yml up -d
+#
+# - Dolt serves TLS only and requires a client certificate of the
+#   installation's CA (tls/config.yaml: tls_cert, tls_key,
+#   require_secure_transport, ca_cert with require_client_cert). Its
+#   certificate is the application VM's machine certificate (role `app`),
+#   copied from its node agent's directory at each start
+#   (tls/entrypoint.sh), as Dolt reads it only then: the agent restarts
+#   Dolt when it is free to give it a renewed one (`qd-node`, QD_DOLT_RESTART).
+# - Its only client is the API, presenting the same machine certificate and
+#   verifying Dolt's name:
+#   DOLT_URL=mysql://qd_app:<password>@<DOLT_SERVER_NAME>:<DOLT_PORT>?ssl-mode=VERIFY_IDENTITY&ssl-ca=<dir>/ca.crt&ssl-cert=<dir>/machine.pem&ssl-key=<dir>/machine.pem
+#   where DOLT_SERVER_NAME, the name in the certificate (the application
+#   VM's machine name), resolves to where this port is published.
+# - Root is locked out without a certificate too, so infra/dolt/tenant.sh
+#   and backup.sh run their statements through the one-shot `sql` below, a
+#   MySQL client in Dolt's network namespace (root stays `localhost`) that
+#   presents the machine's certificate.
+#
+# - Its metrics (decision 0071, point 7) over HTTPS on 11228, published
+#   nowhere: Dolt joins the application's Traefik network (QD_EDGE_NETWORK),
+#   where Traefik reaches it as `dolt` and serves it on its metrics entry
+#   point, which requires a client certificate (infra/traefik/internal.yml).
+#   Start the application's stack first.
+#
+# Required environment, besides docker-compose.yml's:
+#   QD_MACHINE_DIR   the application VM's node agent directory (QD_AGENT_DIR)
+# Optional: DOLT_BIND (127.0.0.1) and DOLT_PORT (3306), where the API reaches
+# it; QD_EDGE_NETWORK (data-quality-edge), the Traefik's network.
+#
+# Verified with tools/verify/dolt_stack_cert.sh.
+networks:
+  edge:
+    external: true
+    name: ${QD_EDGE_NETWORK:-data-quality-edge}
+
+services:
+  dolt:
+    entrypoint: ["tini", "--", "/etc/qd/dolt/entrypoint.sh"]
+    networks:
+      - default
+      - edge
+    environment:
+      QD_DOLT_TLS_SOURCE: /run/qd-node
+      QD_DOLT_TLS_DIR: /run/dolt-tls
+    tmpfs:
+      - /run/dolt-tls:mode=0700
+    volumes:
+      - ./infra/dolt/tls/entrypoint.sh:/etc/qd/dolt/entrypoint.sh:ro
+      - ./infra/dolt/tls/config.yaml:/etc/dolt/servercfg.d/config.yaml:ro
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
+    ports:
+      - "${DOLT_BIND:-127.0.0.1}:${DOLT_PORT:-3306}:3306"
+    # `dolt sql` has no client certificate: whether it listens.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3306"]
+
+  # Root's statements (tenant.sh, backup.sh): `run --rm sql -e "…"`.
+  sql:
+    image: ${DOLT_SQL_CLIENT_IMAGE:-mysql:8.4}
+    profiles: ["sql"]
+    network_mode: "service:dolt"
+    entrypoint:
+      - mysql
+      - --host=127.0.0.1
+      - --user=root
+      # Over the loopback of Dolt's own namespace: the CA, not the name.
+      - --ssl-mode=VERIFY_CA
+      - --ssl-ca=/run/qd-node/ca.crt
+      - --ssl-cert=/run/qd-node/machine.pem
+      - --ssl-key=/run/qd-node/machine.pem
+    environment:
+      MYSQL_PWD: ${DOLT_ROOT_PASSWORD:?set DOLT_ROOT_PASSWORD in .env}
+    volumes:
+      - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro

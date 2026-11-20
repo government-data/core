@@ -1,0 +1,77 @@
+dataset: clientes_naturales
+rules:
+  - id: "V-PN-04"
+    field: "Cargo"
+    extends: "V-PN-03"
+    alert: "No corresponde con cargo"
+
+  - id: V-PN-21
+    field: "Cargo"
+    check: "expression"
+    when: "in_list(ActLaboral, 'genera_ingresos')"
+    fails: "is_empty(Cargo) OR Cargo = 'ACTUALIZAR'"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1639" }
+
+  - id: V-PN-22
+    field: "Cargo"
+    check: "expression"
+    fails: "Cargo IN ('DESEMPLEADO', 'ESTUDIANTE', 'AMA DE CASA', 'MENOR', 'JUBILADO', 'INDEPENDIENTE') AND ActLaboral IN ('ASALARIADO', 'EMPLEADO INFORMAL', 'TRABAJO ASOCIADO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1639" }
+
+  - id: V-PN-23
+    field: "Cargo"
+    check: "expression"
+    fails: "Cargo IN ('DESEMPLEADO', 'ESTUDIANTE', 'AMA DE CASA', 'MENOR', 'JUBILADO') AND in_list(ActLaboral, 'independientes')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1639" }
+
+  - id: V-PN-24
+    field: "Cargo"
+    check: "expression"
+    fails: "coalesce(Cargo, '') NOT IN ('JUBILADO/PENSIONADO', 'JUBILADO', 'PENSIONADO') AND ActLaboral IN ('JUBILADO/PENSIONADO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1639" }
+
+  - id: V-PN-25
+    field: "Cargo"
+    check: "expression"
+    fails: "in_list(Cargo, 'cargos_domesticos') AND coalesce(ActLaboral, '') NOT IN ('EMPLEADO DOMESTICO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1639" }
+
+  - id: V-PN-26
+    field: "Cargo"
+    check: "expression"
+    fails: "coalesce(Cargo, '') NOT IN ('AYUDANTE', 'NIÑERA', 'CAMARERO', 'EMPLEADA DOMESTICA', 'JARDINERO', 'OFICIOS VARIOS', 'MAYORDOMO') AND ActLaboral IN ('EMPLEADO DOMESTICO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1639" }
+
+  - id: V-PN-27
+    field: "Cargo"
+    check: "expression"
+    fails: "coalesce(Cargo, '') NOT IN ('ARRENDADOR', 'ARRENDATARIO', 'RENTISTA', 'PROPIETARIO') AND ActLaboral IN ('RENTISTA DE CAPITAL')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1639" }

@@ -1,0 +1,22 @@
+[package]
+name = "iam"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# Who can do what (ADR 0016): the catalog of actions, policies of statements
+# (effect, actions, resources), the managed policies and their evaluation for
+# the Actor of each request. Pure domain: it depends on no web framework or
+# database.
+[dependencies]
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

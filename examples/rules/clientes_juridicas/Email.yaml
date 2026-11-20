@@ -1,0 +1,33 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-09
+    field: "Email"
+    check: "expression"
+    when: "NOT is_empty(Email)"
+    fails: "regexp_like(trim(Email), '.*(notengo@|notiene@|@@).*') OR NOT regexp_like(trim(Email), '[A-Za-z0-9.!#$%&''*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+')"
+    dimension: "accuracy"
+    case: "exact"
+    severity: major
+    cause: capture
+    alert: "Email Errado"
+    origin: { process: KNIME, node: "#1628" }
+
+  - id: P-24
+    field: "Email"
+    check: "expression"
+    fails: "regexp_like(lower(trim(Email)), '.*(notiene|no\\s?tiene|sincorreo|noaplica|ninguno|correo@).*')"
+    dimension: "accuracy"
+    case: "exact"
+    severity: major
+    cause: capture
+    alert: "Correo genérico de relleno"
+    origin: { process: MVP }
+
+  - id: P-25
+    field: "Email"
+    check: "unique"
+    when: "regexp_like(lower(trim(Email)), '.*@.*') AND NOT regexp_like(lower(trim(Email)), '.*(notiene|sincorreo).*')"
+    severity: minor
+    cause: capture
+    alert: "Correo compartido con otro cliente"
+    origin: { process: MVP }

@@ -1,0 +1,11 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-05
+    field: "Correspondencia"
+    check: "domain"
+    in: ["E-Mail", "Laboral"]
+    on_empty: "fail"
+    severity: major
+    cause: capture
+    alert: "Campo errado"
+    origin: { process: KNIME, node: "#1707" }

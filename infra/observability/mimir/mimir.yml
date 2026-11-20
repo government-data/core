@@ -1,0 +1,85 @@
+# Grafana Mimir as one process in monolithic mode (decision 0071): the
+# services' metrics over time, pushed by each machine's Alloy, its blocks in
+# a bucket of the lake as Loki keeps its chunks there. On its own disk only
+# the write-ahead log, the head of the last two hours and the compactor's
+# working files. The variables come from the container's environment
+# (-config.expand-env); certificate.yml adds HTTPS requiring a client
+# certificate and the lake's client certificate, as for Loki.
+#
+# Everything between its own components stays inside the container: gRPC,
+# the rings' gossip and the addresses the components give one another are
+# on its loopback, so its HTTP port is the only one it opens. Without
+# `frontend.address` the querier looks for the query frontend at the
+# container's address, where gRPC does not listen, and every query hangs
+# (tools/verify/metrics_store.sh).
+multitenancy_enabled: false
+target: all
+
+server:
+  http_listen_port: ${MIMIR_HTTP_PORT:-9009}
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: ${MIMIR_GRPC_PORT:-9096}
+  log_format: json
+  log_level: warn
+
+memberlist:
+  bind_addr: [127.0.0.1]
+
+common:
+  storage:
+    backend: s3
+    s3:
+      endpoint: ${MIMIR_S3_ENDPOINT}
+      insecure: ${MIMIR_S3_INSECURE:-false}
+      bucket_name: ${MIMIR_S3_BUCKET:-qd-metrics}
+      access_key_id: ${MIMIR_S3_ACCESS_KEY}
+      secret_access_key: ${MIMIR_S3_SECRET_KEY}
+      region: us-east-1
+      bucket_lookup_type: path
+
+blocks_storage:
+  storage_prefix: blocks
+  tsdb:
+    dir: /data/tsdb
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+ruler_storage:
+  storage_prefix: ruler
+alertmanager_storage:
+  storage_prefix: alertmanager
+
+activity_tracker:
+  filepath: /data/metrics-activity.log
+compactor:
+  data_dir: /data/compactor
+  sharding_ring: { instance_addr: 127.0.0.1, kvstore: { store: memberlist } }
+distributor:
+  ring: { instance_addr: 127.0.0.1, kvstore: { store: memberlist } }
+ingester:
+  ring: { instance_addr: 127.0.0.1, kvstore: { store: memberlist }, replication_factor: 1 }
+store_gateway:
+  sharding_ring: { instance_addr: 127.0.0.1, replication_factor: 1 }
+querier:
+  ring: { instance_addr: 127.0.0.1 }
+query_scheduler:
+  ring: { instance_addr: 127.0.0.1 }
+# Alerts are not Mimir's (decision 0071, point 13): its ruler, part of
+# `all`, is given no rules.
+ruler:
+  rule_path: /data/ruler
+  ring: { instance_addr: 127.0.0.1 }
+frontend:
+  address: 127.0.0.1
+
+limits:
+  # How long the blocks stay in the lake: 13 months by default, configurable
+  # (decision 0071, point 2, the user's ruling of 2026-11-16).
+  compactor_blocks_retention_period: ${MIMIR_RETENTION:-395d}
+  # The installation's series and labels (decision 0071, point 11): what
+  # passes Alloy's limits and goes beyond these is refused and counted in
+  # cortex_discarded_samples_total.
+  max_global_series_per_user: 20000
+  max_label_names_per_series: 20
+
+usage_stats:
+  enabled: false

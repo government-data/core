@@ -1,0 +1,90 @@
+import { describe, expect, it } from "vitest";
+import { QualityError, type Driver } from "./api";
+import {
+  deleteRefusal,
+  filterTables,
+  missing,
+  refusalText,
+  saveFailure,
+  sourceBody,
+  tableRef,
+  validName,
+} from "./sources";
+
+const postgres: Driver = {
+  id: "postgres",
+  engine: "duckdb",
+  default_port: 5432,
+  fields: [
+    { key: "host", kind: "text", required: true },
+    { key: "port", kind: "port", required: false },
+    { key: "database", kind: "text", required: true },
+    { key: "user", kind: "secret", required: true },
+    { key: "password", kind: "secret", required: true },
+  ],
+};
+
+describe("sourceBody", () => {
+  it("splits the form by the driver, leaving empty secrets out to keep them", () => {
+    const body = sourceBody(postgres, {
+      host: " db.example ",
+      database: "core",
+      user: "reader",
+      password: "",
+      port: "",
+    });
+    expect(body).toEqual({
+      driver: "postgres",
+      fields: { host: "db.example", database: "core" },
+      secrets: { user: "reader" },
+    });
+  });
+});
+
+describe("missing", () => {
+  it("names the required fields still empty, but not a secret already set", () => {
+    expect(missing(postgres, { host: "db" }, ["user", "password"])).toEqual(["database"]);
+    expect(missing(postgres, { host: "db", database: "core" }, [])).toEqual(["user", "password"]);
+  });
+});
+
+describe("names and refusals", () => {
+  it("takes what a mapping may call a source", () => {
+    expect(validName("core_2")).toBe(true);
+    expect(validName("Core")).toBe(false);
+    expect(validName("2core")).toBe(false);
+  });
+
+  it("says each refusal in the person's language, with its field", () => {
+    expect(refusalText({ code: "missing", field: "password" })).toContain("Contraseña");
+    expect(refusalText({ code: "something_new" })).not.toBe("");
+  });
+
+  it("says when Trino did not take the source's catalog", () => {
+    const trino = new QualityError(502, { error: "trino" });
+    expect(saveFailure(trino)).toContain("Trino");
+    expect(deleteRefusal(trino)).toContain("Trino");
+    expect(saveFailure(new QualityError(500, null))).not.toContain("Trino");
+  });
+});
+
+describe("filterTables", () => {
+  const tables = [
+    { schema: "public", name: "clients", columns: [] },
+    { schema: "loans", name: "credits", columns: [] },
+    { schema: "loans", name: "client_guarantees", columns: [] },
+  ];
+
+  it("keeps every table for an empty search", () => {
+    expect(filterTables(tables, "  ")).toEqual(tables);
+  });
+
+  it("matches every word against schema.name, any case", () => {
+    expect(filterTables(tables, "CLIENT").map(tableRef)).toEqual([
+      "public.clients",
+      "loans.client_guarantees",
+    ]);
+    expect(filterTables(tables, "loans client").map(tableRef)).toEqual(["loans.client_guarantees"]);
+    expect(filterTables(tables, "nothing")).toEqual([]);
+  });
+});

@@ -1,0 +1,11 @@
+dataset: clientes_naturales
+rules:
+  - id: P-20
+    check: "implies"
+    if: "coalesce(ExpPublicaPEPS, '') = 'SI'"
+    then: "NOT is_empty(CARGOPEPS)"
+    both_ways: true
+    severity: blocking
+    cause: capture
+    alert: "PEP sin cargo o cargo sin PEP"
+    origin: { process: MVP }

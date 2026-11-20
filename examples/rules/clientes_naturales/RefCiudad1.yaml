@@ -1,0 +1,20 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-42
+    field: "RefCiudad1"
+    check: "required"
+    when: "NOT (coalesce(RefRelacion1, '') LIKE 'Ningun%' OR coalesce(FamParente1, '') LIKE 'Ningun%' OR is_empty(RefRelacion1)) AND NOT (is_empty(RefRelacion1) AND is_empty(FamParente1))"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "AlertasPN › CiudadRef1" }
+
+  - id: V-PN-43
+    field: "RefCiudad1"
+    check: "domain"
+    when: "NOT (is_empty(RefRelacion1) AND is_empty(FamParente1))"
+    not_in: { "list": "departamentos" }
+    severity: major
+    cause: capture
+    alert: "Ciudad errada"
+    origin: { process: KNIME, node: "AlertasPN › CiudadRef1" }

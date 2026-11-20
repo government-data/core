@@ -1,0 +1,21 @@
+dataset: clientes_naturales
+rules:
+  - id: P-11
+    field: "TotPatrimonio"
+    check: "expression"
+    fails: "abs(TotActivos - TotPasivos - TotPatrimonio) > 1"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Patrimonio ≠ activo − pasivo"
+    origin: { process: MVP }
+
+  - id: P-13
+    field: "TotPatrimonio"
+    check: "expression"
+    fails: "TotPatrimonio < 0"
+    dimension: "accuracy"
+    severity: minor
+    cause: capture
+    alert: "Patrimonio negativo"
+    origin: { process: MVP }

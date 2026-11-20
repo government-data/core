@@ -1,0 +1,31 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-104
+    field: "RefTelefono1"
+    check: "required"
+    when: "NOT (coalesce(RefRelacion1, '') LIKE 'Ningun%' OR coalesce(FamParente1, '') LIKE 'Ningun%' OR is_empty(RefRelacion1)) AND NOT (is_empty(RefRelacion1) AND is_empty(FamParente1))"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "AlertasPN › TelefonoRef1" }
+
+  - id: V-PN-105
+    field: "RefTelefono1"
+    check: "length"
+    when: "NOT (coalesce(RefRelacion1, '') LIKE 'Ningun%' OR coalesce(FamParente1, '') LIKE 'Ningun%') AND NOT (is_empty(RefRelacion1) AND is_empty(FamParente1))"
+    in: ["7", "10"]
+    on_empty: "fail"
+    severity: major
+    cause: capture
+    alert: "Teléfono Errado"
+    origin: { process: KNIME, node: "AlertasPN › TelefonoRef1" }
+
+  - id: P-28
+    field: "RefTelefono1"
+    check: "expression"
+    fails: "NOT is_empty(Celular) AND (RefTelefono1 = Celular OR RefTelefono2 = Celular)"
+    dimension: "consistency"
+    severity: minor
+    cause: capture
+    alert: "Referencia con el celular del cliente"
+    origin: { process: MVP }

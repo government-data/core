@@ -1,0 +1,47 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-92
+    field: "Nit"
+    check: "domain"
+    not_in: { "list": "simbolos" }
+    severity: major
+    cause: capture
+    alert: "Campo errado"
+    origin: { process: KNIME, node: "#1698" }
+
+  - id: V-PN-93
+    field: "Nit"
+    check: "length"
+    max: "10"
+    severity: major
+    cause: capture
+    alert: "Campo errado"
+    origin: { process: KNIME, node: "#1698" }
+    note: "Aplica a todos los tipos de documento."
+
+  - id: P-01
+    field: "Nit"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: MVP }
+
+  - id: P-02
+    field: "Nit"
+    check: "expression"
+    fails: "(TipIdnent = 'Cédula de Ciudadanía' AND length(coalesce(trim(Nit), '')) NOT BETWEEN 4 AND 10) OR (TipIdnent = 'Cédula de Extranjería' AND length(coalesce(trim(Nit), '')) NOT BETWEEN 3 AND 10) OR (TipIdnent IN ('Tarjeta de Identidad*', 'Registro Civil*') AND length(coalesce(trim(Nit), '')) NOT BETWEEN 10 AND 11) OR (TipIdnent = 'Nit' AND length(coalesce(trim(Nit), '')) NOT BETWEEN 9 AND 10)"
+    dimension: "validity"
+    severity: blocking
+    cause: capture
+    alert: "Longitud no coincide con el tipo"
+    origin: { process: MVP }
+
+  - id: P-03
+    field: "Nit"
+    check: "unique"
+    severity: blocking
+    cause: capture
+    alert: "Documento duplicado"
+    origin: { process: MVP }
+    note: "the prototype also counts records without a document as repeated among themselves; the pattern skips them (required counts them)"

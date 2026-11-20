@@ -1,0 +1,6 @@
+dataset: clientes_juridicas
+rules:
+  - id: "V-PJ-20"
+    field: "DirComsoc"
+    extends: "V-PJ-13"
+    alert: "Campo vacío"

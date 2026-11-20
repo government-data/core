@@ -1,0 +1,11 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-46
+    field: "Contrato"
+    check: "expression"
+    fails: "coalesce(Contrato, '') NOT IN ('FIJO INFERIOR A 6 MESES', 'INDEFINIDO', 'FIJO', 'PROVISIONALIDAD', 'OBRA O LABOR') AND ActLaboral IN ('ASALARIADO') AND CodEmpresa IN ('596', '11270')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "Error en contrato"
+    origin: { process: KNIME, node: "#1686" }

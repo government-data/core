@@ -1,0 +1,9 @@
+dataset: clientes_juridicas
+rules:
+  - id: V-PJ-24
+    field: "Naturaleza"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1708" }

@@ -1,0 +1,261 @@
+[workspace]
+# Virtual manifest: the root defines no package of its own so the monorepo stays
+# modular and uncoupled. Rust crates live under `crates/`; the frontend apps
+# under `apps/` are a separate pnpm workspace and are intentionally not Cargo
+# members. New backend crates are picked up automatically by the glob below.
+resolver = "2"
+members = ["crates/*"]
+
+# Fields shared by every workspace crate. Members opt in with
+# `field.workspace = true` (e.g. `edition.workspace = true`).
+[workspace.package]
+edition = "2021"
+rust-version = "1.90"
+license = "MIT"
+authors = ["quality-data"]
+repository = "https://github.com/quality-data/core"
+
+# Centralized dependency versions. Members reference these with
+# `some-dep.workspace = true` so the whole monorepo stays on one version.
+[workspace.dependencies]
+# Reading the AWS APIs' XML answers (licensing).
+roxmltree = "0.21"
+# Internal crates, wired as path dependencies. The dependency direction is
+# enforced by which of these each member opts into:
+#   api → application → auth-gateway → domain     (api, auth-gateway → http-kit)
+#   infrastructure → auth-gateway, domain, payments
+#   server (composition root) → api, application, infrastructure, contracts, modules
+# `auth-gateway` is identity (signing in, sessions, OAuth, the directory); it
+# builds on `domain`'s shared kernel (ids, email, role, repository error, clock).
+# `contracts` is the shared plugin contract; feature modules implement it and are mounted by the server, never depending on one another.
+# `payments` is a second, independent domain (its own bounded context): the
+# auth domain and the payments domain never depend on each other, and both
+# are implemented against by `infrastructure`.
+domain = { path = "crates/domain" }
+license-model = { path = "crates/license-model" }
+schedule-core = { path = "crates/schedule-core" }
+# Identity: signing in and sessions (see the crate docs).
+auth-gateway = { path = "crates/auth-gateway" }
+# The error envelope and request id every HTTP service shares.
+http-kit = { path = "crates/http-kit" }
+# Technical logs (decision 0026): the same flat JSON fields and the
+# redaction layer in every service. A leaf, depending on no crate here.
+logging = { path = "crates/logging" }
+sigv4 = { path = "crates/sigv4" }
+trino-client = { path = "crates/trino-client" }
+application = { path = "crates/application" }
+infrastructure = { path = "crates/infrastructure" }
+api = { path = "crates/api" }
+contracts = { path = "crates/contracts" }
+payments = { path = "crates/payments" }
+# Global secrets and connections, global roles, license usage.
+platform = { path = "crates/platform" }
+# Who can do what: actions, policies and the Actor (ADR 0016).
+iam = { path = "crates/iam" }
+# The current task's tenant (online edition): api, application and
+# infrastructure share it without depending on one another.
+tenancy = { path = "crates/tenancy" }
+texts = { path = "crates/texts" }
+# The rule language (decisions 0019, 0033), one stage per crate, each pure
+# and depending only on the stages before it:
+#   quality-rules-model → quality-rules-tree → quality-rules-compile → quality-rules-sql
+#   → quality-rules-lint, quality-rules-explain
+# `quality-rules` gathers them as one entry point.
+quality-rules = { path = "crates/quality-rules" }
+quality-rules-model = { path = "crates/quality-rules-model" }
+quality-rules-tree = { path = "crates/quality-rules-tree" }
+quality-rules-compile = { path = "crates/quality-rules-compile" }
+quality-rules-sql = { path = "crates/quality-rules-sql" }
+quality-rules-lint = { path = "crates/quality-rules-lint" }
+quality-rules-explain = { path = "crates/quality-rules-explain" }
+# The quality core: datasets and their mapping (decision 0020); its
+# migrations, router and use cases come with M2.
+quality = { path = "crates/quality" }
+# Not a stage: the adapter that runs the language on an embedded DuckDB
+# (Parquet in, counts out). It does I/O; the stages above stay pure.
+quality-rules-duckdb = { path = "crates/quality-rules-duckdb" }
+# Test-only harness (ephemeral Postgres via testcontainers); consumed only
+# from other crates' `[dev-dependencies]`, never a runtime dependency.
+testkit = { path = "crates/testkit" }
+# The node agent (`qd-node`, 0066): on every machine, depending on no other
+# crate of the workspace but the `logging` leaf (0026; the user's ruling of
+# 2026-11-13); the API's tests drive its library on the real routes.
+node-agent = { path = "crates/node-agent" }
+
+# External dependencies. The domain crate references no framework or driver;
+# `async-trait` is its one exception — an ergonomics macro (not a runtime) that
+# lets a port be `async` while staying object-safe behind `dyn`.
+axum = "0.8"
+# Typed cookie extraction/building (HttpOnly/Secure/SameSite/Max-Age) for the
+# session and CSRF cookies — the vetted axum-ecosystem crate for this rather
+# than hand-rolling `Cookie` header parsing.
+axum-extra = { version = "0.10", default-features = false, features = [
+    "cookie",
+] }
+# `Cookie::max_age`/`expires` types, pulled in transitively by `cookie` anyway —
+# named explicitly so the api crate can compute a cookie's expiry.
+time = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
+async-trait = "0.1"
+# `Stream` combinators for the live events stream (SSE) in `api`.
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+# Structured, leveled application logging (spans + events). The library crates
+# emit through `tracing`; the server binary installs the subscriber that renders
+# it (JSON) — so a request-scoped span carries a trace id through every log line.
+tracing = "0.1"
+# The subscriber `logging` builds on: its formatter, registry and the
+# env-driven level filter (`RUST_LOG`). The binaries reach it through `logging`.
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "ansi"] }
+# Password hashing. Argon2id is the OWASP-recommended algorithm for password
+# storage; the `argon2` crate pulls in the RustCrypto `password-hash` (PHC
+# string) machinery so parameters and salt travel embedded in the encoded hash.
+argon2 = "0.5"
+# JSON (de)serialization for the HTTP request/response bodies at the API boundary.
+serde = { version = "1", features = ["derive"] }
+# OpenAPI: derive the spec from the API's own request/response types and handler
+# annotations, so the TypeScript client is generated from one contract with no
+# hand-maintained duplicate types.
+utoipa = "5"
+# The services' metrics file (decision 0071, point 9; the user's ruling of
+# 2026-11-14): the Prometheus project's own Rust client keeps the counters
+# and writes the text format the file holds.
+prometheus-client = "0.24"
+# JSON parsing for OAuth provider token/userinfo responses (infrastructure) and
+# building request bodies in the api crate's own end-to-end tests.
+serde_json = "1"
+# The rules' YAML (decision 0033, verified in tools/verify/rules-yaml): line
+# and column of every error and of every value, duplicate keys refused, a node
+# budget against alias bombs.
+serde-saphyr = "2.0.0"
+# The JSON Schema of the rules' YAML, derived from its types, for editors.
+schemars = "1"
+# Parses the expressions of a rule (`when`, `fails`, bounds); quality-rules
+# keeps only the nodes of its closed grammar (decision 0019, point 2).
+sqlparser = "0.63"
+# DuckDB embedded (2.0.0, verified in tools/verify): the rule language's
+# adapter runs compiled rules and their examples on it, reading Parquet.
+duckdb = { version = "=1.20000.1", features = ["bundled", "parquet"] }
+# OAuth/OIDC crypto helpers: SHA-256 for the PKCE `S256` challenge, and
+# URL-safe base64 for PKCE and for decoding the id_token JWT payload.
+sha2 = "0.10"
+base64 = "0.22"
+# Verifying (and, for the issuer, signing) the license entitlements: ed25519.
+ring = "0.17"
+# The installation's CA (decision 0066): certificates built and signed over
+# `ring`, without OpenSSL or aws-lc-rs (the defaults dropped for that);
+# `x509-parser` to load a CA from its certificate.
+rcgen = { version = "0.14", default-features = false, features = [
+    "ring",
+    "pem",
+    "x509-parser",
+] }
+# Reading certificates and signing requests, and verifying a request's own
+# signature (`verify`: with ring). The version ldap3 already brings.
+x509-parser = { version = "0.18", features = ["verify"] }
+# Test-only, the CA's tests: a real verifier of the certificates it signs
+# (the one rustls uses, over ring), and an RSA request to refuse (the `rsa`
+# and `rand` that sqlx's MySQL driver already brings).
+rustls-webpki = { version = "0.103", default-features = false, features = [
+    "ring",
+    "std",
+] }
+rustls-pki-types = "1"
+# Test-only, the worker's (0066 step 7): an HTTPS server that asks for a
+# client certificate of a test CA, over ring (the versions reqwest brings).
+rustls = { version = "0.23", default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+] }
+tokio-rustls = { version = "0.26", default-features = false, features = [
+    "ring",
+    "tls12",
+] }
+rsa = "0.9"
+rand = "0.8"
+# HMAC-SHA256 for verifying payment-webhook signatures (Stripe's scheme).
+hmac = "0.12"
+# HTTP client for the OAuth token/userinfo calls. rustls (no OpenSSL), JSON
+# helpers on; the default reqwest features we do not need are dropped.
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+    "json",
+] }
+# Postgres access. `default-features = false` drops the bundled runtime/TLS pair
+# so we choose them explicitly: the Tokio runtime, rustls (ring) for TLS to
+# cloud databases, the Postgres driver, the migration runner, and `macros` (for
+# the `sqlx::migrate!` embed macro). We deliberately use only *runtime* queries,
+# never the compile-time `query!` macros, so the build never needs a live
+# DATABASE_URL or an offline `.sqlx` cache.
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls-ring",
+    "postgres",
+    # The catalog on Dolt, MySQL-compatible (decision 0021).
+    "mysql",
+    "migrate",
+    "macros",
+    # TIMESTAMPTZ ↔ chrono and JSONB ↔ serde_json; UUID ↔ uuid (the queue's ids).
+    "chrono",
+    "json",
+    "uuid",
+] }
+# Ephemeral Postgres containers for integration tests (see `testkit`).
+testcontainers = "0.27"
+testcontainers-modules = { version = "0.15", features = ["postgres"] }
+# CORS as an explicit-allowlist tower layer (never a wildcard), and `util` for
+# `ServiceExt::oneshot` in the api crate's own HTTP-level tests.
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors"] }
+# Orchestration: dates with a time zone for the schedules, and the cron
+# expression in the standard 5-field syntax (crontab's) that `croner` takes
+# as is.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+chrono-tz = "0.10"
+croner = "3"
+# A pure-Rust LDAP client, with rustls (no OpenSSL), for signing in against
+# the corporate directory.
+ldap3 = { version = "0.12", default-features = false, features = ["tls-rustls-ring"] }
+# Outgoing mail over SMTP (rustls, no OpenSSL) for the system settings;
+# Office 365 goes through Microsoft Graph with reqwest.
+lettre = { version = "0.11", default-features = false, features = [
+    "smtp-transport",
+    "builder",
+    "hostname",
+    "tokio1-rustls-tls",
+] }
+# Encrypting the system settings' secrets stored in Postgres.
+aes-gcm = "0.11"
+# Killing a run's process group on Unix (killpg) without `unsafe`: the Python
+# launcher, outside Windows only.
+nix = { version = "0.29", default-features = false, features = ["signal"] }
+# The worker's free disk (statvfs) without `unsafe` (decision 0072, point 14).
+rustix = { version = "1", features = ["fs"] }
+# Random ids in the tests.
+uuid = { version = "1", features = ["v4"] }
+
+# Lints applied across the whole workspace. Members inherit them with
+# `[lints] workspace = true`.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+todo = "warn"
+dbg_macro = "warn"
+# Functions over `too-many-lines-threshold` (clippy.toml) fail CI (0034).
+too_many_lines = "warn"
+
+# Compilation profiles shared by every crate.
+[profile.dev]
+# Faster incremental debug builds.
+debug = 1
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"

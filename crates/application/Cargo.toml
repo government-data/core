@@ -1,0 +1,47 @@
+[package]
+name = "application"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The application layer orchestrates use cases. It depends on the domain crates
+# (`domain` for auth/sessions, `payments` for the payments bounded context) —
+# never on `infrastructure` or `api`. It knows nothing about HTTP or storage;
+# it wires domain ports into application services.
+[dependencies]
+schedule-core.workspace = true
+license-model.workspace = true
+async-trait.workspace = true
+domain.workspace = true
+auth-gateway.workspace = true
+payments.workspace = true
+# Secrets, global roles and license usage.
+platform.workspace = true
+# Global capabilities and roles (ADR 0013).
+iam.workspace = true
+tenancy.workspace = true
+texts.workspace = true
+# The local time in the failure emails.
+chrono-tz.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+# Structured log events for use-case-level failures (e.g. a webhook that could
+# not be applied), emitted through the same `tracing` pipeline as the API layer.
+tracing.workspace = true
+# `sync` to hand the change notices to the open tabs.
+tokio = { workspace = true, features = ["sync"] }
+serde.workspace = true
+
+# Test-only: a stub port needs `async-trait` to implement the async `HealthCheck`
+# contract, and `tokio` provides the runtime for `#[tokio::test]`.
+[dev-dependencies]
+auth-gateway = { workspace = true, features = ["testing"] }
+async-trait.workspace = true
+tokio.workspace = true

@@ -1,0 +1,10 @@
+{
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "deleting": "Deleting…",
+  "close": "Close",
+  "toast": {
+    "notifications": "Notifications",
+    "close": "Close the notification"
+  }
+}

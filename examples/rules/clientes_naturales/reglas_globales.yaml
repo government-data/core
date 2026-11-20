@@ -1,0 +1,122 @@
+dataset: clientes_naturales
+
+lists:
+  genera_ingresos:
+    [
+      "INDEPENDIENTE-PRFESIONAL",
+      "INDEPENDIENTE FORMALIZADO",
+      "INDEPENDIENTE AGRO",
+      "INDEPENDIENTE INFORMAL",
+      "ASALARIADO",
+      "EMPLEADO INFORMAL",
+      "JUBILADO/PENSIONADO",
+      "TRABAJO ASOCIADO",
+      "EMPLEADO DOMESTICO",
+      "RENTISTA DE CAPITAL",
+    ]
+  independientes:
+    [
+      "INDEPENDIENTE-PRFESIONAL",
+      "INDEPENDIENTE FORMALIZADO",
+      "INDEPENDIENTE AGRO",
+      "INDEPENDIENTE INFORMAL",
+    ]
+  departamentos:
+    [
+      "ANTIOQUIA",
+      "AMAZONAS",
+      "ATLANTICO",
+      "BOLIVAR",
+      "BOYACA",
+      "CAQUETA",
+      "CASANARE",
+      "CAUCA",
+      "CESAR",
+      "CHOCÓ",
+      "CORDOBA",
+      "CUNDINAMARCA",
+      "GUAINIA",
+      "GUAVIARE",
+      "HUILA",
+      "LA GUAJIRA",
+      "MAGDALENA",
+      "META",
+      "N. DE SANTANDER",
+      "NARIÑO",
+      "PUTUMAYO",
+      "QUINDIO",
+      "RISARALDA",
+      "SAN ANDRES",
+      "SANTANDER",
+      "SUCRE",
+      "TOLIMA",
+      "VALLE DEL CAUCA",
+      "VAUPES",
+      "VICHADA",
+    ]
+  simbolos:
+    [
+      "!",
+      "#",
+      "$",
+      "&",
+      "%",
+      "/",
+      "(",
+      ")",
+      "{",
+      "[",
+      "*",
+      "¨",
+      "+",
+      "-",
+      "_",
+      ".",
+      ":",
+      ",",
+      ";",
+      "]",
+      "}",
+      "°",
+      "|",
+      "¡",
+      "¿",
+      "?",
+      "'",
+      "\\",
+    ]
+  cargos_domesticos:
+    [
+      "AYUDANTE",
+      "NIÑERA",
+      "CAMARERO",
+      "EMPLEADA DOMESTICA",
+      "JARDINERO",
+      "OFICIOS VARIOS",
+      "MAYORDOMO",
+    ]
+  no_laboral: ["AMA DE CASA", "DESEMPLEADO", "ESTUDIANTE", "MENOR"]
+
+derived:
+  Edad: "round(days_between(FecNacimiento, :cut) / 365.25, 2)"
+  AnnosExpedicionCedula: "round(days_between(FecExpedicion, :cut) / 365.25, 3)"
+
+references:
+  asesores: { dataset: asesores, key: CodigoEscalaAsesor }
+  asesores_activos: { dataset: asesores, key: CodigoEscalaAsesor, where: "EstadoAsesor = 'ACTIVO'" }
+
+named:
+  "V-PN-08":
+    check: "range"
+    when: "IdActivo = 'SI'"
+    max: ":cut"
+    severity: major
+    cause: capture
+    origin: { process: KNIME, node: "#1688" }
+    note: "KNIME no le asigna dimensión."
+  "V-PN-03":
+    check: "empty"
+    when: "in_list(ActLaboral, 'no_laboral') AND NOT ((ActLaboral IN ('ESTUDIANTE', 'MENOR') AND Cargo IN ('ESTUDIANTE', 'SIN IDENTIFICAR')) OR (ActLaboral = 'AMA DE CASA' AND Cargo = 'AMA DE CASA') OR (ActLaboral = 'DESEMPLEADO' AND Cargo = 'DESEMPLEADO'))"
+    severity: major
+    cause: capture
+    origin: { process: KNIME, node: "#1636" }

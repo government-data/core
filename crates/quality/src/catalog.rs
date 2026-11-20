@@ -1,0 +1,66 @@
+//! The versioned catalog as the quality core sees it (decision 0021): a
+//! dataset's mapping and rules at a commit of `main`, which is what runs
+//! read. Only the application talks to the catalog; a worker gets this
+//! snapshot with its job and records the commit it evaluated.
+
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+/// The tenant's catalog database: `tenant_<id>`, the id without hyphens
+/// (as the lake's warehouse, [`crate::lake::warehouse`]).
+pub fn database(tenant: Uuid) -> String {
+    format!("tenant_{}", tenant.simple())
+}
+
+/// A dataset's mapping and rules files at one commit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CatalogSnapshot {
+    pub commit: String,
+    /// The mapping's YAML ([`crate::mapping::Mapping`]).
+    pub mapping: String,
+    pub rules: Vec<RulesSource>,
+    /// The other datasets' mappings, what the rules' references read.
+    pub others: Vec<DatasetMapping>,
+}
+
+/// A dataset's mapping, as YAML.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetMapping {
+    pub dataset: String,
+    pub yaml: String,
+}
+
+/// One rules file: its name in the catalog and its YAML.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RulesSource {
+    pub file: String,
+    pub yaml: String,
+}
+
+/// Reads the catalog's `main`.
+#[async_trait]
+pub trait Catalog: Send + Sync {
+    /// The dataset's snapshot now; `None` if the tenant's catalog has no
+    /// mapping for it.
+    async fn snapshot(
+        &self,
+        tenant: Uuid,
+        dataset: &str,
+    ) -> Result<Option<CatalogSnapshot>, String>;
+
+    /// Every dataset's mapping now, by dataset; none if the tenant has no
+    /// catalog yet.
+    async fn mappings(&self, tenant: Uuid) -> Result<Vec<DatasetMapping>, String>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_tenants_catalog_database() {
+        let main = Uuid::parse_str(tenancy::MAIN_ID).unwrap();
+        assert_eq!(database(main), "tenant_00000000000000000000000000000001");
+    }
+}

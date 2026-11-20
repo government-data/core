@@ -1,0 +1,1 @@
+sum by (device, direction) (label_replace(rate(node_disk_read_bytes_total{job="host",vm="$vm"}[$__rate_interval]), "direction", "read", "", "") or label_replace(rate(node_disk_written_bytes_total{job="host",vm="$vm"}[$__rate_interval]), "direction", "write", "", ""))

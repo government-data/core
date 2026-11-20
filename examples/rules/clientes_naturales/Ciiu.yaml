@@ -1,0 +1,101 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-09
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) IN (9609, 0) AND CodEmpresa IN ('11', '21', '121', '0') AND (in_list(ActLaboral, 'genera_ingresos') OR ActLaboral = 'AMA DE CASA')"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "No coincide con código empresa y actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PN-10
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) = 8430 AND coalesce(ActLaboral, '') NOT IN ('JUBILADO/PENSIONADO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PN-11
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) <> 8430 AND ActLaboral IN ('JUBILADO/PENSIONADO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PN-12
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) = 9700 AND coalesce(ActLaboral, '') NOT IN ('EMPLEADO DOMESTICO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PN-13
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) <> 9700 AND ActLaboral IN ('EMPLEADO DOMESTICO')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PN-14
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) = 9810 AND coalesce(ActLaboral, '') NOT IN ('DESEMPLEADO', 'INSOLVENTE')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PN-15
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) = 9820 AND coalesce(ActLaboral, '') NOT IN ('AMA DE CASA', 'ESTUDIANTE', 'MENOR')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: V-PN-16
+    field: "Ciiu"
+    check: "expression"
+    fails: "coalesce(CAST(Ciiu AS INTEGER), -1) <> 9820 AND ActLaboral IN ('AMA DE CASA', 'ESTUDIANTE', 'MENOR')"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "No coincide con la Actividad laboral"
+    origin: { process: KNIME, node: "#1651" }
+
+  - id: P-07
+    field: "Ciiu"
+    check: "expression"
+    fails: "Ciiu IN ('0', '0000', '?') OR coalesce(DetCiiu, '') LIKE 'SIN IDENTIFICAR%'"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "CIIU sin identificar"
+    origin: { process: MVP }
+
+  - id: P-08
+    field: "Ciiu"
+    check: "format"
+    pattern: "\\d{4}"
+    severity: minor
+    cause: systemic
+    alert: "CIIU sin 4 dígitos en la fuente"
+    origin: { process: MVP }
+    note: "El flujo lo repara (ReparacionCI); se mide en la fuente para corregir la extracción.; measured on the source's code, before the flow repairs it (ReparacionCI)"

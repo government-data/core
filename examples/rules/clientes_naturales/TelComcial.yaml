@@ -1,0 +1,12 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-117
+    field: "TelComcial"
+    check: "length"
+    when: "TipIdnent IN ('Nit', 'Fideicomiso') OR ActLaboral IN ('INDEPENDIENTE AGRO', 'INDEPENDIENTE FORMALIZADO', 'INDEPENDIENTE-PRFESIONAL', 'PERSONA JURIDICA')"
+    in: ["7", "10"]
+    on_empty: "fail"
+    severity: major
+    cause: capture
+    alert: "Teléfono Errado"
+    origin: { process: KNIME, node: "#1625" }

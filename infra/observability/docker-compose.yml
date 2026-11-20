@@ -1,0 +1,276 @@
+# Observability (decisions 0026 and 0071): Grafana to read the logs and the
+# services' metrics, Loki to keep the logs, Mimir the metrics, Alloy to
+# collect them. Its own stack, not part of the application's compose:
+# in production Grafana and Loki run on their own server and Alloy on every
+# VM; in development the three stand for them on this machine.
+#
+# The application reaches Grafana by URL, never by Docker labels: its Traefik
+# routes /grafana to `GRAFANA_URL` (infra/traefik/dynamic/apps-observability.yml).
+# People sign in with their Quality Data account (OIDC, the `policy` claim
+# gives the role), inside the app at /apps/grafana. Loki and Alloy are not
+# exposed: Alloy pushes to Loki, Grafana reads it, and Loki keeps its chunks
+# and index in a bucket of the lake (RustFS), with its own user; Mimir the
+# same, its blocks in a bucket of its own (qd-metrics), with its own user.
+#
+#   task obs:up | obs:down | obs:logs
+#
+# Grafana's secrets, as files in `secrets/` (git-ignored; QD_SECRETS_DIR
+# moves it), written once by setup-secrets.sh (`task obs:up` runs it):
+#   grafana_admin_password                 the emergency admin, only through
+#                                          /grafana/login?disableAutoLogin=true
+#   grafana_oidc_client_secret             from `server oidc-client grafana …`
+#   grafana_pg_password                    its read-only PostgreSQL role's,
+#                                          qd_grafana (tools/dev/grafana-role.sh)
+#   grafana_metrics_password               the basic auth of its /metrics,
+#                                          which Alloy sends (decision 0071)
+#   grafana_smtp_password                  its SMTP user's, for the alerts'
+#                                          mail (decision 0072); empty
+#                                          without authentication
+# Required environment (in the repo `.env`):
+#   LOKI_S3_ACCESS_KEY, LOKI_S3_SECRET_KEY Loki's own RustFS user, limited to
+#                                          its bucket (setup-storage.sh); Loki
+#                                          has no file form for them
+#   MIMIR_S3_ACCESS_KEY, MIMIR_S3_SECRET_KEY Mimir's, the same way
+#   GRAFANA_ALERT_EMAILS                   the mailboxes the alerts are
+#                                          mailed to, separated by `;`
+#                                          (decision 0072, point 8)
+# Optional: MIMIR_RETENTION (395d, 13 months), how long the metrics stay in
+# the lake (decision 0071, point 2, the user's ruling of 2026-11-16).
+#   GRAFANA_PG_CA_FILE                     the installation's CA, which signs
+#                                          PostgreSQL's certificate (tls.yml);
+#                                          unset, nothing is trusted and
+#                                          verify-full refuses every connection
+#   GF_SMTP_HOST (host:port), GF_SMTP_USER, GF_SMTP_FROM_ADDRESS and
+#   GF_SMTP_ENABLED=true                   Grafana's own SMTP, for the alerts'
+#                                          mail (decision 0072, point 9),
+#                                          STARTTLS required
+#                                          (GF_SMTP_STARTTLS_POLICY)
+#   GRAFANA_SMTP_CA_FILE                   the mail server's CA, unless its
+#                                          certificate is public
+name: data-quality-observability # `-p` in the tasks: .env sets COMPOSE_PROJECT_NAME for the app
+
+# Mounted at /run/secrets/<name>, with the host file's owner and mode: 444,
+# so Grafana's user (472) reads them; only the folder (700) is closed.
+secrets:
+  grafana_admin_password:
+    file: ${QD_SECRETS_DIR:-./secrets}/grafana_admin_password
+  grafana_oidc_client_secret:
+    file: ${QD_SECRETS_DIR:-./secrets}/grafana_oidc_client_secret
+  grafana_pg_password:
+    file: ${QD_SECRETS_DIR:-./secrets}/grafana_pg_password
+  grafana_metrics_password:
+    file: ${QD_SECRETS_DIR:-./secrets}/grafana_metrics_password
+  grafana_smtp_password:
+    file: ${QD_SECRETS_DIR:-./secrets}/grafana_smtp_password
+
+volumes:
+  # Grafana's own database: users, their preferences, sessions.
+  grafana-data:
+  # Loki's write-ahead log and the compactor's working files; the logs
+  # themselves are in the lake.
+  loki-data:
+  # Alloy's positions in each container's log, so a restart does not resend,
+  # and its write-ahead log of the metrics Mimir has not taken yet.
+  alloy-data:
+  # Mimir's write-ahead log, the head before a block is cut and the
+  # compactor's working files; the blocks themselves are in the lake.
+  mimir-data:
+  # The API's metrics file (decision 0071, point 9), written by the
+  # application's project (infra/traefik/docker-compose.yml) under the same
+  # name (QD_METRICS_VOLUME moves it, for a test); Alloy only reads it.
+  metrics:
+    name: ${QD_METRICS_VOLUME:-data-quality-metrics}
+  # PostgreSQL's and Dolt's data, the application's projects' volumes
+  # (infra/postgres, infra/dolt) under their names: Alloy reads only their
+  # filesystems' size and free space (decision 0072, step 1).
+  pgdata:
+    name: ${APP_STACK:-data-quality}_pgdata
+  dolt-data:
+    name: ${APP_STACK:-data-quality}_dolt-data
+
+services:
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:13.2.5}
+    restart: unless-stopped
+    environment:
+      GF_SERVER_HTTP_PORT: ${GRAFANA_PORT:-3000}
+      # Served under the app's domain at /grafana, inside its frame.
+      GF_SERVER_ROOT_URL: https://${APP_DOMAIN:-localhost}/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: lax
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      # The emergency admin: the only local account. The form stays for it,
+      # behind the automatic sign-in (/grafana/login?disableAutoLogin=true).
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-qd-emergency-admin}
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_DEFAULT_LANGUAGE: es-ES
+      # Sign in with Quality Data (the installation as OIDC provider).
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Quality Data
+      GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN: "true"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: "true"
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET__FILE: /run/secrets/grafana_oidc_client_secret
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid email profile
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://${APP_DOMAIN:-localhost}/api/oauth/authorize
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://${APP_DOMAIN:-localhost}/api/oauth/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: https://${APP_DOMAIN:-localhost}/api/oauth/userinfo
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: email
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+      GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH: name
+      # The role from the `policy` claim (a list of IAM policy names):
+      # quality-admin → Admin, auditor → Viewer; anyone else is refused.
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: >-
+        contains(not_null(policy, `[]`), 'quality-admin') && 'Admin'
+        || contains(not_null(policy, `[]`), 'auditor') && 'Viewer'
+        || ''
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: "true"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "false"
+      # Where its datasource reads (provisioning/datasources/loki.yml).
+      LOKI_URL: ${LOKI_URL:-http://loki:3100}
+      # The services' metrics (provisioning/datasources/mimir.yml); with TLS,
+      # the name its certificate is checked against (certificate.yml).
+      MIMIR_URL: ${MIMIR_URL:-http://mimir:9009}
+      MIMIR_SERVER_NAME: ""
+      # The audit and run logs (provisioning/datasources/postgres.yml), as
+      # qd_grafana, over TLS verified against the installation's CA: the
+      # host is the name in PostgreSQL's certificate (infra/postgres/tls.yml).
+      GRAFANA_PG_HOST: ${GRAFANA_PG_HOST:-${POSTGRES_SERVER_NAME:-postgres}}
+      GRAFANA_PG_PORT: ${GRAFANA_PG_PORT:-5432}
+      GRAFANA_PG_DATABASE: ${GRAFANA_PG_DATABASE:-${POSTGRES_DB:-knime}}
+      GRAFANA_PG_SSLMODE: ${GRAFANA_PG_SSLMODE:-verify-full}
+      # Its /metrics (decision 0071, point 7) only with this basic auth, which
+      # Alloy sends: /grafana/metrics on the public entry point gives 401.
+      GF_METRICS_BASIC_AUTH_USERNAME: qd-metrics
+      GF_METRICS_BASIC_AUTH_PASSWORD__FILE: /run/secrets/grafana_metrics_password
+      # The alerts (decision 0072): rules, template, policies and contact
+      # points provisioned from provisioning/alerting (tools/grafana/
+      # alerts.mjs). The mail goes to these mailboxes, read only in the
+      # contact point (`$GRAFANA_ALERT_EMAILS`), through Grafana's own SMTP,
+      # copied once from Settings → Mail by the installer (points 8 and 9).
+      GRAFANA_ALERT_EMAILS: ${GRAFANA_ALERT_EMAILS:?set GRAFANA_ALERT_EMAILS in .env (decision 0072, point 8)}
+      GF_SMTP_ENABLED: ${GF_SMTP_ENABLED:-false}
+      GF_SMTP_HOST: ${GF_SMTP_HOST:-}
+      GF_SMTP_USER: ${GF_SMTP_USER:-}
+      GF_SMTP_PASSWORD__FILE: /run/secrets/grafana_smtp_password
+      GF_SMTP_FROM_ADDRESS: ${GF_SMTP_FROM_ADDRESS:-}
+      GF_SMTP_FROM_NAME: ${GF_SMTP_FROM_NAME:-Quality Data}
+      # Grafana will not authenticate over plain SMTP; its [smtp] has no CA
+      # file, so a private mail server's CA is Go's SSL_CERT_FILE (0072, V2).
+      GF_SMTP_STARTTLS_POLICY: ${GF_SMTP_STARTTLS_POLICY:-MandatoryStartTLS}
+      SSL_CERT_FILE: ${GRAFANA_SMTP_CA_FILE:+/etc/qd/smtp-ca.crt}
+      # An HTML part and a text part.
+      GF_EMAILS_CONTENT_TYPES: text/html,text/plain
+      # The heartbeat's webhook (contact point qd-api-heartbeat), on the
+      # internal entry point; its TLS comes with step 5's route.
+      INTERNAL_DOMAIN: ${INTERNAL_DOMAIN:-internal.${APP_DOMAIN:-localhost}}
+      # JSON on its output, like every service of the installation.
+      GF_LOG_CONSOLE_FORMAT: json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    secrets:
+      - grafana_admin_password
+      - grafana_oidc_client_secret
+      - grafana_pg_password
+      - grafana_metrics_password
+      - grafana_smtp_password
+    volumes:
+      - grafana-data:/var/lib/grafana
+      # The mail server's CA (SSL_CERT_FILE), when GRAFANA_SMTP_CA_FILE names it.
+      - ${GRAFANA_SMTP_CA_FILE:-/dev/null}:/etc/qd/smtp-ca.crt:ro
+      # The CA that PostgreSQL's certificate is verified against.
+      - ${GRAFANA_PG_CA_FILE:-/dev/null}:/etc/qd/postgres-ca.crt:ro
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      # The dashboards (provisioning/dashboards/files.yml).
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana-dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${GRAFANA_PORT:-3000}/api/health >/dev/null"]
+      interval: 10s
+      retries: 12
+
+  loki:
+    image: ${LOKI_IMAGE:-grafana/loki:3.7.9}
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yml", "-config.expand-env=true"]
+    environment:
+      LOKI_HTTP_PORT: ${LOKI_HTTP_PORT:-3100}
+      LOKI_GRPC_PORT: ${LOKI_GRPC_PORT:-9095}
+      # The lake's S3 API, as host:port; `true` for plain HTTP.
+      LOKI_S3_ENDPOINT: ${LOKI_S3_ENDPOINT:-rustfs:9000}
+      LOKI_S3_INSECURE: ${LOKI_S3_INSECURE:-false}
+      LOKI_S3_BUCKET: ${LOKI_S3_BUCKET:-qd-observability}
+      LOKI_S3_ACCESS_KEY: ${LOKI_S3_ACCESS_KEY:?set LOKI_S3_ACCESS_KEY in .env (setup-storage.sh)}
+      LOKI_S3_SECRET_KEY: ${LOKI_S3_SECRET_KEY:?set LOKI_S3_SECRET_KEY in .env (setup-storage.sh)}
+    volumes:
+      - loki-data:/loki
+      - ./infra/observability/loki/loki.yml:/etc/loki/loki.yml:ro
+    # Distroless: no shell for a healthcheck; /ready answers 200 when it is.
+
+  # The services' metrics over time (decision 0071), one process.
+  mimir:
+    image: ${MIMIR_IMAGE:-grafana/mimir:3.2.4}
+    restart: unless-stopped
+    command: ["-config.file=/etc/mimir/mimir.yml", "-config.expand-env=true"]
+    environment:
+      MIMIR_HTTP_PORT: ${MIMIR_HTTP_PORT:-9009}
+      MIMIR_GRPC_PORT: ${MIMIR_GRPC_PORT:-9096}
+      # The lake's S3 API, as host:port; `true` for plain HTTP.
+      MIMIR_S3_ENDPOINT: ${MIMIR_S3_ENDPOINT:-rustfs:9000}
+      MIMIR_S3_INSECURE: ${MIMIR_S3_INSECURE:-false}
+      MIMIR_S3_BUCKET: ${MIMIR_S3_BUCKET:-qd-metrics}
+      MIMIR_S3_ACCESS_KEY: ${MIMIR_S3_ACCESS_KEY:?set MIMIR_S3_ACCESS_KEY in .env (setup-storage.sh)}
+      MIMIR_S3_SECRET_KEY: ${MIMIR_S3_SECRET_KEY:?set MIMIR_S3_SECRET_KEY in .env (setup-storage.sh)}
+      MIMIR_RETENTION: ${MIMIR_RETENTION:-395d}
+    volumes:
+      - mimir-data:/data
+      - ./infra/observability/mimir/mimir.yml:/etc/mimir/mimir.yml:ro
+    # Distroless: no shell for a healthcheck; /ready answers 200 when it is.
+
+  # The collector. In production, one on every VM, next to the role's own
+  # compose; here it reads every container of this machine, and collects
+  # the application VM's services' metrics and pushes them to Mimir
+  # (alloy/app.alloy, decision 0071). The folder /etc/qd-alloy holds its
+  # files, loaded as one.
+  alloy:
+    image: ${ALLOY_IMAGE:-grafana/alloy:v1.21.3}
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:${ALLOY_PORT:-12345}
+      - --storage.path=/var/lib/alloy/data
+      - --disable-reporting
+      - /etc/qd-alloy
+    environment:
+      LOKI_PUSH_URL: ${LOKI_PUSH_URL:-http://loki:3100/loki/api/v1/push}
+      # The VM's name, a label on every line (decision 0026, point 1) and
+      # on every series (0071, point 10).
+      OBS_VM: ${OBS_VM:-dev}
+      # The compose projects whose logs are collected (RE2, whole name).
+      OBS_LOG_PROJECTS: ${OBS_LOG_PROJECTS:-data-quality|data-quality-.+}
+      # Where the metrics go, and where each target is (alloy/app.alloy).
+      METRICS_PUSH_URL: ${METRICS_PUSH_URL:-http://mimir:9009/api/v1/push}
+      METRICS_ROUTER_ADDRESS: traefik:9445
+      LOKI_METRICS_ADDRESS: loki:${LOKI_HTTP_PORT:-3100}
+      MIMIR_METRICS_ADDRESS: mimir:${MIMIR_HTTP_PORT:-9009}
+    secrets:
+      - grafana_metrics_password
+    volumes:
+      - alloy-data:/var/lib/alloy/data
+      - metrics:/run/qd-metrics:ro
+      - ./infra/observability/alloy/config.alloy:/etc/qd-alloy/config.alloy:ro
+      - ./infra/observability/alloy/app.alloy:/etc/qd-alloy/app.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # The machine (decision 0072, step 1): the watched paths, PostgreSQL's,
+      # Dolt's and Loki's data, for their filesystems (statfs), and the
+      # host's interfaces from its init's network files alone, never the
+      # whole /proc (point 2 as amended on 2026-11-16). All read-only.
+      - pgdata:/host/watch/postgres:ro
+      - dolt-data:/host/watch/dolt:ro
+      - loki-data:/host/watch/loki:ro
+      - /proc/1/net:/host/proc1/net:ro

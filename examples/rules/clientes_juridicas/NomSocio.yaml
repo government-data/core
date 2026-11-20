@@ -1,0 +1,6 @@
+dataset: clientes_juridicas
+rules:
+  - id: "V-PJ-14"
+    field: "NomSocio"
+    extends: "V-PJ-13"
+    alert: "Campo vacío"

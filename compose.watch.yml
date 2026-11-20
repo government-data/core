@@ -1,0 +1,36 @@
+# Watch mode, over compose.yml and compose.override.yml: only Traefik,
+# Postgres and Mailpit in containers; the API, the web and the docs run on
+# this machine with their watchers, and Traefik sends https://localhost to them
+# (infra/traefik/watch.yml). `task dev:watch` brings it all up.
+#
+#   docker compose -f compose.yml -f compose.override.yml -f compose.watch.yml --profile dev up -d
+name: data-quality
+
+services:
+  traefik:
+    # How a container reaches a process of this machine.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      # The sign-in gate of the applications (orq-auth, orq-auth-admin)
+      # calls http://api:8080: here the API is this machine's.
+      - "api:host-gateway"
+    # The route Trino reads its rules from (dynamic/apps-trino.yml) goes to
+    # this machine's API too, not to the container's.
+    # The machines' routes on the internal entry point (internal.yml), too.
+    environment:
+      TRINO_RULES_SERVICE: api-host@file
+      INTERNAL_API_SERVICE: api-host@file
+    # Its dynamic configuration: the shared middlewares and TLS plus
+    # watch.yml, copied by `task dev:watch` into .dev/traefik (it replaces
+    # ./dynamic, mounted at the same place).
+    volumes:
+      - "./.dev/traefik:/etc/traefik/dynamic:ro"
+
+  # Run on this machine instead: out of the dev profile. `!override`
+  # replaces the profiles; a plain list would be merged with ["dev", "prod"].
+  api:
+    profiles: !override ["prod"]
+  web:
+    profiles: !override ["prod"]
+  bootstrap:
+    profiles: !override ["prod"]

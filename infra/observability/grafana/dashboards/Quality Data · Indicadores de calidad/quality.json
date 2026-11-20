@@ -1,0 +1,5516 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Generado desde infra/observability/grafana/definition con tools/grafana/dashboards.mjs: no se edita aquí ni en Grafana.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "trend",
+      "title": "Conformidad e IGCD por corte",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Records, conformity and the IGCD by cut (decisions 0031 and 0057): the\n-- last twelve cuts up to this one, oldest first.\nSELECT cut, records, failures, conformity, igcd\n  FROM (SELECT s.cut::text AS cut, s.records, round(s.igcd::numeric, 4) AS igcd,\n               COALESCE(sum(r.failures), 0)::bigint AS failures,\n               CASE WHEN sum(r.applies) > 0\n                    THEN round(1 - sum(r.failures)::numeric / sum(r.applies), 4) END AS conformity\n          FROM quality.run_summary s\n          LEFT JOIN quality.rule_results r USING (tenant_id, dataset, cut)\n         WHERE s.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND s.cut <= (NULLIF(${cut:sqlstring}, '')::text)::date\n         GROUP BY s.cut, s.records, s.igcd\n         ORDER BY s.cut DESC\n         LIMIT 12) recent\n ORDER BY cut",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Corte"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:YYYY-MM-DD"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fallos"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Conformidad"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IGCD"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Corte"
+      },
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "cut",
+                "destinationType": "time",
+                "dateFormat": "YYYY-MM-DD"
+              },
+              {
+                "targetField": "cut",
+                "destinationType": "number"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "cut": "Corte",
+              "records": "Registros",
+              "failures": "Fallos",
+              "conformity": "Conformidad",
+              "igcd": "IGCD"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Fallos por dimensión y severidad",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Failures by dimension and severity (decision 0031): the cut's rules by\n-- what they measure and how much a failure weighs.\nSELECT dimension, severity, count(*) AS rules, sum(applies)::bigint AS applies,\n       sum(failures)::bigint AS failures\n  FROM quality.rule_results\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n GROUP BY dimension, severity\n ORDER BY failures DESC, dimension NULLS LAST, severity NULLS LAST",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "string"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "completeness · blocking": {
+                        "index": 0,
+                        "text": "Completitud · Bloqueante"
+                      },
+                      "completeness · major": {
+                        "index": 1,
+                        "text": "Completitud · Mayor"
+                      },
+                      "completeness · minor": {
+                        "index": 2,
+                        "text": "Completitud · Menor"
+                      },
+                      "consistency · blocking": {
+                        "index": 3,
+                        "text": "Consistencia · Bloqueante"
+                      },
+                      "consistency · major": {
+                        "index": 4,
+                        "text": "Consistencia · Mayor"
+                      },
+                      "consistency · minor": {
+                        "index": 5,
+                        "text": "Consistencia · Menor"
+                      },
+                      "accuracy · blocking": {
+                        "index": 6,
+                        "text": "Exactitud · Bloqueante"
+                      },
+                      "accuracy · major": {
+                        "index": 7,
+                        "text": "Exactitud · Mayor"
+                      },
+                      "accuracy · minor": {
+                        "index": 8,
+                        "text": "Exactitud · Menor"
+                      },
+                      "validity · blocking": {
+                        "index": 9,
+                        "text": "Validez · Bloqueante"
+                      },
+                      "validity · major": {
+                        "index": 10,
+                        "text": "Validez · Mayor"
+                      },
+                      "validity · minor": {
+                        "index": 11,
+                        "text": "Validez · Menor"
+                      },
+                      "timeliness · blocking": {
+                        "index": 12,
+                        "text": "Oportunidad · Bloqueante"
+                      },
+                      "timeliness · major": {
+                        "index": 13,
+                        "text": "Oportunidad · Mayor"
+                      },
+                      "timeliness · minor": {
+                        "index": 14,
+                        "text": "Oportunidad · Menor"
+                      },
+                      "uniqueness · blocking": {
+                        "index": 15,
+                        "text": "Unicidad · Bloqueante"
+                      },
+                      "uniqueness · major": {
+                        "index": 16,
+                        "text": "Unicidad · Mayor"
+                      },
+                      "uniqueness · minor": {
+                        "index": 17,
+                        "text": "Unicidad · Menor"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Fallos"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transformations": [
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "rules": true,
+              "applies": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "failures": "Value"
+            }
+          }
+        },
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "dimension",
+              "severity"
+            ],
+            "keepFields": false,
+            "naming": {
+              "asLabels": false,
+              "separator2": " · "
+            }
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "includeTimeField": false,
+            "mode": "seriesToRows",
+            "reducers": [
+              "lastNotNull"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "barchart",
+      "title": "Campos con más fallos",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Fields with the most failures (decision 0031): the cut's rules by field.\nSELECT field, count(*) AS rules, sum(applies)::bigint AS applies,\n       sum(failures)::bigint AS failures\n  FROM quality.rule_results\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n GROUP BY field\n ORDER BY failures DESC, field NULLS LAST",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Reglas"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Aplica a"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fallos"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Campo"
+      },
+      "transformations": [
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "failures",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "field": "Campo",
+              "rules": "Reglas",
+              "applies": "Aplica a",
+              "failures": "Fallos"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "Campos con menor ICD",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Fields with the lowest ICD in the cut (decision 0057): each field's mean\n-- over the records where it has one, the lowest first.\nSELECT field, round(mean_icd::numeric, 4) AS icd\n  FROM quality.field_quality\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND mean_icd IS NOT NULL\n ORDER BY mean_icd, field",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ICD promedio"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Campo"
+      },
+      "transformations": [
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "field": "Campo",
+              "icd": "ICD promedio"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Distribución del ICD por entidad",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 8,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- The entities' ICD in the cut (decision 0057), in bins of 0.05: how many\n-- from 0.00, 0.05, … 0.95 (1.0 counts in the last).\nSELECT round((least(floor(icd * 20), 19) / 20)::numeric, 2) AS from_icd, count(*) AS entities\n  FROM quality.entity_icd\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND icd IS NOT NULL\n GROUP BY 1\n ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Entidades"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Tramo de ICD"
+      },
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "from_icd",
+                "destinationType": "string"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "from_icd": "Tramo de ICD",
+              "entities": "Entidades"
+            }
+          }
+        }
+      ],
+      "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `entity`."
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Estado de los datos por segmento",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 18
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- The entities of each segment by band in the cut (decision 0057), the\n-- largest segment first.\nSELECT segment,\n       count(*) FILTER (WHERE band = 'high') AS high,\n       count(*) FILTER (WHERE band = 'medium') AS medium,\n       count(*) FILTER (WHERE band = 'low') AS low\n  FROM quality.entity_icd\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND band IS NOT NULL\n GROUP BY segment\n ORDER BY count(*) DESC, segment",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Segmento"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Buen estado (ICD ≥ 0,90)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#0ca30c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Regular (0,75–0,90)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#fab219"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Malo (< 0,75)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d03b3b"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "percent",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Segmento"
+      },
+      "transformations": [
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "segment": "Segmento",
+              "high": "Buen estado (ICD ≥ 0,90)",
+              "medium": "Regular (0,75–0,90)",
+              "low": "Malo (< 0,75)"
+            }
+          }
+        }
+      ],
+      "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `entity`, `segment`."
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Cómo se movieron las entidades entre bandas",
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- How the entities moved between bands from the previous cut to this one\n-- (decision 0057), matched by their hash; none without a previous cut.\nSELECT p.band AS from_band, c.band AS to_band, count(*) AS entities\n  FROM quality.entity_icd c\n  JOIN quality.entity_icd p\n    ON p.tenant_id = c.tenant_id AND p.dataset = c.dataset AND p.entity = c.entity\n   AND p.cut = (NULLIF(${previous_cut:sqlstring}, '')::text)::date\n WHERE c.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND c.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n   AND c.band IS NOT NULL AND p.band IS NOT NULL\n GROUP BY 1, 2\n ORDER BY array_position(ARRAY['high', 'medium', 'low'], p.band),\n          array_position(ARRAY['high', 'medium', 'low'], c.band)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "color-background",
+              "mode": "gradient"
+            }
+          },
+          "color": {
+            "mode": "continuous-blues"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Corte anterior ↓ / este corte →"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "high": {
+                        "index": 0,
+                        "text": "Buen estado (ICD ≥ 0,90)"
+                      },
+                      "medium": {
+                        "index": 1,
+                        "text": "Regular (0,75–0,90)"
+                      },
+                      "low": {
+                        "index": 2,
+                        "text": "Malo (< 0,75)"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "to_band",
+            "emptyValue": "zero",
+            "rowField": "from_band",
+            "valueField": "entities"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "from_band\\to_band": 0,
+              "high": 1,
+              "medium": 2,
+              "low": 3
+            },
+            "renameByName": {
+              "from_band\\to_band": "Corte anterior ↓ / este corte →",
+              "high": "Buen estado (ICD ≥ 0,90)",
+              "medium": "Regular (0,75–0,90)",
+              "low": "Malo (< 0,75)"
+            }
+          }
+        }
+      ],
+      "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `entity`."
+    },
+    {
+      "id": 8,
+      "type": "barchart",
+      "title": "Indicador SFC",
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 8,
+        "y": 28
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- The SFC view (decision 0058, the guide's formulas §4 and §5): each cell\n-- with its share of active records right, whether it passes (90 %), its\n-- missing and margin, its closeness to the threshold, and the dataset's\n-- SFC, the share of its cells that pass. The highest share first.\nSELECT cell, ok, total,\n       round((ok::float8 / NULLIF(total, 0))::numeric, 4) AS p,\n       passes, missing, margin,\n       CASE\n           WHEN total = 0 THEN NULL\n           WHEN ok >= 0.92 * total THEN 0.2\n           WHEN ok >= 0.90 * total THEN 0.5\n           WHEN ok >= 0.80 * total THEN 1.0\n           WHEN ok >= 0.70 * total THEN 0.6\n           ELSE 0.3\n       END AS closeness,\n       round(avg(passes::int) OVER ()::numeric, 4) AS sfc\n  FROM quality.cells\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY ok::float8 / NULLIF(total, 0) DESC NULLS LAST, cell",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Correctos"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros activos"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Porcentaje correcto"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.axisSoftMin",
+                "value": 0.7
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#d03b3b",
+                      "value": null
+                    },
+                    {
+                      "color": "#fab219",
+                      "value": 0.8
+                    },
+                    {
+                      "color": "#0ca30c",
+                      "value": 0.9
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.thresholdsStyle",
+                "value": {
+                  "mode": "dashed+area"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Valor (1 o 0)"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Faltan para cumplir"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Margen"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cercanía"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Celdas que cumplen"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Celda"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "cell": "Celda",
+              "ok": "Correctos",
+              "total": "Registros activos",
+              "p": "Porcentaje correcto",
+              "passes": "Valor (1 o 0)",
+              "missing": "Faltan para cumplir",
+              "margin": "Margen",
+              "closeness": "Cercanía",
+              "sfc": "Celdas que cumplen"
+            }
+          }
+        }
+      ],
+      "description": "Cada fila es una celda: un campo con el rol sfc, correcto cuando está diligenciado y no falla ninguna regla que lo lea. Vale 1 si al menos el 90 % de los registros activos lo tiene correcto. La franja (80–90 %) es donde menos correcciones cambian la celda de 0 a 1. Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `sfc`."
+    },
+    {
+      "id": 9,
+      "type": "xychart",
+      "title": "Carta p′ por grupo · ${dimension}",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "repeat": "dimension",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- p′ chart by group (decision 0031, the guide's formulas, Laney): per\n-- dimension, each group's share of records with a serious failure against\n-- the dimension's, with limits widened by the real spread between groups\n-- (the moving range of z, groups by size). The empty group is left out.\nWITH g AS (\n    SELECT dimension, grp, records, serious, serious::float8 / records AS p\n      FROM quality.group_metrics\n     WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND grp <> '' AND records > 0),\npb AS (\n    SELECT dimension, sum(serious)::float8 / sum(records) AS p_bar FROM g GROUP BY 1),\nz AS (\n    SELECT g.*, pb.p_bar, sqrt(pb.p_bar * (1 - pb.p_bar) / g.records) AS sigma\n      FROM g JOIN pb USING (dimension)),\nmr AS (\n    SELECT *, abs(z - lag(z) OVER (PARTITION BY dimension ORDER BY records, grp)) AS mr\n      FROM (SELECT *, (p - p_bar) / NULLIF(sigma, 0) AS z FROM z) zz),\nsz AS (\n    SELECT dimension, COALESCE(avg(mr) / 1.128, 1) AS sigma_z FROM mr GROUP BY 1),\nl AS (\n    SELECT mr.*, greatest(0, p_bar - 3 * sigma * sigma_z) AS lcl,\n           least(1, p_bar + 3 * sigma * sigma_z) AS ucl\n      FROM mr JOIN sz USING (dimension))\nSELECT dimension, grp, records, serious, round(p::numeric, 4) AS p,\n       round(p_bar::numeric, 4) AS p_bar, round(lcl::numeric, 4) AS lcl,\n       round(ucl::numeric, 4) AS ucl,\n       CASE WHEN p > ucl THEN 'above' WHEN p < lcl THEN 'below' ELSE 'in' END AS signal\n  FROM l\n ORDER BY dimension, records DESC, grp",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "pointSize": {
+              "fixed": 6
+            },
+            "show": "points"
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grupo"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros"
+            },
+            "properties": [
+              {
+                "id": "min",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros con falla grave"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Con falla grave"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "min",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Proporción de la dimensión"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.show",
+                "value": "lines"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#898781"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Límite inferior"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.show",
+                "value": "lines"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d03b3b"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Límite superior"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.show",
+                "value": "lines"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d03b3b"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lectura"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "in": {
+                        "index": 0,
+                        "text": "En control"
+                      },
+                      "above": {
+                        "index": 1,
+                        "text": "Señal: por encima del límite"
+                      },
+                      "below": {
+                        "index": 2,
+                        "text": "Señal: por debajo del límite"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "position"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": true
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#0ca30c",
+                      "value": null
+                    },
+                    {
+                      "color": "#898781",
+                      "value": 0
+                    },
+                    {
+                      "color": "#d03b3b",
+                      "value": 1.0001
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "mapping": "manual",
+        "series": [
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "Registros"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "Con falla grave"
+              }
+            },
+            "color": {
+              "matcher": {
+                "id": "byName",
+                "options": "position"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "Registros"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "Límite superior"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "Registros"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "Límite inferior"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "Registros"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "Proporción de la dimensión"
+              }
+            }
+          }
+        ]
+      },
+      "pluginVersion": "13.2.5",
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "dimension",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "${dimension}"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "p_from_lcl",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "p"
+                }
+              },
+              "operator": "-",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "lcl"
+                }
+              }
+            },
+            "mode": "binary"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "lcl_to_ucl",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "ucl"
+                }
+              },
+              "operator": "-",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "lcl"
+                }
+              }
+            },
+            "mode": "binary"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "position",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "p_from_lcl"
+                }
+              },
+              "operator": "/",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "lcl_to_ucl"
+                }
+              }
+            },
+            "mode": "binary"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "p_from_lcl": true,
+              "lcl_to_ucl": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "dimension": "Dimensión",
+              "grp": "Grupo",
+              "records": "Registros",
+              "serious": "Registros con falla grave",
+              "p": "Con falla grave",
+              "p_bar": "Proporción de la dimensión",
+              "lcl": "Límite inferior",
+              "ucl": "Límite superior",
+              "signal": "Lectura"
+            }
+          }
+        }
+      ],
+      "description": "Proporción de registros con una falla grave (bloqueante o mayor en un campo crítico o alto), según el tamaño del grupo. Las curvas son los límites de control. Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+    },
+    {
+      "id": 10,
+      "type": "barchart",
+      "title": "Grupos más grandes · ${dimension}",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      },
+      "repeat": "dimension",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Largest groups (decision 0031): per dimension, its fifteen groups with\n-- the most records, each with its share of serious failures and its mean\n-- ICD; the empty group too, as ''.\nSELECT dimension, grp, records, serious,\n       round((serious::float8 / NULLIF(records, 0))::numeric, 4) AS serious_share,\n       round(mean_icd::numeric, 4) AS icd\n  FROM (SELECT *, row_number() OVER (PARTITION BY dimension ORDER BY records DESC, grp) AS n\n          FROM quality.group_metrics\n         WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date) g\n WHERE n <= 15\n ORDER BY dimension, records DESC, grp",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grupo"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros con falla grave"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Con falla grave"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ICD promedio"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Grupo"
+      },
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "dimension",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "${dimension}"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "dimension": "Dimensión",
+              "grp": "Grupo",
+              "records": "Registros",
+              "serious": "Registros con falla grave",
+              "serious_share": "Con falla grave",
+              "icd": "ICD promedio"
+            }
+          }
+        }
+      ],
+      "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+    },
+    {
+      "id": 11,
+      "type": "barchart",
+      "title": "Grupos que más cambiaron · ${dimension}",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 56
+      },
+      "repeat": "dimension",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Groups that changed most (decision 0031): per dimension, the fifteen\n-- groups whose share of serious failures moved most since the previous\n-- cut, each in both; none without a previous cut.\nSELECT dimension, grp, before, now, round((now - before)::numeric, 4) AS change\n  FROM (SELECT c.dimension, c.grp,\n               round((p.serious::float8 / p.records)::numeric, 4) AS before,\n               round((c.serious::float8 / c.records)::numeric, 4) AS now,\n               row_number() OVER (PARTITION BY c.dimension\n                   ORDER BY abs(c.serious::float8 / c.records - p.serious::float8 / p.records) DESC,\n                            c.grp) AS n\n          FROM quality.group_metrics c\n          JOIN quality.group_metrics p\n            ON p.tenant_id = c.tenant_id AND p.dataset = c.dataset\n           AND p.dimension = c.dimension AND p.grp = c.grp AND p.cut = (NULLIF(${previous_cut:sqlstring}, '')::text)::date\n         WHERE c.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND c.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n           AND c.records > 0 AND p.records > 0) g\n WHERE n <= 15\n ORDER BY dimension, abs(now - before) DESC, grp",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grupo"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Corte anterior"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Este corte"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cambio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#e34948",
+                      "value": null
+                    },
+                    {
+                      "color": "#2a78d6",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Grupo"
+      },
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "dimension",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "${dimension}"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "dimension": "Dimensión",
+              "grp": "Grupo",
+              "before": "Corte anterior",
+              "now": "Este corte",
+              "change": "Cambio"
+            }
+          }
+        }
+      ],
+      "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+    },
+    {
+      "id": 12,
+      "type": "barchart",
+      "title": "Atípicos por grupo · ${dimension}",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 66
+      },
+      "repeat": "dimension",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Outliers by group (decision 0031, the guide's formula 7): per dimension,\n-- the fifteen groups with the most outliers of the outlier amount, robust\n-- z beyond 3.5 within the group, each with its share; the empty group as ''.\nSELECT variable, dimension, grp, records, low, high,\n       round(((low + high)::float8 / NULLIF(records, 0))::numeric, 4) AS share\n  FROM (SELECT *, row_number() OVER (PARTITION BY variable, dimension\n                                         ORDER BY low + high DESC, records DESC, grp) AS n\n          FROM quality.distribution_checks\n         WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND dimension <> '') d\n WHERE n <= 15\n ORDER BY dimension, low + high DESC, records DESC, grp",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grupo"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Atípicos bajos"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#eb6834"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Atípicos altos"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Proporción"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "normal",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "Grupo"
+      },
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "dimension",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "${dimension}"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "share",
+                "config": {
+                  "id": "greater",
+                  "options": {
+                    "value": 0
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "variable": "Variable",
+              "dimension": "Dimensión",
+              "grp": "Grupo",
+              "records": "Registros",
+              "low": "Atípicos bajos",
+              "high": "Atípicos altos",
+              "share": "Proporción"
+            }
+          }
+        }
+      ],
+      "description": "importes cuya z robusta dentro de su grupo pasa de 3,5, hacia arriba o hacia abajo Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `outlier_amount`, `dimension`."
+    },
+    {
+      "id": 13,
+      "type": "barchart",
+      "title": "PSI por deciles · ${drift_variable}",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 76
+      },
+      "repeat": "drift_variable",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- PSI by deciles (decision 0031, the guide's formula 8): per drift\n-- variable, the previous cut's deciles as bins, each cut's share in them\n-- read off its percentiles (to 1 %), and the PSI their sum; none without\n-- a previous cut. Bins empty in both count with a floor of 0.0001.\nWITH c AS (\n    SELECT variable, percentiles AS cur FROM quality.distribution_checks\n     WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND dimension = ''\n       AND percentiles IS NOT NULL),\np AS (\n    SELECT variable, percentiles AS prev FROM quality.distribution_checks\n     WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${previous_cut:sqlstring}, '')::text)::date AND dimension = ''\n       AND percentiles IS NOT NULL),\nf AS (\n    SELECT c.variable, k,\n           CASE WHEN k = 0 THEN 0 WHEN k = 10 THEN 1\n                ELSE (SELECT greatest(count(*) - 1, 0) FROM unnest(c.cur) x\n                       WHERE x <= p.prev[10 * k + 1]) / 100.0 END AS fa,\n           CASE WHEN k = 0 THEN 0 WHEN k = 10 THEN 1\n                ELSE (SELECT greatest(count(*) - 1, 0) FROM unnest(p.prev) x\n                       WHERE x <= p.prev[10 * k + 1]) / 100.0 END AS fe\n      FROM c JOIN p USING (variable), generate_series(0, 10) AS k),\nb AS (\n    SELECT variable, k,\n           greatest(fe - lag(fe) OVER w, 0.0001) AS e,\n           greatest(fa - lag(fa) OVER w, 0.0001) AS a\n      FROM f WINDOW w AS (PARTITION BY variable ORDER BY k))\nSELECT variable, k AS decile, round(e, 4) AS base, round(a, 4) AS now,\n       round(sum((a - e) * ln(a / e)) OVER (PARTITION BY variable), 4) AS psi\n  FROM b\n WHERE k > 0\n ORDER BY variable, k",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "variable"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Variable"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "decile"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Decil"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "base"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Corte anterior"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#898781"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "now"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Este corte · PSI = ${__field.labels.psi}"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "psi"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "PSI"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Decil"
+      },
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "decile",
+                "destinationType": "string"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "variable",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "${drift_variable}"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "psi"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
+      "description": "PSI menor que 0,10: estable; de 0,10 a 0,25: deriva moderada; mayor que 0,25: deriva significativa. Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `drift`."
+    },
+    {
+      "id": 14,
+      "type": "barchart",
+      "title": "Colas de remediación · ${dimension}",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
+      "repeat": "dimension",
+      "repeatDirection": "h",
+      "maxPerRow": 2,
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Remediation queues (decision 0059): per dimension, its fifteen queues\n-- with the most open findings at the cut, each with those overdue by its\n-- SLA (its group's, else its dimension's, else 30 days), those resolved\n-- at the cut, its oldest open finding's age in days since the cut it\n-- opened at, and the open ones' summed priority; the empty group as ''.\nSELECT dimension, grp, open, overdue, resolved, oldest_days, sla_days,\n       round(priority::numeric, 4) AS priority\n  FROM (SELECT q.*, row_number() OVER (PARTITION BY dimension ORDER BY open DESC, grp) AS n\n          FROM (SELECT f.dimension, f.grp,\n                       sum(f.open)::bigint AS open,\n                       coalesce(sum(f.open) FILTER (\n                           WHERE f.since + coalesce(g.days, d.days, 30) < (NULLIF(${cut:sqlstring}, '')::text)::date), 0)::bigint\n                           AS overdue,\n                       sum(f.resolved)::bigint AS resolved,\n                       max((NULLIF(${cut:sqlstring}, '')::text)::date - f.since) FILTER (WHERE f.open > 0) AS oldest_days,\n                       coalesce(max(g.days), max(d.days), 30) AS sla_days,\n                       sum(f.priority) AS priority\n                  FROM quality.queue_findings f\n                  LEFT JOIN quality.remediation_slas g\n                    ON g.tenant_id = f.tenant_id AND g.dataset = f.dataset\n                   AND g.dimension = f.dimension AND g.grp = f.grp\n                  LEFT JOIN quality.remediation_slas d\n                    ON d.tenant_id = f.tenant_id AND d.dataset = f.dataset\n                   AND d.dimension = f.dimension AND d.grp IS NULL\n                 WHERE f.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND f.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n                 GROUP BY f.dimension, f.grp) q) r\n WHERE n <= 15\n ORDER BY dimension, open DESC, grp",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Grupo"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "text": "(vacío)"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Abiertos"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Vencidos"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#d03b3b"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resueltos en este corte"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Abierto más antiguo"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ANS"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prioridad"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Grupo"
+      },
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "dimension",
+                "config": {
+                  "id": "equal",
+                  "options": {
+                    "value": "${dimension}"
+                  }
+                }
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "dimension": "Dimensión",
+              "grp": "Grupo",
+              "open": "Abiertos",
+              "overdue": "Vencidos",
+              "resolved": "Resueltos en este corte",
+              "oldest_days": "Abierto más antiguo",
+              "sla_days": "ANS",
+              "priority": "Prioridad"
+            }
+          }
+        }
+      ],
+      "description": "Hallazgos abiertos en la cola de cada grupo y los que pasaron su ANS, contados en días desde el corte en que fallaron por primera vez. Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+    },
+    {
+      "id": 15,
+      "type": "barchart",
+      "title": "Antigüedad de la actualización",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 0,
+        "y": 95
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Update recency (decision 0031): the records of the cut by the age of its\n-- `updated` field at the cut, in its bands, the empty ones last.\nSELECT r.band, r.records\n  FROM quality.field_quality f,\n       LATERAL (SELECT 'b' || o AS band, n AS records, o\n                  FROM unnest(f.recency) WITH ORDINALITY AS u (n, o)\n                UNION ALL\n                SELECT 'empty', f.empty, 99) r\n WHERE f.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND f.cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND f.recency IS NOT NULL\n ORDER BY r.o",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Antigüedad al corte"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "b1": {
+                        "index": 0,
+                        "text": "Posterior al corte"
+                      },
+                      "b2": {
+                        "index": 1,
+                        "text": "Hasta 30 días"
+                      },
+                      "b3": {
+                        "index": 2,
+                        "text": "31–90 días"
+                      },
+                      "b4": {
+                        "index": 3,
+                        "text": "91–180 días"
+                      },
+                      "b5": {
+                        "index": 4,
+                        "text": "181 días – 1 año"
+                      },
+                      "b6": {
+                        "index": 5,
+                        "text": "1–2 años"
+                      },
+                      "b7": {
+                        "index": 6,
+                        "text": "Más de 2 años"
+                      },
+                      "empty": {
+                        "index": 7,
+                        "text": "Sin fecha"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Antigüedad al corte"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "band": "Antigüedad al corte",
+              "records": "Registros"
+            }
+          }
+        }
+      ],
+      "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `updated`."
+    },
+    {
+      "id": 16,
+      "type": "barchart",
+      "title": "Tiempo por etapa",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 8,
+        "y": 95
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Time per stage (decision 0031, the run log of 0026): how long each stage\n-- of the cut's evaluation took, in the order it ran, and its milliseconds\n-- per million record-attributes (the guide's formula 9, V = records ×\n-- mapped fields), the previous cut's beside it; no rate without a volume.\nWITH volume AS (\n    SELECT s.cut, s.records * count(f.field) AS v\n      FROM quality.run_summary s\n      LEFT JOIN quality.field_quality f\n        ON f.tenant_id = s.tenant_id AND f.dataset = s.dataset AND f.cut = s.cut\n     WHERE s.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND s.cut IN ((NULLIF(${cut:sqlstring}, '')::text)::date, (NULLIF(${previous_cut:sqlstring}, '')::text)::date)\n     GROUP BY s.cut, s.records\n), times AS (\n    SELECT j.cut, j.stage, j.position, j.ms,\n           CASE WHEN v.v > 0 THEN round(j.ms * 1e6 / v.v, 2) END AS per_million\n      FROM quality.job_stats j\n      JOIN volume v ON v.cut = j.cut\n     WHERE j.dataset = (NULLIF(${dataset:sqlstring}, '')::text)\n)\nSELECT c.stage, c.ms, c.per_million,\n       p.ms AS previous_ms, p.per_million AS previous_per_million\n  FROM times c\n  LEFT JOIN times p ON p.stage = c.stage AND p.cut = (NULLIF(${previous_cut:sqlstring}, '')::text)::date\n WHERE c.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY c.position",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Etapa"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "load": {
+                        "index": 0,
+                        "text": "Cargar el corte"
+                      },
+                      "rules": {
+                        "index": 1,
+                        "text": "Ejecutar las reglas"
+                      },
+                      "profile": {
+                        "index": 2,
+                        "text": "Perfilar los campos"
+                      },
+                      "icd": {
+                        "index": 3,
+                        "text": "ICD y grupos"
+                      },
+                      "queues": {
+                        "index": 4,
+                        "text": "Colas de remediación"
+                      },
+                      "recency": {
+                        "index": 5,
+                        "text": "Recencia de actualización"
+                      },
+                      "distributions": {
+                        "index": 6,
+                        "text": "Distribuciones y atípicos"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tiempo"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms por millón"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tiempo del corte anterior"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms por millón del corte anterior"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ms por millón (ms si el corte no tiene volumen)"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Etapa"
+      },
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "ms por millón (ms si el corte no tiene volumen)",
+            "mode": "reduceRow",
+            "reduce": {
+              "include": [
+                "ms",
+                "per_million"
+              ],
+              "reducer": "lastNotNull"
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "stage": "Etapa",
+              "ms": "Tiempo",
+              "per_million": "ms por millón",
+              "previous_ms": "Tiempo del corte anterior",
+              "previous_per_million": "ms por millón del corte anterior"
+            }
+          }
+        }
+      ],
+      "description": "milisegundos por millón de registro-atributos (registros × campos mapeados)"
+    },
+    {
+      "id": 17,
+      "type": "barchart",
+      "title": "Campos más vacíos",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 95
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Profiling (decision 0031): each field of the cut, the emptiest first,\n-- with its distinct values and its commonest shape's share.\nSELECT f.field, s.records, f.empty,\n       CASE WHEN s.records > 0 THEN round(f.empty::numeric / s.records, 4) END AS empty_share,\n       f.distinct_values, f.pattern,\n       CASE WHEN s.records > f.empty\n            THEN round(f.pattern_count::numeric / (s.records - f.empty), 4) END AS pattern_share\n  FROM quality.field_quality f\n  JOIN quality.run_summary s USING (tenant_id, dataset, cut)\n WHERE f.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND f.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY empty_share DESC NULLS LAST, f.field",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Registros"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Vacíos"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Porcentaje vacío"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Valores distintos"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Su porcentaje de los llenos"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Campo"
+      },
+      "transformations": [
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "field": "Campo",
+              "records": "Registros",
+              "empty": "Vacíos",
+              "empty_share": "Porcentaje vacío",
+              "distinct_values": "Valores distintos",
+              "pattern": "Forma más común",
+              "pattern_share": "Su porcentaje de los llenos"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "barchart",
+      "title": "Reglas con menor conformidad",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 105
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "postgres"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "-- Conformity by rule (decision 0031): each rule of the cut, the worst first.\nSELECT rule, field, dimension, severity, applies, failures,\n       CASE WHEN applies > 0 THEN round(1 - failures::numeric / applies, 4) END AS conformity\n  FROM quality.rule_results\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY conformity NULLS LAST, rule",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byType",
+              "options": "number"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Conformidad"
+              },
+              {
+                "id": "unit",
+                "value": "percentunit"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#2a78d6"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "fieldName": "conformity",
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                }
+              }
+            ],
+            "match": "any",
+            "type": "exclude"
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "dimension": true,
+              "severity": true,
+              "applies": true,
+              "failures": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "conformity": "Value"
+            }
+          }
+        },
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "rule",
+              "field"
+            ],
+            "keepFields": false,
+            "naming": {
+              "asLabels": false,
+              "separator2": " · "
+            }
+          }
+        },
+        {
+          "id": "reduce",
+          "options": {
+            "includeTimeField": false,
+            "mode": "seriesToRows",
+            "reducers": [
+              "lastNotNull"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "row",
+      "title": "Tablas: todas las filas de cada gráfico",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 115
+      },
+      "collapsed": true,
+      "panels": [
+        {
+          "id": 20,
+          "type": "table",
+          "title": "Conformidad e IGCD por corte",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 116
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Records, conformity and the IGCD by cut (decisions 0031 and 0057): the\n-- last twelve cuts up to this one, oldest first.\nSELECT cut, records, failures, conformity, igcd\n  FROM (SELECT s.cut::text AS cut, s.records, round(s.igcd::numeric, 4) AS igcd,\n               COALESCE(sum(r.failures), 0)::bigint AS failures,\n               CASE WHEN sum(r.applies) > 0\n                    THEN round(1 - sum(r.failures)::numeric / sum(r.applies), 4) END AS conformity\n          FROM quality.run_summary s\n          LEFT JOIN quality.rule_results r USING (tenant_id, dataset, cut)\n         WHERE s.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND s.cut <= (NULLIF(${cut:sqlstring}, '')::text)::date\n         GROUP BY s.cut, s.records, s.igcd\n         ORDER BY s.cut DESC\n         LIMIT 12) recent\n ORDER BY cut",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Corte"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time:YYYY-MM-DD"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Conformidad"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "IGCD"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "cut": "Corte",
+                  "records": "Registros",
+                  "failures": "Fallos",
+                  "conformity": "Conformidad",
+                  "igcd": "IGCD"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 21,
+          "type": "table",
+          "title": "Fallos por dimensión y severidad",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 116
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Failures by dimension and severity (decision 0031): the cut's rules by\n-- what they measure and how much a failure weighs.\nSELECT dimension, severity, count(*) AS rules, sum(applies)::bigint AS applies,\n       sum(failures)::bigint AS failures\n  FROM quality.rule_results\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n GROUP BY dimension, severity\n ORDER BY failures DESC, dimension NULLS LAST, severity NULLS LAST",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Dimensión"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "completeness": {
+                            "index": 0,
+                            "text": "Completitud"
+                          },
+                          "consistency": {
+                            "index": 1,
+                            "text": "Consistencia"
+                          },
+                          "accuracy": {
+                            "index": 2,
+                            "text": "Exactitud"
+                          },
+                          "validity": {
+                            "index": 3,
+                            "text": "Validez"
+                          },
+                          "timeliness": {
+                            "index": 4,
+                            "text": "Oportunidad"
+                          },
+                          "uniqueness": {
+                            "index": 5,
+                            "text": "Unicidad"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Severidad"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "blocking": {
+                            "index": 0,
+                            "text": "Bloqueante"
+                          },
+                          "major": {
+                            "index": 1,
+                            "text": "Mayor"
+                          },
+                          "minor": {
+                            "index": 2,
+                            "text": "Menor"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "dimension": "Dimensión",
+                  "severity": "Severidad",
+                  "rules": "Reglas",
+                  "applies": "Aplica a",
+                  "failures": "Fallos"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 22,
+          "type": "table",
+          "title": "Campos con más fallos",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 124
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Fields with the most failures (decision 0031): the cut's rules by field.\nSELECT field, count(*) AS rules, sum(applies)::bigint AS applies,\n       sum(failures)::bigint AS failures\n  FROM quality.rule_results\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n GROUP BY field\n ORDER BY failures DESC, field NULLS LAST",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "field": "Campo",
+                  "rules": "Reglas",
+                  "applies": "Aplica a",
+                  "failures": "Fallos"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 23,
+          "type": "table",
+          "title": "Campos con menor ICD",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 124
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Fields with the lowest ICD in the cut (decision 0057): each field's mean\n-- over the records where it has one, the lowest first.\nSELECT field, round(mean_icd::numeric, 4) AS icd\n  FROM quality.field_quality\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND mean_icd IS NOT NULL\n ORDER BY mean_icd, field",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "ICD promedio"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "field": "Campo",
+                  "icd": "ICD promedio"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 24,
+          "type": "table",
+          "title": "Distribución del ICD por entidad",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 132
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- The entities' ICD in the cut (decision 0057), in bins of 0.05: how many\n-- from 0.00, 0.05, … 0.95 (1.0 counts in the last).\nSELECT round((least(floor(icd * 20), 19) / 20)::numeric, 2) AS from_icd, count(*) AS entities\n  FROM quality.entity_icd\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND icd IS NOT NULL\n GROUP BY 1\n ORDER BY 1",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "convertFieldType",
+              "options": {
+                "conversions": [
+                  {
+                    "targetField": "from_icd",
+                    "destinationType": "string"
+                  }
+                ],
+                "fields": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "from_icd": "Tramo de ICD",
+                  "entities": "Entidades"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `entity`."
+        },
+        {
+          "id": 25,
+          "type": "table",
+          "title": "Estado de los datos por segmento",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 132
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- The entities of each segment by band in the cut (decision 0057), the\n-- largest segment first.\nSELECT segment,\n       count(*) FILTER (WHERE band = 'high') AS high,\n       count(*) FILTER (WHERE band = 'medium') AS medium,\n       count(*) FILTER (WHERE band = 'low') AS low\n  FROM quality.entity_icd\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND band IS NOT NULL\n GROUP BY segment\n ORDER BY count(*) DESC, segment",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Segmento"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "empty",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      },
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "null",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "segment": "Segmento",
+                  "high": "Buen estado (ICD ≥ 0,90)",
+                  "medium": "Regular (0,75–0,90)",
+                  "low": "Malo (< 0,75)"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `entity`, `segment`."
+        },
+        {
+          "id": 26,
+          "type": "table",
+          "title": "Indicador SFC",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 140
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- The SFC view (decision 0058, the guide's formulas §4 and §5): each cell\n-- with its share of active records right, whether it passes (90 %), its\n-- missing and margin, its closeness to the threshold, and the dataset's\n-- SFC, the share of its cells that pass. The highest share first.\nSELECT cell, ok, total,\n       round((ok::float8 / NULLIF(total, 0))::numeric, 4) AS p,\n       passes, missing, margin,\n       CASE\n           WHEN total = 0 THEN NULL\n           WHEN ok >= 0.92 * total THEN 0.2\n           WHEN ok >= 0.90 * total THEN 0.5\n           WHEN ok >= 0.80 * total THEN 1.0\n           WHEN ok >= 0.70 * total THEN 0.6\n           ELSE 0.3\n       END AS closeness,\n       round(avg(passes::int) OVER ()::numeric, 4) AS sfc\n  FROM quality.cells\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY ok::float8 / NULLIF(total, 0) DESC NULLS LAST, cell",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Porcentaje correcto"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "cell": "Celda",
+                  "ok": "Correctos",
+                  "total": "Registros activos",
+                  "p": "Porcentaje correcto",
+                  "passes": "Valor (1 o 0)",
+                  "missing": "Faltan para cumplir",
+                  "margin": "Margen",
+                  "closeness": "Cercanía",
+                  "sfc": "Celdas que cumplen"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `sfc`."
+        },
+        {
+          "id": 27,
+          "type": "table",
+          "title": "Carta p′ por grupo",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 140
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- p′ chart by group (decision 0031, the guide's formulas, Laney): per\n-- dimension, each group's share of records with a serious failure against\n-- the dimension's, with limits widened by the real spread between groups\n-- (the moving range of z, groups by size). The empty group is left out.\nWITH g AS (\n    SELECT dimension, grp, records, serious, serious::float8 / records AS p\n      FROM quality.group_metrics\n     WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND grp <> '' AND records > 0),\npb AS (\n    SELECT dimension, sum(serious)::float8 / sum(records) AS p_bar FROM g GROUP BY 1),\nz AS (\n    SELECT g.*, pb.p_bar, sqrt(pb.p_bar * (1 - pb.p_bar) / g.records) AS sigma\n      FROM g JOIN pb USING (dimension)),\nmr AS (\n    SELECT *, abs(z - lag(z) OVER (PARTITION BY dimension ORDER BY records, grp)) AS mr\n      FROM (SELECT *, (p - p_bar) / NULLIF(sigma, 0) AS z FROM z) zz),\nsz AS (\n    SELECT dimension, COALESCE(avg(mr) / 1.128, 1) AS sigma_z FROM mr GROUP BY 1),\nl AS (\n    SELECT mr.*, greatest(0, p_bar - 3 * sigma * sigma_z) AS lcl,\n           least(1, p_bar + 3 * sigma * sigma_z) AS ucl\n      FROM mr JOIN sz USING (dimension))\nSELECT dimension, grp, records, serious, round(p::numeric, 4) AS p,\n       round(p_bar::numeric, 4) AS p_bar, round(lcl::numeric, 4) AS lcl,\n       round(ucl::numeric, 4) AS ucl,\n       CASE WHEN p > ucl THEN 'above' WHEN p < lcl THEN 'below' ELSE 'in' END AS signal\n  FROM l\n ORDER BY dimension, records DESC, grp",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Grupo"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "empty",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      },
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "null",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Registros"
+                },
+                "properties": [
+                  {
+                    "id": "min",
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Con falla grave"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Proporción de la dimensión"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Límite inferior"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Límite superior"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lectura"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "in": {
+                            "index": 0,
+                            "text": "En control"
+                          },
+                          "above": {
+                            "index": 1,
+                            "text": "Señal: por encima del límite"
+                          },
+                          "below": {
+                            "index": 2,
+                            "text": "Señal: por debajo del límite"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "fieldName": "dimension",
+                    "config": {
+                      "id": "regex",
+                      "options": {
+                        "value": "^(${dimension:pipe})$"
+                      }
+                    }
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "dimension": "Dimensión",
+                  "grp": "Grupo",
+                  "records": "Registros",
+                  "serious": "Registros con falla grave",
+                  "p": "Con falla grave",
+                  "p_bar": "Proporción de la dimensión",
+                  "lcl": "Límite inferior",
+                  "ucl": "Límite superior",
+                  "signal": "Lectura"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+        },
+        {
+          "id": 28,
+          "type": "table",
+          "title": "Grupos más grandes",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 148
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Largest groups (decision 0031): per dimension, its fifteen groups with\n-- the most records, each with its share of serious failures and its mean\n-- ICD; the empty group too, as ''.\nSELECT dimension, grp, records, serious,\n       round((serious::float8 / NULLIF(records, 0))::numeric, 4) AS serious_share,\n       round(mean_icd::numeric, 4) AS icd\n  FROM (SELECT *, row_number() OVER (PARTITION BY dimension ORDER BY records DESC, grp) AS n\n          FROM quality.group_metrics\n         WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date) g\n WHERE n <= 15\n ORDER BY dimension, records DESC, grp",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Grupo"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "empty",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      },
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "null",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Con falla grave"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "ICD promedio"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 3
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "fieldName": "dimension",
+                    "config": {
+                      "id": "regex",
+                      "options": {
+                        "value": "^(${dimension:pipe})$"
+                      }
+                    }
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "dimension": "Dimensión",
+                  "grp": "Grupo",
+                  "records": "Registros",
+                  "serious": "Registros con falla grave",
+                  "serious_share": "Con falla grave",
+                  "icd": "ICD promedio"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+        },
+        {
+          "id": 29,
+          "type": "table",
+          "title": "Grupos que más cambiaron",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 148
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Groups that changed most (decision 0031): per dimension, the fifteen\n-- groups whose share of serious failures moved most since the previous\n-- cut, each in both; none without a previous cut.\nSELECT dimension, grp, before, now, round((now - before)::numeric, 4) AS change\n  FROM (SELECT c.dimension, c.grp,\n               round((p.serious::float8 / p.records)::numeric, 4) AS before,\n               round((c.serious::float8 / c.records)::numeric, 4) AS now,\n               row_number() OVER (PARTITION BY c.dimension\n                   ORDER BY abs(c.serious::float8 / c.records - p.serious::float8 / p.records) DESC,\n                            c.grp) AS n\n          FROM quality.group_metrics c\n          JOIN quality.group_metrics p\n            ON p.tenant_id = c.tenant_id AND p.dataset = c.dataset\n           AND p.dimension = c.dimension AND p.grp = c.grp AND p.cut = (NULLIF(${previous_cut:sqlstring}, '')::text)::date\n         WHERE c.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND c.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n           AND c.records > 0 AND p.records > 0) g\n WHERE n <= 15\n ORDER BY dimension, abs(now - before) DESC, grp",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Grupo"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "empty",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      },
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "null",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Corte anterior"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Este corte"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Cambio"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "fieldName": "dimension",
+                    "config": {
+                      "id": "regex",
+                      "options": {
+                        "value": "^(${dimension:pipe})$"
+                      }
+                    }
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "dimension": "Dimensión",
+                  "grp": "Grupo",
+                  "before": "Corte anterior",
+                  "now": "Este corte",
+                  "change": "Cambio"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+        },
+        {
+          "id": 30,
+          "type": "table",
+          "title": "Atípicos por grupo",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 156
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Outliers by group (decision 0031, the guide's formula 7): per dimension,\n-- the fifteen groups with the most outliers of the outlier amount, robust\n-- z beyond 3.5 within the group, each with its share; the empty group as ''.\nSELECT variable, dimension, grp, records, low, high,\n       round(((low + high)::float8 / NULLIF(records, 0))::numeric, 4) AS share\n  FROM (SELECT *, row_number() OVER (PARTITION BY variable, dimension\n                                         ORDER BY low + high DESC, records DESC, grp) AS n\n          FROM quality.distribution_checks\n         WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND dimension <> '') d\n WHERE n <= 15\n ORDER BY dimension, low + high DESC, records DESC, grp",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Grupo"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "empty",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      },
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "null",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Proporción"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "fieldName": "dimension",
+                    "config": {
+                      "id": "regex",
+                      "options": {
+                        "value": "^(${dimension:pipe})$"
+                      }
+                    }
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "variable": "Variable",
+                  "dimension": "Dimensión",
+                  "grp": "Grupo",
+                  "records": "Registros",
+                  "low": "Atípicos bajos",
+                  "high": "Atípicos altos",
+                  "share": "Proporción"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `outlier_amount`, `dimension`."
+        },
+        {
+          "id": 31,
+          "type": "table",
+          "title": "PSI por deciles",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 156
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- PSI by deciles (decision 0031, the guide's formula 8): per drift\n-- variable, the previous cut's deciles as bins, each cut's share in them\n-- read off its percentiles (to 1 %), and the PSI their sum; none without\n-- a previous cut. Bins empty in both count with a floor of 0.0001.\nWITH c AS (\n    SELECT variable, percentiles AS cur FROM quality.distribution_checks\n     WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND dimension = ''\n       AND percentiles IS NOT NULL),\np AS (\n    SELECT variable, percentiles AS prev FROM quality.distribution_checks\n     WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${previous_cut:sqlstring}, '')::text)::date AND dimension = ''\n       AND percentiles IS NOT NULL),\nf AS (\n    SELECT c.variable, k,\n           CASE WHEN k = 0 THEN 0 WHEN k = 10 THEN 1\n                ELSE (SELECT greatest(count(*) - 1, 0) FROM unnest(c.cur) x\n                       WHERE x <= p.prev[10 * k + 1]) / 100.0 END AS fa,\n           CASE WHEN k = 0 THEN 0 WHEN k = 10 THEN 1\n                ELSE (SELECT greatest(count(*) - 1, 0) FROM unnest(p.prev) x\n                       WHERE x <= p.prev[10 * k + 1]) / 100.0 END AS fe\n      FROM c JOIN p USING (variable), generate_series(0, 10) AS k),\nb AS (\n    SELECT variable, k,\n           greatest(fe - lag(fe) OVER w, 0.0001) AS e,\n           greatest(fa - lag(fa) OVER w, 0.0001) AS a\n      FROM f WINDOW w AS (PARTITION BY variable ORDER BY k))\nSELECT variable, k AS decile, round(e, 4) AS base, round(a, 4) AS now,\n       round(sum((a - e) * ln(a / e)) OVER (PARTITION BY variable), 4) AS psi\n  FROM b\n WHERE k > 0\n ORDER BY variable, k",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Corte anterior"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Este corte"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "PSI"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 4
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "convertFieldType",
+              "options": {
+                "conversions": [
+                  {
+                    "targetField": "decile",
+                    "destinationType": "string"
+                  }
+                ],
+                "fields": {}
+              }
+            },
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "fieldName": "variable",
+                    "config": {
+                      "id": "regex",
+                      "options": {
+                        "value": "^(${drift_variable:pipe})$"
+                      }
+                    }
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "variable": "Variable",
+                  "decile": "Decil",
+                  "base": "Corte anterior",
+                  "now": "Este corte",
+                  "psi": "PSI"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `drift`."
+        },
+        {
+          "id": 32,
+          "type": "table",
+          "title": "Colas de remediación",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 164
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Remediation queues (decision 0059): per dimension, its fifteen queues\n-- with the most open findings at the cut, each with those overdue by its\n-- SLA (its group's, else its dimension's, else 30 days), those resolved\n-- at the cut, its oldest open finding's age in days since the cut it\n-- opened at, and the open ones' summed priority; the empty group as ''.\nSELECT dimension, grp, open, overdue, resolved, oldest_days, sla_days,\n       round(priority::numeric, 4) AS priority\n  FROM (SELECT q.*, row_number() OVER (PARTITION BY dimension ORDER BY open DESC, grp) AS n\n          FROM (SELECT f.dimension, f.grp,\n                       sum(f.open)::bigint AS open,\n                       coalesce(sum(f.open) FILTER (\n                           WHERE f.since + coalesce(g.days, d.days, 30) < (NULLIF(${cut:sqlstring}, '')::text)::date), 0)::bigint\n                           AS overdue,\n                       sum(f.resolved)::bigint AS resolved,\n                       max((NULLIF(${cut:sqlstring}, '')::text)::date - f.since) FILTER (WHERE f.open > 0) AS oldest_days,\n                       coalesce(max(g.days), max(d.days), 30) AS sla_days,\n                       sum(f.priority) AS priority\n                  FROM quality.queue_findings f\n                  LEFT JOIN quality.remediation_slas g\n                    ON g.tenant_id = f.tenant_id AND g.dataset = f.dataset\n                   AND g.dimension = f.dimension AND g.grp = f.grp\n                  LEFT JOIN quality.remediation_slas d\n                    ON d.tenant_id = f.tenant_id AND d.dataset = f.dataset\n                   AND d.dimension = f.dimension AND d.grp IS NULL\n                 WHERE f.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND f.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n                 GROUP BY f.dimension, f.grp) q) r\n WHERE n <= 15\n ORDER BY dimension, open DESC, grp",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Grupo"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "empty",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      },
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "null",
+                          "result": {
+                            "text": "(vacío)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "fieldName": "dimension",
+                    "config": {
+                      "id": "regex",
+                      "options": {
+                        "value": "^(${dimension:pipe})$"
+                      }
+                    }
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "dimension": "Dimensión",
+                  "grp": "Grupo",
+                  "open": "Abiertos",
+                  "overdue": "Vencidos",
+                  "resolved": "Resueltos en este corte",
+                  "oldest_days": "Abierto más antiguo",
+                  "sla_days": "ANS",
+                  "priority": "Prioridad"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `dimension`."
+        },
+        {
+          "id": 33,
+          "type": "table",
+          "title": "Antigüedad de la actualización",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 164
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Update recency (decision 0031): the records of the cut by the age of its\n-- `updated` field at the cut, in its bands, the empty ones last.\nSELECT r.band, r.records\n  FROM quality.field_quality f,\n       LATERAL (SELECT 'b' || o AS band, n AS records, o\n                  FROM unnest(f.recency) WITH ORDINALITY AS u (n, o)\n                UNION ALL\n                SELECT 'empty', f.empty, 99) r\n WHERE f.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND f.cut = (NULLIF(${cut:sqlstring}, '')::text)::date AND f.recency IS NOT NULL\n ORDER BY r.o",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Antigüedad al corte"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "b1": {
+                            "index": 0,
+                            "text": "Posterior al corte"
+                          },
+                          "b2": {
+                            "index": 1,
+                            "text": "Hasta 30 días"
+                          },
+                          "b3": {
+                            "index": 2,
+                            "text": "31–90 días"
+                          },
+                          "b4": {
+                            "index": 3,
+                            "text": "91–180 días"
+                          },
+                          "b5": {
+                            "index": 4,
+                            "text": "181 días – 1 año"
+                          },
+                          "b6": {
+                            "index": 5,
+                            "text": "1–2 años"
+                          },
+                          "b7": {
+                            "index": 6,
+                            "text": "Más de 2 años"
+                          },
+                          "empty": {
+                            "index": 7,
+                            "text": "Sin fecha"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "band": "Antigüedad al corte",
+                  "records": "Registros"
+                }
+              }
+            }
+          ],
+          "description": "Muestra datos solo de un conjunto cuyo mapeo da a sus campos los roles `updated`."
+        },
+        {
+          "id": 34,
+          "type": "table",
+          "title": "Tiempo por etapa",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 172
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Time per stage (decision 0031, the run log of 0026): how long each stage\n-- of the cut's evaluation took, in the order it ran, and its milliseconds\n-- per million record-attributes (the guide's formula 9, V = records ×\n-- mapped fields), the previous cut's beside it; no rate without a volume.\nWITH volume AS (\n    SELECT s.cut, s.records * count(f.field) AS v\n      FROM quality.run_summary s\n      LEFT JOIN quality.field_quality f\n        ON f.tenant_id = s.tenant_id AND f.dataset = s.dataset AND f.cut = s.cut\n     WHERE s.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND s.cut IN ((NULLIF(${cut:sqlstring}, '')::text)::date, (NULLIF(${previous_cut:sqlstring}, '')::text)::date)\n     GROUP BY s.cut, s.records\n), times AS (\n    SELECT j.cut, j.stage, j.position, j.ms,\n           CASE WHEN v.v > 0 THEN round(j.ms * 1e6 / v.v, 2) END AS per_million\n      FROM quality.job_stats j\n      JOIN volume v ON v.cut = j.cut\n     WHERE j.dataset = (NULLIF(${dataset:sqlstring}, '')::text)\n)\nSELECT c.stage, c.ms, c.per_million,\n       p.ms AS previous_ms, p.per_million AS previous_per_million\n  FROM times c\n  LEFT JOIN times p ON p.stage = c.stage AND p.cut = (NULLIF(${previous_cut:sqlstring}, '')::text)::date\n WHERE c.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY c.position",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Etapa"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "load": {
+                            "index": 0,
+                            "text": "Cargar el corte"
+                          },
+                          "rules": {
+                            "index": 1,
+                            "text": "Ejecutar las reglas"
+                          },
+                          "profile": {
+                            "index": 2,
+                            "text": "Perfilar los campos"
+                          },
+                          "icd": {
+                            "index": 3,
+                            "text": "ICD y grupos"
+                          },
+                          "queues": {
+                            "index": 4,
+                            "text": "Colas de remediación"
+                          },
+                          "recency": {
+                            "index": 5,
+                            "text": "Recencia de actualización"
+                          },
+                          "distributions": {
+                            "index": 6,
+                            "text": "Distribuciones y atípicos"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Tiempo"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "ms por millón"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Tiempo del corte anterior"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "ms"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "ms por millón del corte anterior"
+                },
+                "properties": [
+                  {
+                    "id": "decimals",
+                    "value": 2
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "stage": "Etapa",
+                  "ms": "Tiempo",
+                  "per_million": "ms por millón",
+                  "previous_ms": "Tiempo del corte anterior",
+                  "previous_per_million": "ms por millón del corte anterior"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 35,
+          "type": "table",
+          "title": "Campos más vacíos",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 172
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Profiling (decision 0031): each field of the cut, the emptiest first,\n-- with its distinct values and its commonest shape's share.\nSELECT f.field, s.records, f.empty,\n       CASE WHEN s.records > 0 THEN round(f.empty::numeric / s.records, 4) END AS empty_share,\n       f.distinct_values, f.pattern,\n       CASE WHEN s.records > f.empty\n            THEN round(f.pattern_count::numeric / (s.records - f.empty), 4) END AS pattern_share\n  FROM quality.field_quality f\n  JOIN quality.run_summary s USING (tenant_id, dataset, cut)\n WHERE f.dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND f.cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY empty_share DESC NULLS LAST, f.field",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Porcentaje vacío"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Su porcentaje de los llenos"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "field": "Campo",
+                  "records": "Registros",
+                  "empty": "Vacíos",
+                  "empty_share": "Porcentaje vacío",
+                  "distinct_values": "Valores distintos",
+                  "pattern": "Forma más común",
+                  "pattern_share": "Su porcentaje de los llenos"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 36,
+          "type": "table",
+          "title": "Reglas con menor conformidad",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 180
+          },
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "postgres"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "postgres"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "-- Conformity by rule (decision 0031): each rule of the cut, the worst first.\nSELECT rule, field, dimension, severity, applies, failures,\n       CASE WHEN applies > 0 THEN round(1 - failures::numeric / applies, 4) END AS conformity\n  FROM quality.rule_results\n WHERE dataset = (NULLIF(${dataset:sqlstring}, '')::text) AND cut = (NULLIF(${cut:sqlstring}, '')::text)::date\n ORDER BY conformity NULLS LAST, rule",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Dimensión"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "completeness": {
+                            "index": 0,
+                            "text": "Completitud"
+                          },
+                          "consistency": {
+                            "index": 1,
+                            "text": "Consistencia"
+                          },
+                          "accuracy": {
+                            "index": 2,
+                            "text": "Exactitud"
+                          },
+                          "validity": {
+                            "index": 3,
+                            "text": "Validez"
+                          },
+                          "timeliness": {
+                            "index": 4,
+                            "text": "Oportunidad"
+                          },
+                          "uniqueness": {
+                            "index": 5,
+                            "text": "Unicidad"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Severidad"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "blocking": {
+                            "index": 0,
+                            "text": "Bloqueante"
+                          },
+                          "major": {
+                            "index": 1,
+                            "text": "Mayor"
+                          },
+                          "minor": {
+                            "index": 2,
+                            "text": "Menor"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Conformidad"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  },
+                  {
+                    "id": "decimals",
+                    "value": 1
+                  },
+                  {
+                    "id": "max",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "cellHeight": "sm",
+            "showHeader": true
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "rule": "Regla",
+                  "field": "Campo",
+                  "dimension": "Dimensión",
+                  "severity": "Severidad",
+                  "applies": "Aplica a",
+                  "failures": "Fallos",
+                  "conformity": "Conformidad"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "quality-data",
+    "quality"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT DISTINCT dataset FROM quality.run_summary ORDER BY 1",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Conjunto de datos",
+        "multi": false,
+        "name": "dataset",
+        "options": [],
+        "query": "SELECT DISTINCT dataset FROM quality.run_summary ORDER BY 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT cut::text FROM quality.run_summary WHERE dataset = ${dataset:sqlstring} ORDER BY cut DESC LIMIT 60",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Corte",
+        "multi": false,
+        "name": "cut",
+        "options": [],
+        "query": "SELECT cut::text FROM quality.run_summary WHERE dataset = ${dataset:sqlstring} ORDER BY cut DESC LIMIT 60",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT coalesce((SELECT cut::text FROM (SELECT cut FROM quality.run_summary WHERE dataset = ${dataset:sqlstring} ORDER BY cut DESC LIMIT 60) recent WHERE cut < ${cut:sqlstring}::date ORDER BY cut DESC LIMIT 1), '')",
+        "hide": 2,
+        "includeAll": false,
+        "label": "Corte anterior",
+        "multi": false,
+        "name": "previous_cut",
+        "options": [],
+        "query": "SELECT coalesce((SELECT cut::text FROM (SELECT cut FROM quality.run_summary WHERE dataset = ${dataset:sqlstring} ORDER BY cut DESC LIMIT 60) recent WHERE cut < ${cut:sqlstring}::date ORDER BY cut DESC LIMIT 1), '')",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT dimension FROM quality.group_metrics WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date UNION SELECT dimension FROM quality.distribution_checks WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date AND dimension <> '' UNION SELECT dimension FROM quality.queue_findings WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date ORDER BY 1",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Dimensión",
+        "multi": true,
+        "name": "dimension",
+        "options": [],
+        "query": "SELECT dimension FROM quality.group_metrics WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date UNION SELECT dimension FROM quality.distribution_checks WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date AND dimension <> '' UNION SELECT dimension FROM quality.queue_findings WHERE dataset = ${dataset:sqlstring} AND cut = ${cut:sqlstring}::date ORDER BY 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "postgres"
+        },
+        "definition": "SELECT DISTINCT c.variable FROM quality.distribution_checks c JOIN quality.distribution_checks p ON p.tenant_id = c.tenant_id AND p.dataset = c.dataset AND p.variable = c.variable AND p.dimension = '' AND p.percentiles IS NOT NULL AND p.cut = NULLIF(${previous_cut:sqlstring}, '')::date WHERE c.dataset = ${dataset:sqlstring} AND c.cut = ${cut:sqlstring}::date AND c.dimension = '' AND c.percentiles IS NOT NULL ORDER BY 1",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Variable de deriva",
+        "multi": true,
+        "name": "drift_variable",
+        "options": [],
+        "query": "SELECT DISTINCT c.variable FROM quality.distribution_checks c JOIN quality.distribution_checks p ON p.tenant_id = c.tenant_id AND p.dataset = c.dataset AND p.variable = c.variable AND p.dimension = '' AND p.percentiles IS NOT NULL AND p.cut = NULLIF(${previous_cut:sqlstring}, '')::date WHERE c.dataset = ${dataset:sqlstring} AND c.cut = ${cut:sqlstring}::date AND c.dimension = '' AND c.percentiles IS NOT NULL ORDER BY 1",
+        "refresh": 1,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": true
+  },
+  "timezone": "browser",
+  "title": "Indicadores de calidad",
+  "uid": "qd-quality-es",
+  "weekStart": ""
+}

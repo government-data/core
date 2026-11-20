@@ -1,0 +1,35 @@
+# The local (on-premise) edition's layer, over compose.yml and
+# compose.prod.yml: the API's internal routes for the host's update daemon
+# (orquestador-actualizador) and the documentation for the customers at /docs.
+#
+# It is the only port the API publishes, and only on 127.0.0.1: it cannot be
+# reached from outside the machine. Each request brings the token of
+# secrets/internal_token, which the installer generates. The API never gets
+# docker.sock: the host is the one that updates.
+name: knime-orchestador
+
+secrets:
+  internal_token:
+    file: ./secrets/internal_token
+
+services:
+  api:
+    environment:
+      ORQ_INTERNAL_ADDR: 0.0.0.0:9417
+      ORQ_INTERNAL_TOKEN_FILE: /run/secrets/internal_token
+    secrets:
+      - internal_token
+    ports:
+      - "127.0.0.1:${ORQ_INTERNAL_PORT:-9417}:9417"
+
+  # The documentation (apps/docs, in the web image): only with a session.
+  # Traefik asks the API (docs-chain in infra/traefik/dynamic/middlewares.yml).
+  # Only here: the online cell requires CloudFront's secret on every route.
+  web:
+    labels:
+      - "traefik.http.routers.docs.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/docs`)"
+      - "traefik.http.routers.docs.entrypoints=websecure"
+      - "traefik.http.routers.docs.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.docs.priority=50"
+      - "traefik.http.routers.docs.service=web"
+      - "traefik.http.routers.docs.middlewares=docs-chain@file"

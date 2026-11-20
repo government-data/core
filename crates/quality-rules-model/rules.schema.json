@@ -1,0 +1,748 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quality Data rules",
+  "description": "One rules file: a dataset's declarations and rules.",
+  "type": "object",
+  "properties": {
+    "dataset": {
+      "description": "The dataset the rules read, as named in its mapping.",
+      "type": "string"
+    },
+    "derived": {
+      "description": "Fields computed against the cut, never against today.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "lists": {
+      "description": "Named lists of values, for `domain` (`in: { list: name }`) and\n`in_list(x, 'name')`.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/Value"
+        }
+      }
+    },
+    "named": {
+      "description": "Rules with everything but their `id` and `field`, which a field's\nrule `extends` (decision 0045): only in the table's global rules.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Rule"
+      }
+    },
+    "placeholders": {
+      "description": "Fillers that mean \"no value\", declared once per type.",
+      "$ref": "#/$defs/Placeholders"
+    },
+    "populations": {
+      "description": "Named conditions a rule can apply to (`population: individuals`).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "references": {
+      "description": "Other datasets a rule may look up, and which of their cuts.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Reference"
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Rule"
+      }
+    },
+    "tables": {
+      "description": "Tables of allowed or forbidden combinations, for `combination`.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/CombinationTable"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "dataset"
+  ],
+  "$defs": {
+    "AsOf": {
+      "oneOf": [
+        {
+          "description": "The other dataset's cut of the same date.",
+          "type": "string",
+          "const": "same_cut"
+        }
+      ]
+    },
+    "Case": {
+      "type": "string",
+      "enum": [
+        "insensitive",
+        "exact"
+      ]
+    },
+    "Cause": {
+      "description": "Why a record fails: at capture, or in a system that moves the data.",
+      "type": "string",
+      "enum": [
+        "capture",
+        "systemic"
+      ]
+    },
+    "CombinationTable": {
+      "description": "What a field may hold given others: one row per case, edited by the\nfield's owner as a table.",
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TableRow"
+          }
+        },
+        "then": {
+          "description": "The field whose values the rows allow or forbid.",
+          "type": "string"
+        },
+        "when": {
+          "description": "The field or fields each row starts from.",
+          "$ref": "#/$defs/Fields"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "when",
+        "then",
+        "rows"
+      ]
+    },
+    "Dimension": {
+      "type": "string",
+      "enum": [
+        "completeness",
+        "consistency",
+        "accuracy",
+        "validity",
+        "timeliness",
+        "uniqueness"
+      ]
+    },
+    "Examples": {
+      "description": "Records the rule must fail, pass and skip; lint runs them.",
+      "type": "object",
+      "properties": {
+        "fails": {
+          "$ref": "#/$defs/Records"
+        },
+        "passes": {
+          "$ref": "#/$defs/Records"
+        },
+        "skips": {
+          "$ref": "#/$defs/Records"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Fields": {
+      "description": "One field or several (`field: [A, B]` gives one rule per field).",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "NamedFormat": {
+      "type": "string",
+      "enum": [
+        "email",
+        "mobile_co",
+        "divipola",
+        "address_co",
+        "person_name",
+        "not_only_symbols",
+        "capitalized",
+        "normalized_spaces"
+      ]
+    },
+    "OnEmpty": {
+      "type": "string",
+      "enum": [
+        "skip",
+        "fail"
+      ]
+    },
+    "OneOrMany": {
+      "description": "One value or several.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Value"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        }
+      ]
+    },
+    "Origin": {
+      "type": "object",
+      "properties": {
+        "node": {
+          "description": "Where in that process (`\"#1636\"`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "process": {
+          "description": "The process it was imported from (`KNIME`).",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "process"
+      ]
+    },
+    "Pattern": {
+      "description": "The fourteen patterns (decision 0033, point 1).",
+      "type": "string",
+      "enum": [
+        "required",
+        "empty",
+        "placeholder",
+        "length",
+        "format",
+        "domain",
+        "range",
+        "fresh",
+        "sum",
+        "unique",
+        "combination",
+        "implies",
+        "differs",
+        "expression"
+      ]
+    },
+    "Placeholders": {
+      "description": "The dataset's fillers by type: `required` counts them as empty and\n`placeholder` finds them.",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        "email": {
+          "description": "Patterns with `*`, such as `notiene@*`.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        "number": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        "text": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Records": {
+      "description": "One record or several: field → value, `null` for no value.",
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Value"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Value"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Reference": {
+      "description": "Another dataset, looked up by its key.",
+      "type": "object",
+      "properties": {
+        "as_of": {
+          "description": "Which cut of the other dataset: by default the same date.",
+          "$ref": "#/$defs/AsOf"
+        },
+        "dataset": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "where": {
+          "description": "Only the other dataset's records where this holds (its fields):\n`EstadoAsesor = 'ACTIVO'`. Compared as written.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "dataset",
+        "key"
+      ]
+    },
+    "Rule": {
+      "type": "object",
+      "properties": {
+        "alert": {
+          "description": "What the person who fixes the record reads.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "both_ways": {
+          "description": "`implies`: `then` must also imply `if`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "case": {
+          "description": "Text comparisons are trimmed and case-insensitive by default.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Case"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cause": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cause"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "check": {
+          "description": "Its pattern; a rule that `extends` a named one may take it from it.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pattern"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dimension": {
+          "description": "Only for `expression`: the others take it from the pattern.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Dimension"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "examples": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Examples"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "extends": {
+          "description": "A named rule of the table's global rules this one starts from: its\nkeys, then this rule's on top (decision 0045).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fails": {
+          "description": "`expression`: the rule fails where this holds.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "field": {
+          "description": "The field it checks; a list gives one rule per field.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fields"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "for_each": {
+          "description": "Repeats the rule for each value: `{ n: [1, 2] }` with `TelefonoRef{n}`.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Value"
+            }
+          }
+        },
+        "from": {
+          "description": "`differs`: the other field.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Unique in the dataset; kept when a rule is imported (`V-PN-01`).\nA named rule has none (decision 0045).",
+          "type": "string"
+        },
+        "if": {
+          "description": "`implies`: when this holds, `then` must hold.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ignore": {
+          "description": "`unique`: values that may repeat.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        "in": {
+          "description": "`domain`: the allowed values; `length`: the allowed lengths.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValueSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "key": {
+          "description": "`unique`: the fields that must not repeat (default: the field).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fields"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Value"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_age": {
+          "description": "`fresh`: how old a date may be against the cut (`13 months`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_exclusive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "`length`, `range`: a number, a date, a field, `:cut` or an expression.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Value"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "min_exclusive": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "named": {
+          "description": "`format`: a format maintained by the platform.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NamedFormat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "normalize": {
+          "description": "`unique`, `differs`: compare normalized values.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "not_in": {
+          "description": "`domain`: the forbidden values.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValueSet"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "on_empty": {
+          "description": "An empty value is skipped by every pattern but `required` and\n`empty`; `fail` counts it as a failure instead.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OnEmpty"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "origin": {
+          "description": "Where an imported rule comes from.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Origin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parts": {
+          "description": "`sum`: the parts, each with its sign (`- Pasivo`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "pattern": {
+          "description": "`format`: a regular expression, anchored to the whole value.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "population": {
+          "description": "A population declared by the dataset.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "description": "By default, the pattern's.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "table": {
+          "description": "`combination`: a table declared by the dataset.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "then": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tolerance": {
+          "description": "`sum`: the difference allowed.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Value"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "values": {
+          "description": "`placeholder`: the fillers to find (default: the dataset's).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        "when": {
+          "description": "The rule applies only where this condition holds.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "blocking",
+        "major",
+        "minor"
+      ]
+    },
+    "TableRow": {
+      "type": "object",
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        "when": {
+          "description": "One value, several, or `*` for every other.",
+          "$ref": "#/$defs/OneOrMany"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "when"
+      ]
+    },
+    "Value": {
+      "description": "A value: text, a number or a boolean, read as text.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number",
+          "format": "double"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    },
+    "ValueSet": {
+      "description": "Values given inline, a list of the dataset, or a reference's column.",
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Value"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "list": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "list"
+          ]
+        },
+        {
+          "description": "`dataset.column`, a reference declared by the dataset.",
+          "type": "object",
+          "properties": {
+            "reference": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reference"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+[package]
+name = "quality-rules"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The rule language (decisions 0019, 0033) as one entry point: it re-exports
+# its stages, each a crate of its own (model, tree, compile, SQL, lint,
+# explain). Pure: no I/O.
+[dependencies]
+quality-rules-compile.workspace = true
+quality-rules-explain.workspace = true
+quality-rules-lint.workspace = true
+quality-rules-model.workspace = true
+quality-rules-sql.workspace = true
+quality-rules-tree.workspace = true

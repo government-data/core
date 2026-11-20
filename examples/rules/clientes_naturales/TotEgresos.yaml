@@ -1,0 +1,33 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-114
+    field: "TotEgresos"
+    check: "expression"
+    when: "in_list(ActLaboral, 'genera_ingresos')"
+    fails: "TotEgresos <= 0"
+    dimension: "completeness"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1697" }
+
+  - id: P-10
+    field: "TotEgresos"
+    check: "expression"
+    when: "GtoFamiliares IS NOT NULL"
+    fails: "abs(coalesce(GtoFamiliares, 0) + coalesce(GtoArriendo, 0) + coalesce(PagoDeudas, 0) + coalesce(OtrosGastos, 0) + coalesce(Deducciones, 0) + coalesce(DedLegales, 0) + coalesce(CuotaAdicional, 0) - TotEgresos) > 1"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Egresos no cuadran"
+    origin: { process: MVP }
+
+  - id: P-12
+    field: "TotEgresos"
+    check: "expression"
+    fails: "TotIngresos > 0 AND TotEgresos > 1.5 * TotIngresos"
+    dimension: "accuracy"
+    severity: minor
+    cause: capture
+    alert: "Egresos muy superiores a ingresos"
+    origin: { process: MVP }

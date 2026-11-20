@@ -1,0 +1,54 @@
+# The application's Traefik with the application VM's machine certificate
+# (decision 0066, points 10, 13 and 15). An overlay of docker-compose.yml,
+# beside it, for an installation whose machines have certificates;
+# development does not use it (gen-dev-internal.sh writes internal.crt):
+#
+#   docker compose -f infra/traefik/docker-compose.yml -f infra/traefik/certificate.yml up -d
+#
+# - machine/entrypoint.sh copies the node agent's machine.pem into the
+#   watched directory as app-machine.pem, and again at each renewal, so
+#   Traefik takes the renewed certificate without a restart. Its watched
+#   directory is therefore writable here (still read-only in the base).
+# - The internal entry point serves that certificate (internal.yml's
+#   INTERNAL_CERT_FILE and INTERNAL_KEY_FILE), so INTERNAL_DOMAIN must be
+#   the application VM's machine name, the only DNS name the CA gives it;
+#   the serversTransport `lake` presents it to the lake's gate.
+# - The `metrics` entry point (decision 0071) is published for this VM's
+#   Alloy, which reaches it as the machine's name through the Docker
+#   host's gateway (infra/observability/certificate.yml) and presents the
+#   same certificate. No other VM scrapes it: 0023's ports table has no row
+#   for it.
+# - Mimir (decision 0071, amended on 2026-11-16) is reached through the
+#   `mimir` entry point, published as MIMIR_HTTP_PORT (9009), where every
+#   VM's Alloy pushes: any certificate of the CA may push, only role `app`
+#   may read (internal.yml). Traefik reaches Mimir on its network
+#   (MIMIR_UPSTREAM), presenting the same certificate; Mimir's own port is
+#   published nowhere (infra/observability/certificate.yml).
+#
+# Required environment, besides docker-compose.yml's:
+#   QD_MACHINE_DIR   the application VM's node agent directory (QD_AGENT_DIR)
+# Optional: QD_TRAEFIK_CHECK_EVERY (30), seconds between looks at the
+# agent's machine.pem; TRAEFIK_METRICS_BIND (0.0.0.0) and
+# TRAEFIK_METRICS_PORT (9445), where the metrics entry point is published;
+# MIMIR_BIND (0.0.0.0) and MIMIR_HTTP_PORT (9009), where the `mimir` one
+# is; MIMIR_UPSTREAM (https://mimir:9009), Mimir as Traefik reaches it.
+#
+# Verified with tools/verify/traefik_app_certificate.sh; this file itself
+# only by `docker compose config`.
+services:
+  traefik:
+    # The watcher of machine/entrypoint.sh is a child of this init.
+    init: true
+    entrypoint: ["/etc/qd/traefik/entrypoint.sh"]
+    environment:
+      INTERNAL_CERT_FILE: /etc/traefik/dynamic/app-machine.pem
+      INTERNAL_KEY_FILE: /etc/traefik/dynamic/app-machine.pem
+      QD_TRAEFIK_CHECK_EVERY: ${QD_TRAEFIK_CHECK_EVERY:-30}
+      MIMIR_UPSTREAM: ${MIMIR_UPSTREAM:-https://mimir:${MIMIR_HTTP_PORT:-9009}}
+    ports:
+      - "${TRAEFIK_METRICS_BIND:-0.0.0.0}:${TRAEFIK_METRICS_PORT:-9445}:9445"
+      - "${MIMIR_BIND:-0.0.0.0}:${MIMIR_HTTP_PORT:-9009}:9446"
+    volumes:
+      - "./dynamic:/etc/traefik/dynamic"
+      - "./machine/entrypoint.sh:/etc/qd/traefik/entrypoint.sh:ro"
+      - "${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro"

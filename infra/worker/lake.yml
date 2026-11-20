@@ -1,0 +1,75 @@
+# The worker's way to a lake behind its gate (decision 0066, point 10): an
+# overlay of docker-compose.yml for an installation whose lake takes only
+# machines' certificates (infra/rustfs/gate.yml). Development does not use
+# it.
+#
+#   docker compose --project-directory . -f infra/worker/docker-compose.yml \
+#     -f infra/worker/lake.yml up -d
+#
+# - `lake`, a Traefik inside the worker's own network namespace, listens on
+#   its loopback (127.0.0.1:9000) and presents the machine's certificate to
+#   the lake's gate for DuckDB, which cannot (lake/entrypoint.sh). It reads
+#   no request. It runs as the node agent's user and reads the agent's
+#   files as they are; a renewed machine.pem is taken without a restart.
+# - The worker reaches every job's lake there (QD_LAKE_URL), over TLS,
+#   under the machine's own name, which its loopback answers to, and trusts
+#   the installation's CA for it (QD_CA_FILE, the agent's ca.crt). It waits
+#   for the proxy before it takes a job.
+#
+# Required environment, besides docker-compose.yml's:
+#   QD_MACHINE_NAME   the machine's name, as in its certificate
+#   QD_LAKE_GATE      the lake's gate, <the lake node's name>:<port> (9000)
+# Optional: TRAEFIK_IMAGE (traefik:v3.6), QD_LAKE_CHECK_EVERY (30, seconds).
+#
+# Its entrypoint is verified with tools/verify/rustfs_lake_gate_api.sh;
+# this file's `lake`, with the worker stood in, by
+# tools/verify/rustfs_source_proxy.sh, (g); the worker's image is not.
+services:
+  worker:
+    extra_hosts:
+      - "${QD_MACHINE_NAME:?set QD_MACHINE_NAME to the machine's name}:127.0.0.1"
+    environment:
+      QD_LAKE_URL: https://${QD_MACHINE_NAME}:9000
+      QD_CA_FILE: /var/lib/qd-node/ca.crt
+
+  lake:
+    image: ${TRAEFIK_IMAGE:-traefik:v3.6}
+    restart: unless-stopped
+    init: true
+    user: "65532:65532"
+    network_mode: "service:worker"
+    # When the worker restarts by itself or by `docker restart` (Compose's
+    # own restart restarts the proxy too), Docker leaves the proxy in its
+    # old namespace, its loopback alone, and the worker no longer reaches
+    # the lake: so it runs under the loop of the lake pool's proxy
+    # (infra/rustfs/pool/docker-compose.yml), the same text but the line it
+    # logs, which ends it once its namespace has no other interface, and its
+    # restart policy starts it again in the worker's new one
+    # (tools/verify/rustfs_source_proxy.sh, (g)).
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        /etc/qd/lake/entrypoint.sh "$$@" &
+        pid=$$!
+        trap 'kill -TERM $$pid; wait $$pid; exit' TERM INT
+        while kill -0 $$pid 2>/dev/null; do
+          if [ "$$(grep -c : /proc/net/dev)" -le 1 ]; then
+            echo "qd: the worker restarted, its network namespace is gone: the proxy restarts to join the new one" >&2
+            kill -TERM $$pid
+            wait $$pid
+            exit 1
+          fi
+          sleep 15 &
+          wait $$!
+        done
+        wait $$pid
+      - lake-proxy
+    environment:
+      QD_LAKE_GATE: ${QD_LAKE_GATE:?set QD_LAKE_GATE to the lake's gate, <name>:<port>}
+      QD_LAKE_CHECK_EVERY: ${QD_LAKE_CHECK_EVERY:-30}
+    tmpfs:
+      - /run/qd-lake:uid=65532,gid=65532,mode=0700
+    volumes:
+      - ./infra/worker/lake/entrypoint.sh:/etc/qd/lake/entrypoint.sh:ro
+      - machine:/run/qd-node:ro

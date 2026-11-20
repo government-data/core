@@ -1,0 +1,17 @@
+dataset: clientes_juridicas
+rules:
+  - id: "V-PJ-16"
+    field: "TelComSoc"
+    extends: "V-PJ-13"
+    alert: "Campo vacío"
+
+  - id: P-21
+    field: "TelComSoc"
+    check: "format"
+    pattern: "(?:CL|CLL|CALLE|CR|CRA|KR|CARRERA|AV|AVENIDA|AK|AC|TV|TR|TRANSVERSAL|DG|DIAGONAL|CIR|CQ|KM|VDA|VEREDA|VER|MZ|MANZANA|FINCA|FCA|BRR|BARRIO|SECTOR|CORREGIMIENTO|CORR|LOTE|PARCELA|URB|CONJ)\\b.*"
+    case: "exact"
+    severity: major
+    cause: systemic
+    alert: "Dirección del representante sin formato de dirección"
+    origin: { process: MVP }
+    note: "La columna trae el teléfono del socio por el renombre TelComSoc → DireccionRepresentanteLegal."

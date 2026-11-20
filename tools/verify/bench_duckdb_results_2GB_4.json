@@ -1,0 +1,74 @@
+[
+  {
+    "rows": 9000000,
+    "parquet_gb": 0.49,
+    "mem": "2GB",
+    "threads": 4,
+    "rules": 3.3,
+    "rules_spill_gb": 0.0,
+    "unique": 0.6,
+    "unique_spill_gb": 0.0,
+    "icd": 1.0,
+    "icd_spill_gb": 0.0
+  },
+  {
+    "rows": 18000000,
+    "parquet_gb": 0.97,
+    "mem": "2GB",
+    "threads": 4,
+    "rules": 5.4,
+    "rules_spill_gb": 0.0,
+    "unique": 1.3,
+    "unique_spill_gb": 0.0,
+    "icd": 2.0,
+    "icd_spill_gb": 0.0
+  },
+  {
+    "rows": 36000000,
+    "parquet_gb": 1.95,
+    "mem": "2GB",
+    "threads": 4,
+    "rules": 10.6,
+    "rules_spill_gb": 0.0,
+    "unique": 3.0,
+    "unique_spill_gb": 0.08,
+    "icd": 6.3,
+    "icd_spill_gb": 0.62
+  },
+  {
+    "rows": 72000000,
+    "parquet_gb": 3.9,
+    "mem": "2GB",
+    "threads": 4,
+    "rules": 28.4,
+    "rules_spill_gb": 0.0,
+    "unique": 11.6,
+    "unique_spill_gb": 1.75,
+    "icd": 14.5,
+    "icd_spill_gb": 2.59
+  },
+  {
+    "rows": 145000000,
+    "parquet_gb": 7.85,
+    "mem": "2GB",
+    "threads": 4,
+    "rules": 48.4,
+    "rules_spill_gb": 0.0,
+    "unique": "FAIL OutOfMemoryException: Out of Memory Error: could not allocate block of size 256.0 KiB (1.8 GiB/1.8 GiB",
+    "unique_spill_gb": 5.15,
+    "icd": "FAIL OutOfMemoryException: Out of Memory Error: failed to allocate data of size 16.0 MiB (1.8 GiB/1.8 GiB u",
+    "icd_spill_gb": 4.49
+  },
+  {
+    "rows": 290000000,
+    "parquet_gb": 15.71,
+    "mem": "2GB",
+    "threads": 4,
+    "rules": 106.4,
+    "rules_spill_gb": 0.0,
+    "unique": "FAIL OutOfMemoryException: Out of Memory Error: failed to allocate data of size 8.0 MiB (1.8 GiB/1.8 GiB us",
+    "unique_spill_gb": 5.73,
+    "icd": "FAIL OutOfMemoryException: Out of Memory Error: could not allocate block of size 256.0 KiB (1.8 GiB/1.8 GiB",
+    "icd_spill_gb": 4.07
+  }
+]

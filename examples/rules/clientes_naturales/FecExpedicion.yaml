@@ -1,0 +1,47 @@
+dataset: clientes_naturales
+rules:
+  - id: V-PN-64
+    field: "FecExpedicion"
+    check: "required"
+    severity: blocking
+    cause: capture
+    alert: "Campo vacío"
+    origin: { process: KNIME, node: "#1597" }
+
+  - id: V-PN-65
+    field: "FecExpedicion"
+    check: "placeholder"
+    values: ["1900-01-01"]
+    severity: major
+    cause: capture
+    alert: "Fecha errada"
+    origin: { process: KNIME, node: "#1597" }
+
+  - id: V-PN-66
+    field: "FecExpedicion"
+    check: "expression"
+    fails: "FecNacimiento > FecExpedicion AND NOT coalesce(TipIdnent, '') LIKE 'Registro Civil%'"
+    dimension: "accuracy"
+    severity: major
+    cause: capture
+    alert: "Fecha errada"
+    origin: { process: KNIME, node: "#1597" }
+
+  - id: V-PN-67
+    field: "FecExpedicion"
+    check: "range"
+    max: ":cut"
+    severity: major
+    cause: capture
+    alert: "Fecha errada"
+    origin: { process: KNIME, node: "#1597" }
+
+  - id: P-05
+    field: "FecExpedicion"
+    check: "expression"
+    fails: "TipIdnent = 'Cédula de Ciudadanía' AND days_between(FecNacimiento, FecExpedicion) / 365.25 < 17.9"
+    dimension: "consistency"
+    severity: major
+    cause: capture
+    alert: "Cédula expedida antes de los 18"
+    origin: { process: MVP }

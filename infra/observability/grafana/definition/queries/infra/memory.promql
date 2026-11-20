@@ -1,0 +1,1 @@
+100 * (1 - node_memory_MemAvailable_bytes{job="host",vm="$vm"} / node_memory_MemTotal_bytes{job="host",vm="$vm"})

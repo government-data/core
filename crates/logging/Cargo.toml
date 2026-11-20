@@ -1,0 +1,26 @@
+[package]
+name = "logging"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# Technical logs as decision 0026 points 1 and 5 want them: one flat JSON
+# object per line with the same fields in every service, and the redaction
+# layer. A leaf: no crate of the workspace, nothing beyond `tracing`, its
+# subscriber, `serde_json` and `chrono` (the time); and, for the metrics file
+# every Rust service writes (decision 0071, point 9), `prometheus-client`.
+# It is here, the one crate the API, the worker and the node agent already
+# share, because the node agent depends on no other crate of the workspace.
+[dependencies]
+prometheus-client.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
