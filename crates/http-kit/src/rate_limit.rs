@@ -7,8 +7,8 @@
 //! for blunt, global protection, but it cannot see the request body — so it
 //! cannot limit "attempts against this one account" the way this limiter
 //! does. Keyed generically (a caller-chosen string), so the same type serves
-//! login-by-IP, login-by-account, and — once that endpoint exists —
-//! payment-webhook limiting, without duplicating the counter logic per route.
+//! login-by-IP and login-by-account without duplicating the counter logic per
+//! route.
 //!
 //! In-memory and per-process by design: a defense-in-depth layer behind
 //! Traefik's shared, cross-replica limit, not a replacement for it.

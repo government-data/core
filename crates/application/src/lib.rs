@@ -12,8 +12,6 @@ pub mod actors;
 pub mod admins;
 pub mod audit_chain;
 pub mod machines;
-pub mod payments;
-pub mod payments_webhook;
 pub mod platform;
 pub mod settings;
 pub mod updates;
@@ -30,8 +28,6 @@ pub use machines::{AlertsApplied, AlertsError, DeliveredAlert, MachineMetrics};
 pub use machines::{Drives, DrivesError, MAX_DRIVES};
 pub use machines::{Lakes, ReplicationReadiness, ReplicationStatus, RECONCILER};
 pub use machines::{PoolError, PoolNodes};
-pub use payments::{PaymentsService, RefundError};
-pub use payments_webhook::{WebhookOutcome, WebhookService};
 pub use platform::{
     CreatedServiceAccount, Edition, GroupChange, MintedToken, PlatformError, PlatformService,
     PolicyView, TokenMint,

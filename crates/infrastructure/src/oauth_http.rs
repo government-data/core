@@ -36,10 +36,9 @@ impl std::fmt::Display for HttpError {
 
 impl std::error::Error for HttpError {}
 
-/// Infrastructure-internal port: the small set of HTTP shapes the OAuth and
-/// payment provider adapters need. `bearer` is optional on `post_form` because
-/// the OIDC token endpoint takes no auth header while Stripe's API takes a
-/// `Bearer` secret key on every call.
+/// Infrastructure-internal port: the small set of HTTP shapes the OAuth
+/// adapters need. `bearer` is optional on `post_form` because the OIDC token
+/// endpoint takes no auth header while other endpoints take a `Bearer` token.
 #[async_trait]
 pub trait HttpClient: Send + Sync {
     /// POST an `application/x-www-form-urlencoded` body, optionally with a

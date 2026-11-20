@@ -13,9 +13,8 @@ workspace = true
 
 # What the platform keeps besides identity: global secrets and connections,
 # the IAM records (groups, custom policies, attachments, service accounts) and
-# the license usage. Like `payments`, it knows no web framework or database
-# driver: persistence is the `PlatformRepository` port, implemented in
-# `infrastructure`.
+# the license usage. It knows no web framework or database driver: persistence
+# is the `PlatformRepository` port, implemented in `infrastructure`.
 [dependencies]
 iam.workspace = true
 async-trait.workspace = true

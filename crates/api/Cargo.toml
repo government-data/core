@@ -23,9 +23,6 @@ application.workspace = true
 domain.workspace = true
 auth-gateway.workspace = true
 http-kit.workspace = true
-# The payments bounded context's own types (payment status, money, query) cross
-# the transactions HTTP boundary, the same way `domain`'s types do elsewhere.
-payments.workspace = true
 # The platform's records (secrets) cross the HTTP boundary.
 platform.workspace = true
 # The lake replica's state test checks the signature its stand-in gate got.
@@ -67,10 +64,9 @@ serde_json.workspace = true
 sqlx.workspace = true
 # The oauth end-to-end test drives the real OidcProvider against a fake
 # `HttpClient` (async-trait to implement it) and builds a fake id_token
-# (base64url). The payments-webhook test signs a body with HMAC-SHA256.
+# (base64url).
 async-trait.workspace = true
 base64.workspace = true
-hmac.workspace = true
 sha2.workspace = true
 # Signing requests of keys made in the machines test (0066).
 rcgen.workspace = true

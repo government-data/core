@@ -115,13 +115,11 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "domain",
- "hmac",
  "http-kit",
  "iam",
  "infrastructure",
  "logging",
  "node-agent",
- "payments",
  "platform",
  "rcgen",
  "ring",
@@ -151,7 +149,6 @@ dependencies = [
  "chrono-tz",
  "domain",
  "iam",
- "payments",
  "platform",
  "schedule-core",
  "serde",
@@ -2070,12 +2067,10 @@ dependencies = [
  "chrono",
  "contracts",
  "domain",
- "hmac",
  "http-kit",
  "iam",
  "ldap3",
  "lettre",
- "payments",
  "platform",
  "rand 0.8.6",
  "rcgen",
@@ -2695,13 +2690,6 @@ dependencies = [
  "base64ct",
  "rand_core 0.6.4",
  "subtle",
-]
-
-[[package]]
-name = "payments"
-version = "0.1.0"
-dependencies = [
- "async-trait",
 ]
 
 [[package]]
@@ -3729,7 +3717,6 @@ dependencies = [
  "infrastructure",
  "logging",
  "node-agent",
- "payments",
  "platform",
  "prometheus-client",
  "quality",
