@@ -1,52 +1,11 @@
-//! What `serve` builds from the environment before mounting it: the local
-//! installation's license and the OIDC provider.
+//! What `serve` builds from the environment before mounting it: the OIDC
+//! provider.
 
-use std::sync::Arc;
-
-use application::{Edition, LicenseService};
+use application::Edition;
 use auth_gateway::http::client_cert::ClientCertificates;
 use auth_gateway::SessionService;
-use infrastructure::SecretBox;
 
 use crate::config::env_value;
-
-/// The local installation's license: only on-premise, with the licensing
-/// cloud configured (`ORQ_NUBE`) and the identifier the installer left. Its
-/// daily renewal starts once the settings' mail is loaded, to warn about the
-/// expiry.
-pub(crate) async fn local_license(
-    edition: Edition,
-    pool: &infrastructure::PgPool,
-    secret_box: &SecretBox,
-    usage: &Arc<dyn platform::PlatformRepository>,
-) -> Result<Option<LicenseService>, Box<dyn std::error::Error>> {
-    let (Edition::OnPremise, Some(cloud), Some(installation)) = (
-        edition,
-        env_value("ORQ_NUBE"),
-        env_value("ORQ_INSTALLATION_ID"),
-    ) else {
-        return Ok(None);
-    };
-    let license = LicenseService::new(
-        Arc::new(infrastructure::HttpLicenseAuthority::new(
-            &cloud,
-            infrastructure::license::compiled_public_key(),
-        )?),
-        Arc::new(infrastructure::PgLicenseStore::new(
-            pool.clone(),
-            Arc::new(secret_box.clone()),
-        )),
-        installation,
-        env_value("ORQ_LICENSE_KEY"),
-        infrastructure::license::uses_dev_key(),
-    )
-    .with_usage(usage.clone());
-    if infrastructure::license::uses_dev_key() {
-        tracing::warn!("licenses verified with the DEVELOPMENT key: not fit for customers");
-    }
-    license.load().await?;
-    Ok(Some(license))
-}
 
 /// The OIDC provider, if there is a key (`OIDC_SIGNING_KEY`) and it is
 /// on-premise. The issuer is `OIDC_ISSUER` or, without it, the public address

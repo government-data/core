@@ -198,45 +198,6 @@ impl SettingsConnectors for Connectors {
     }
 }
 
-/// The `orquestador` provider (signing in with the shared account) the cloud
-/// gives.
-pub(crate) fn platform_oidc(o: infrastructure::license::PlatformOidc) -> OAuthProviderSettings {
-    OAuthProviderSettings {
-        id: "orquestador".into(),
-        enabled: true,
-        client_id: o.client_id,
-        client_secret: o.client_secret,
-        issuer: o.issuer,
-        auth_endpoint: o.auth_endpoint,
-        token_endpoint: o.token_endpoint,
-        userinfo_endpoint: o.userinfo_endpoint,
-        scopes: vec!["openid".into(), "email".into(), "profile".into()],
-        trust_email: false,
-    }
-}
-
-/// The platform mail the licensing cloud (management) sends, as a mail
-/// section.
-pub(crate) fn platform_mail(m: infrastructure::license::PlatformMail) -> MailSettings {
-    MailSettings {
-        enabled: true,
-        transport: MailTransport::Smtp,
-        from_address: m.sender,
-        from_name: m.name,
-        smtp_host: m.host,
-        smtp_port: m.port,
-        smtp_security: match m.tls.as_str() {
-            "tls" => SmtpSecurity::Tls,
-            "none" => SmtpSecurity::None,
-            _ => SmtpSecurity::Starttls,
-        },
-        smtp_username: m.user,
-        smtp_password: m.password,
-        platform: true,
-        ..MailSettings::default()
-    }
-}
-
 /// `LDAP_*` from the environment, as the LDAP section's initial value.
 pub(crate) fn ldap_from_env() -> Result<Option<LdapSettings>, String> {
     Ok(LdapConfig::from_env()?.map(|c| LdapSettings {

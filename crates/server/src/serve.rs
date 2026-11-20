@@ -6,8 +6,7 @@
 //!    then apply each module's own migrations.
 //! 4. Initialize the modules.
 //! 5. Build the router: health, sign-in, the platform, settings,
-//!    and each module's routes, behind the tenant, license and language
-//!    layers.
+//!    and each module's routes, behind the tenant and language layers.
 //! 6. Start the HTTP server (and the internal routes, on their own port).
 
 use std::net::SocketAddr;
@@ -27,11 +26,9 @@ use infrastructure::{
     SystemClock,
 };
 
-use crate::background::{
-    spawn_background, spawn_license_renewal, spawn_platform_mail, spawn_scheduler,
-};
+use crate::background::{spawn_background, spawn_scheduler};
 use crate::config::{env_value, public_url_from_env, Config, OAuthSettings};
-use crate::startup::{local_license, oidc_provider};
+use crate::startup::oidc_provider;
 use crate::updates_wiring;
 use crate::{init_tracing, machines_wiring, payments_wiring, settings_wiring, tenants};
 
@@ -88,25 +85,19 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         auth.lockout_policy,
     );
 
-    // The key that seals the settings' secrets, the global secrets and the
-    // license: `SETTINGS_ENCRYPTION_KEY` or, without it, the file in
+    // The key that seals the settings' secrets and the global secrets: `SETTINGS_ENCRYPTION_KEY` or, without it, the file in
     // `SETTINGS_KEY_FILE`.
     let secret_box = SecretBox::from_env_or_file(
         env_value("SETTINGS_KEY_FILE").unwrap_or_else(|| DEFAULT_SETTINGS_KEY_FILE.into()),
     )?;
     let key_source = secret_box.source();
 
-    // The platform: the actor and IAM, secrets, license and updates.
+    // The platform: the actor and IAM, secrets and updates.
     tracing::info!(?edition, "edition");
     let platform = PlatformService::new(platform_repo.clone())
         .with_edition(edition)
         .with_cipher(Arc::new(settings_wiring::Cipher(secret_box.clone())))
         .with_tokens(Arc::new(infrastructure::ServiceTokenMint));
-    let license = local_license(edition, &pool, &secret_box, &platform_repo).await?;
-    let platform = match &license {
-        Some(license) => platform.with_license(license.clone()),
-        None => platform,
-    };
     // When what someone can do changes (here, in another replica or directly
     // in the database), the Actor kept in memory stops being valid (ADR 0013).
     {
@@ -172,35 +163,7 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         infrastructure::KeySource::Generated => "generated",
     });
     settings.init().await?;
-    let (captcha, captcha_from_env) = settings_wiring::captcha_from_env()?;
-    // The platform mail is configured in management (the licensing cloud):
-    // the online cell or an instance we manage (its key marked as managed)
-    // asks for it with its key and it is set on each company instead of its
-    // own (in the background round): there mail is not configured on the
-    // instance. A customer's installation does not get it and configures its
-    // own.
-    match (env_value("ORQ_NUBE"), env_value("ORQ_LICENSE_KEY")) {
-        (Some(cloud), Some(key)) => {
-            let installation = env_value("ORQ_INSTALLATION_ID")
-                .or_else(|| env_value("ORQ_DOMINIO"))
-                .unwrap_or_else(|| "cell".into());
-            spawn_platform_mail(
-                settings.clone(),
-                infrastructure::HttpLicenseAuthority::new(
-                    &cloud,
-                    infrastructure::license::compiled_public_key(),
-                )?,
-                key,
-                installation,
-                (!captcha_from_env).then(|| captcha.clone()),
-            );
-        }
-        _ if matches!(edition, Edition::Online) => tracing::warn!(
-            "online without ORQ_NUBE and ORQ_LICENSE_KEY: no platform mail, \
-             each company has to configure its own"
-        ),
-        _ => {}
-    }
+    let (captcha, _) = settings_wiring::captcha_from_env()?;
     // The background round of every tenant (the platform mail), once the
     // settings are loaded.
     spawn_background(
@@ -220,12 +183,6 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         settings.mailer(),
         Arc::new(application::PlatformAdmins(platform_repo.clone())),
     );
-    if let Some(license) = license {
-        spawn_license_renewal(license.with_reminders(
-            settings.mailer(),
-            Arc::new(application::PlatformAdmins(platform_repo)),
-        ));
-    }
     tracing::info!(
         ldap = settings.ldap().value.enabled,
         mail = settings.mail().value.enabled,
