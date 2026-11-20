@@ -25,15 +25,6 @@
       "label": "OAuth2 / OIDC",
       "desc": "Entrar con Microsoft, Google u otro proveedor."
     },
-    "license": {
-      "label": "Licencia",
-      "desc": "Plan, límites y clave de activación.",
-      "unavailable": "No disponible",
-      "none": "Sin licencia",
-      "basic": "Plan básico",
-      "plan": "Plan {{plan}}",
-      "grace": "{{plan}} · sin renovar"
-    },
     "updates": {
       "label": "Actualizaciones",
       "desc": "Versión instalada y nuevas versiones.",
