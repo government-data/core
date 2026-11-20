@@ -12,15 +12,13 @@ publish = false
 workspace = true
 
 # The application layer orchestrates use cases. It depends on the domain crates
-# (`domain` for auth/sessions, `payments` for the payments bounded context) —
-# never on `infrastructure` or `api`. It knows nothing about HTTP or storage;
+# (`domain` for auth/sessions) — never on `infrastructure` or `api`. It knows nothing about HTTP or storage;
 # it wires domain ports into application services.
 [dependencies]
 schedule-core.workspace = true
 async-trait.workspace = true
 domain.workspace = true
 auth-gateway.workspace = true
-payments.workspace = true
 # Secrets, global roles and license usage.
 platform.workspace = true
 # Global capabilities and roles (ADR 0013).

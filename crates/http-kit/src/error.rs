@@ -103,7 +103,7 @@ impl ApiError {
         }
     }
 
-    /// `502` — an upstream dependency (e.g. a payment provider) was unavailable.
+    /// `502` — an upstream dependency (e.g. an identity provider) was unavailable.
     pub fn bad_gateway(code: &'static str, message: impl Into<String>) -> Self {
         Self::new(StatusCode::BAD_GATEWAY, code, message)
     }

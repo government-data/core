@@ -22,7 +22,6 @@ auth-gateway.workspace = true
 # The modules' callers (src/callers.rs): the session's IAM actor, its 403.
 http-kit.workspace = true
 iam.workspace = true
-payments.workspace = true
 platform.workspace = true
 infrastructure.workspace = true
 # Trino's protocol, for a source's catalog (decision 0048).

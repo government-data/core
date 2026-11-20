@@ -83,15 +83,15 @@ pub async fn app_role(db: &TestDb) -> sqlx::postgres::PgConnectOptions {
     let admin = &db.pool;
     for sql in [
         "CREATE ROLE app LOGIN PASSWORD 'app' NOSUPERUSER NOBYPASSRLS",
-        "GRANT USAGE ON SCHEMA public, payments TO app",
-        "GRANT ALL ON ALL TABLES IN SCHEMA public, payments TO app",
-        "GRANT ALL ON ALL SEQUENCES IN SCHEMA public, payments TO app",
+        "GRANT USAGE ON SCHEMA public TO app",
+        "GRANT ALL ON ALL TABLES IN SCHEMA public TO app",
+        "GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO app",
     ] {
         sqlx::query(sql).execute(admin).await.expect(sql);
     }
     let tables: Vec<String> = sqlx::query_scalar(
         "SELECT format('%I.%I', table_schema, table_name) FROM information_schema.columns
-          WHERE column_name = 'tenant_id' AND table_schema IN ('public', 'payments')",
+          WHERE column_name = 'tenant_id' AND table_schema = 'public'",
     )
     .fetch_all(admin)
     .await

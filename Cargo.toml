@@ -23,14 +23,11 @@ roxmltree = "0.21"
 # Internal crates, wired as path dependencies. The dependency direction is
 # enforced by which of these each member opts into:
 #   api → application → auth-gateway → domain     (api, auth-gateway → http-kit)
-#   infrastructure → auth-gateway, domain, payments
+#   infrastructure → auth-gateway, domain
 #   server (composition root) → api, application, infrastructure, contracts, modules
 # `auth-gateway` is identity (signing in, sessions, OAuth, the directory); it
 # builds on `domain`'s shared kernel (ids, email, role, repository error, clock).
 # `contracts` is the shared plugin contract; feature modules implement it and are mounted by the server, never depending on one another.
-# `payments` is a second, independent domain (its own bounded context): the
-# auth domain and the payments domain never depend on each other, and both
-# are implemented against by `infrastructure`.
 domain = { path = "crates/domain" }
 schedule-core = { path = "crates/schedule-core" }
 # Identity: signing in and sessions (see the crate docs).
@@ -46,7 +43,6 @@ application = { path = "crates/application" }
 infrastructure = { path = "crates/infrastructure" }
 api = { path = "crates/api" }
 contracts = { path = "crates/contracts" }
-payments = { path = "crates/payments" }
 # Global secrets and connections, global roles, license usage.
 platform = { path = "crates/platform" }
 # Who can do what: actions, policies and the Actor (ADR 0016).
@@ -172,7 +168,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = [
 ] }
 rsa = "0.9"
 rand = "0.8"
-# HMAC-SHA256 for verifying payment-webhook signatures (Stripe's scheme).
+# HMAC-SHA256 (SigV4 signing, keyed hashes).
 hmac = "0.12"
 # HTTP client for the OAuth token/userinfo calls. rustls (no OpenSSL), JSON
 # helpers on; the default reqwest features we do not need are dropped.

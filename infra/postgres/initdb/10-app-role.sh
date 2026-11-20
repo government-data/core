@@ -49,9 +49,10 @@ psql -v ON_ERROR_STOP=1 \
 	REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 	GRANT USAGE, CREATE ON SCHEMA public TO :"app_user";
 
-	-- Let the app create new schemas in its own database: a migration adds the
-	-- `payments` bounded-context schema (0004_payments_schema), so the role that
-	-- runs the migrations at startup needs database-level CREATE. This stays
+	-- Let the app create new schemas in its own database: the migrations run at
+	-- startup create schemas (the baseline's legacy `payments` schema, kept
+	-- until a later version drops it, and each module's own, such as
+	-- `quality`), so the role that runs them needs database-level CREATE. This stays
 	-- confined to this one database — the role remains NOSUPERUSER/NOCREATEDB/
 	-- NOCREATEROLE and holds no cluster-wide authority.
 	GRANT CREATE ON DATABASE :"app_db" TO :"app_user";
