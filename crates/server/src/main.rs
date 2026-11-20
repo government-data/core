@@ -9,8 +9,6 @@
 //!   * `recover-admin` — after restoring a backup on a new server.
 //!   * `audit verify` — every tenant's audit chain recomputed; exits 1 on a
 //!     break (see [`audit`], decision 0070).
-//!   * `license-keygen`, `license-sign` — issue licenses (only for whoever
-//!     issues them, with the private key).
 //!   * `ca-init` — make the installation's CA, once (decision 0066).
 //!   * `app-machine` — the application VM's machine and its first
 //!     certificate, signed on the spot (decision 0066, point 16).
@@ -64,8 +62,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some("bootstrap-admin") => commands::bootstrap_admin().await,
         Some("recover-admin") => commands::recover_admin().await,
         Some("audit") => audit::run().await,
-        Some("license-keygen") => commands::license_keygen(),
-        Some("license-sign") => commands::license_sign(),
         Some("ca-init") => commands::ca_init(),
         Some("app-machine") => app_machine::run().await,
         Some("oidc-keygen") => commands::oidc_keygen(),
@@ -94,8 +90,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                  recover-admin    Recover the admin after restoring a backup\n  \
                  audit verify     Verify the audit chain: [--tenant ID] [--lang es|en] \
                  (exits 1 on a break)\n  \
-                 license-keygen   Print a new license key pair\n  \
-                 license-sign     Sign a permit: PRIVATE_KEY PERMIT.json\n  \
                  ca-init          Make the installation's CA: --name INSTALLATION \
                  --cert PATH --key PATH (prints its SHA-256)\n  \
                  app-machine      The application VM's machine and its first \

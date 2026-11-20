@@ -12,33 +12,6 @@ use crate::init_tracing;
 
 type CommandResult = Result<(), Box<dyn std::error::Error>>;
 
-/// `server license-keygen`: a key pair to sign licenses. The private one is
-/// kept outside every repository; the public one is compiled into the binary
-/// (`ORQ_LICENSE_PUBKEY=<public> cargo build ...`).
-pub(crate) fn license_keygen() -> CommandResult {
-    let (private, public) = infrastructure::license::generate_keypair()?;
-    println!("private (PKCS#8, base64; keep it secret): {private}");
-    println!("public (ORQ_LICENSE_PUBKEY): {public}");
-    Ok(())
-}
-
-/// `server license-sign PRIVATE_KEY PERMIT.json`: sign a permit (an
-/// Entitlement in JSON) and print the signed permit.
-pub(crate) fn license_sign() -> CommandResult {
-    let args: Vec<String> = std::env::args().skip(2).collect();
-    let [key_file, permit_file] = args.as_slice() else {
-        return Err("usage: server license-sign PRIVATE_KEY PERMIT.json".into());
-    };
-    let private = std::fs::read_to_string(key_file)?;
-    let entitlement: license_model::Entitlement =
-        serde_json::from_str(&std::fs::read_to_string(permit_file)?)?;
-    println!(
-        "{}",
-        infrastructure::license::sign_permit(&entitlement, &private)?
-    );
-    Ok(())
-}
-
 /// `server ca-init --name INSTALLATION --cert PATH --key PATH`: the
 /// installation's CA (0066), made once by the installer. Writes its
 /// certificate (0644) and key (0600, the secret of `CA_KEY_FILE`), refuses
