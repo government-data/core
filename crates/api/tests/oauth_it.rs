@@ -180,8 +180,6 @@ async fn router_with(pool: sqlx::PgPool, http: ScriptedHttp) -> axum::Router {
         audit,
         Arc::new(PgAdminRepository::new(pool.clone())),
         Some((oauth, api::oauth::OAuthRedirects::default())),
-        None,
-        None,
         application::PlatformService::new(Arc::new(infrastructure::PgPlatformRepository::new(
             pool.clone(),
         ))),

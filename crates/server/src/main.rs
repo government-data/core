@@ -33,7 +33,6 @@ mod machine_gauge;
 mod machines_wiring;
 mod metrics_wiring;
 mod modules;
-mod payments_wiring;
 mod quality;
 mod quality_catalog;
 mod replication_wiring;
