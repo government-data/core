@@ -24,7 +24,6 @@ pub mod machines;
 pub mod openapi;
 pub mod payments_webhook;
 pub mod platform;
-pub mod read_only;
 pub mod settings;
 pub mod tenancy;
 pub mod transactions;

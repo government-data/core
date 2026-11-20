@@ -288,7 +288,6 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         )),
         _ => None,
     };
-    let license_guard = platform.clone();
     // The gateway as an OIDC provider (with OIDC_SIGNING_KEY): the
     // applications registered with `server oidc-client` let their users in
     // with this installation's accounts.
@@ -373,11 +372,6 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let app = app.layer(axum::Extension(captcha));
     // The language of each request's messages (Accept-Language).
     let app = app.layer(axum::middleware::from_fn(api::language::per_request));
-    // With the license expired (past the grace period) or suspended, read-only.
-    let app = app.layer(axum::middleware::from_fn_with_state(
-        license_guard,
-        api::read_only::by_license,
-    ));
     // Each request's company wraps everything, modules included.
     let app = app.layer(axum::middleware::from_fn_with_state(
         tenancy.resolver,

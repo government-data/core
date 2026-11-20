@@ -10,9 +10,6 @@
     }
   },
   "api": {
-    "license": {
-      "readOnly": "Read-only: {{reason}}. Everything can be viewed and scheduled runs keep going."
-    },
     "machines": {
       "certificateNotTrusted": "This server does not take a machine's certificate: it is not reached only through the internal entry point (INTERNAL_CLIENT_CERT_HEADER).",
       "certificateRefused": "The machine's certificate is not accepted: it is unknown, replaced, or the machine is retired. Join it again with a new token.",

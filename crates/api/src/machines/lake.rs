@@ -10,8 +10,7 @@
 //! gate asks. 200 with an empty body lets the request through; anything
 //! else is Traefik's answer to it. The original method and path
 //! (`X-Forwarded-Method`, `X-Forwarded-Uri`) are not read: the answer is
-//! the machine's. No session, no CSRF; a `GET`, so allowed while the
-//! license is read-only (`read_only.rs`). A pass is not audited, one per
+//! the machine's. No session, no CSRF. A pass is not audited, one per
 //! request to the lake; a refusal is. Neither the request nor a
 //! certificate is logged.
 

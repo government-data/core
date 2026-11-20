@@ -9,7 +9,7 @@ use std::time::Duration;
 
 mod machine_certs;
 
-use application::{Acceptance, LicenseService, MachinesService, PlatformService};
+use application::{Acceptance, MachinesService};
 use auth_gateway::http::client_cert::ClientCertificates;
 use auth_gateway::{MachineId, MachineRole};
 use axum::body::Body;
@@ -19,9 +19,6 @@ use infrastructure::ca::{
     certificate_info, Ca, Lifetime, MachineIdentity, X509CertificateReader, DEFAULT_CA_VALIDITY,
 };
 use infrastructure::{PgAuditRepository, PgMachines, RingJoinTokenMint, SystemClock};
-use license_model::{
-    Entitlement, FetchError, LicenseAuthority, LicenseStore, Limits, StoredLicense,
-};
 use machine_certs::{admin, csr, key, origin, traefik_header, Held};
 use rcgen::{CertificateParams, DnType, KeyPair};
 use serde_json::{json, Value};
@@ -40,18 +37,16 @@ struct World {
     _db: testkit::TestDb,
 }
 
-/// How the world is made: with a CA, trusting the header, read-only.
+/// How the world is made: with a CA, trusting the header.
 #[derive(Clone, Copy)]
 struct Setup {
     ca: bool,
     trusted: bool,
-    read_only: bool,
 }
 
 const NORMAL: Setup = Setup {
     ca: true,
     trusted: true,
-    read_only: false,
 };
 
 async fn world(setup: Setup) -> World {
@@ -73,20 +68,8 @@ async fn world(setup: Setup) -> World {
     } else {
         ClientCertificates::not_trusted()
     };
-    let mut platform = PlatformService::new(Arc::new(infrastructure::PgPlatformRepository::new(
-        pool.clone(),
-    )));
-    if setup.read_only {
-        platform = platform.with_license(suspended_license().await);
-        assert!(platform.read_only().is_some());
-    }
     let app = api::machines::join::routes(machines.clone(), rate_limit())
-        .merge(api::machines::renew::routes(machines.clone(), certificates))
-        // As the server wraps every route.
-        .layer(axum::middleware::from_fn_with_state(
-            platform,
-            api::read_only::by_license,
-        ));
+        .merge(api::machines::renew::routes(machines.clone(), certificates));
     World {
         app,
         machines,
@@ -346,102 +329,4 @@ async fn machines_renew_is_503_without_a_trusted_header_or_a_ca() {
         (status, body["code"].as_str()),
         (StatusCode::SERVICE_UNAVAILABLE, Some("no_ca"))
     );
-}
-
-#[tokio::test]
-async fn machines_renew_while_the_license_is_read_only() {
-    let w = world(Setup {
-        read_only: true,
-        ..NORMAL
-    })
-    .await;
-    let trino = joined(&w, MachineRole::TrinoCoordinator, "trino-1").await;
-    let (status, body, renewed) = renew(&w, &trino).await;
-    assert_eq!(status, StatusCode::OK, "{body}");
-    let info = certificate_info(&renewed.unwrap().cert).unwrap();
-    assert!(
-        (info.not_after.timestamp() - now() - 365 * DAY).abs() < 120,
-        "a year"
-    );
-    // The guard is on: joining, a write, is refused.
-    let request = Request::post("/install/join")
-        .header("content-type", "application/json")
-        .body(Body::from(
-            json!({ "token": "x", "name": "y", "csr": "z" }).to_string(),
-        ));
-    let response = w.app.clone().oneshot(request.unwrap()).await.unwrap();
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
-}
-
-/// A license the cloud suspended: the installation is read-only.
-async fn suspended_license() -> LicenseService {
-    let license = LicenseService::new(
-        Arc::new(Cloud),
-        Arc::new(Stored::default()),
-        "inst-1".into(),
-        Some("ORQ-PRUEBA-0001".into()),
-        true,
-    );
-    license.refresh().await.unwrap();
-    license
-}
-
-struct Cloud;
-
-#[async_trait::async_trait]
-impl LicenseAuthority for Cloud {
-    async fn fetch(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&license_model::Usage>,
-    ) -> Result<String, FetchError> {
-        let entitlement = Entitlement {
-            customer: "Synthetic".into(),
-            plan: "Plan".into(),
-            features: vec![],
-            limits: Limits::default(),
-            installation: "inst-1".into(),
-            issued_at: Utc::now(),
-            expires_at: Utc::now() + chrono::Duration::days(30),
-            contract_ends_at: None,
-            suspended: Some("synthetic".into()),
-        };
-        Ok(serde_json::to_string(&entitlement).unwrap())
-    }
-
-    fn verify(&self, signed: &str) -> Result<Entitlement, String> {
-        serde_json::from_str(signed).map_err(|e| e.to_string())
-    }
-}
-
-#[derive(Default)]
-struct Stored(std::sync::Mutex<StoredLicense>);
-
-#[async_trait::async_trait]
-impl LicenseStore for Stored {
-    async fn load(&self) -> Result<StoredLicense, String> {
-        Ok(self.0.lock().unwrap().clone())
-    }
-    async fn save_key(&self, key: &str) -> Result<(), String> {
-        self.0.lock().unwrap().key = Some(key.into());
-        Ok(())
-    }
-    async fn save_permit(&self, permit: &str) -> Result<(), String> {
-        self.0.lock().unwrap().permit = Some(permit.into());
-        Ok(())
-    }
-    async fn record_error(&self, _: &str) -> Result<(), String> {
-        Ok(())
-    }
-    async fn clear_permit(&self, _: &str) -> Result<(), String> {
-        self.0.lock().unwrap().permit = None;
-        Ok(())
-    }
-    async fn reminders_sent(&self) -> Result<Vec<String>, String> {
-        Ok(vec![])
-    }
-    async fn mark_reminders(&self, _: &[String]) -> Result<(), String> {
-        Ok(())
-    }
 }

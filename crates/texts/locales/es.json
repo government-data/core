@@ -10,9 +10,6 @@
     }
   },
   "api": {
-    "license": {
-      "readOnly": "Solo lectura: {{reason}}. Se puede consultar todo y lo programado sigue corriendo."
-    },
     "machines": {
       "certificateNotTrusted": "Este servidor no recibe el certificado de una máquina: no se llega a él solo por el punto de entrada interno (INTERNAL_CLIENT_CERT_HEADER).",
       "certificateRefused": "El certificado de la máquina no se acepta: no se conoce, fue reemplazado o la máquina está retirada. Únela de nuevo con un token nuevo.",

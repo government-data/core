@@ -3,9 +3,8 @@
 //! in use, and once Trino answers after the restart, ends the hold with
 //! `POST /internal/machines/trino/release` and its new one. Served on
 //! Traefik's internal entry point (the machines' router), as renewing is:
-//! the certificate is the proof, no session, no CSRF; allowed while the
-//! license is read-only (`read_only.rs`). Neither the request nor the
-//! certificate is logged.
+//! the certificate is the proof, no session, no CSRF. Neither the request
+//! nor the certificate is logged.
 
 use application::{MachinesService, TrinoHoldError};
 use auth_gateway::http::client_cert::{
