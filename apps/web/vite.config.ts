@@ -65,7 +65,6 @@ export default defineConfig({
     exclude: [
       "@knime-orchestador/feature-dashboard",
       "@knime-orchestador/feature-users",
-      "@knime-orchestador/feature-transactions",
       "@knime-orchestador/feature-kit",
       "@knime-orchestador/query",
     ],
