@@ -17,7 +17,6 @@ workspace = true
 # it wires domain ports into application services.
 [dependencies]
 schedule-core.workspace = true
-license-model.workspace = true
 async-trait.workspace = true
 domain.workspace = true
 auth-gateway.workspace = true

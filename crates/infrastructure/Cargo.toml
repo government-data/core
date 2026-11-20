@@ -17,7 +17,6 @@ workspace = true
 # `HealthCheck`/`PaymentRepository` ports. It never depends on `application` or
 # `api`: dependencies point inward.
 [dependencies]
-license-model.workspace = true
 domain.workspace = true
 auth-gateway.workspace = true
 # The login rate limit's settings type (`auth_config`).

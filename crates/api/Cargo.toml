@@ -77,8 +77,6 @@ rcgen.workspace = true
 # The node agent's library, driven against the real join and renew routes
 # (0066 step 6); a test dependency only, so the API never depends on it.
 node-agent.workspace = true
-# A read-only license in the machines' renew test: a fake cloud and store.
-license-model.workspace = true
 # Check the OIDC provider's signatures as a relying party would.
 ring.workspace = true
 platform.workspace = true

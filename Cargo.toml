@@ -32,7 +32,6 @@ roxmltree = "0.21"
 # auth domain and the payments domain never depend on each other, and both
 # are implemented against by `infrastructure`.
 domain = { path = "crates/domain" }
-license-model = { path = "crates/license-model" }
 schedule-core = { path = "crates/schedule-core" }
 # Identity: signing in and sessions (see the crate docs).
 auth-gateway = { path = "crates/auth-gateway" }
