@@ -5,8 +5,6 @@ use std::sync::Arc;
 
 use application::SettingsService;
 
-use crate::settings_wiring;
-
 /// The background work of every tenant in this cell, every
 /// `BACKGROUND_INTERVAL_SECS` (15 by default): keep the platform mail set.
 pub(crate) fn spawn_background(
