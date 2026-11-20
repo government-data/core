@@ -43,8 +43,6 @@ async fn router_with_rate_limit(pool: sqlx::PgPool, max_requests: u32) -> axum::
         audit,
         Arc::new(PgAdminRepository::new(pool.clone())),
         None,
-        None,
-        None,
         application::PlatformService::new(Arc::new(infrastructure::PgPlatformRepository::new(
             pool.clone(),
         ))),

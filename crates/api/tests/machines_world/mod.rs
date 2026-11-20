@@ -122,8 +122,6 @@ pub(crate) async fn world(with_ca: bool, joins: u32) -> World {
         AuditService::new(Arc::new(PgAuditRepository::new(pool.clone()))),
         admins,
         None,
-        None,
-        None,
         platform.clone(),
         None,
         None,
