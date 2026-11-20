@@ -33,7 +33,13 @@ pub fn json_lines(service: &str, f: impl FnOnce()) -> Vec<Map<String, Value>> {
     let out = Captured::default();
     let writer = out.clone();
     let subscriber = crate::json_subscriber(service, "vm-test", move || writer.clone());
-    tracing::subscriber::with_default(subscriber, f);
+    tracing::subscriber::with_default(subscriber, || {
+        // Another test may have reached a callsite first with no subscriber,
+        // caching "never" for it; tests run in parallel, so ask again now that
+        // this one is the default, or its lines are lost by chance.
+        tracing::callsite::rebuild_interest_cache();
+        f()
+    });
     let bytes = out.0.lock().map(|b| b.clone()).unwrap_or_default();
     String::from_utf8_lossy(&bytes)
         .lines()
