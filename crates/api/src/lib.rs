@@ -6,9 +6,7 @@
 
 use std::sync::Arc;
 
-use application::{
-    HealthService, PaymentsService, PlatformService, SettingsService, WebhookService,
-};
+use application::{HealthService, PlatformService, SettingsService};
 use auth_gateway::AdminRepository;
 use auth_gateway::{AuditService, OAuthLoginService, SessionService, UsersService};
 use auth_gateway::{LoginService, PasswordResetService};
@@ -22,12 +20,10 @@ pub mod internal;
 pub mod language;
 pub mod machines;
 pub mod openapi;
-pub mod payments_webhook;
 pub mod platform;
 pub mod read_only;
 pub mod settings;
 pub mod tenancy;
-pub mod transactions;
 
 pub use auth_gateway::http::{
     auth, captcha, central, oauth, password_reset, rbac, session, users, verify,
@@ -45,10 +41,8 @@ use rate_limit::RateLimitConfig;
 /// line as they land. The CORS layer wraps the whole router last, so it
 /// applies (and answers preflight `OPTIONS`) uniformly across every route.
 ///
-/// `oauth`, `webhooks`, `transactions`, `settings` and `password_reset` are optional: `None` simply leaves
-/// those endpoints unmounted (OAuth returns `404`; the webhook and transactions
-/// routes are absent). Transactions is mounted only when a payment provider is
-/// configured, since a refund needs one.
+/// `oauth`, `settings` and `password_reset` are optional: `None` simply leaves
+/// those endpoints unmounted (OAuth returns `404`).
 // The composition root legitimately injects one argument per delivery surface;
 // bundling them into a struct would only move the same wiring elsewhere.
 #[allow(clippy::too_many_arguments)]
@@ -59,8 +53,6 @@ pub fn router(
     audit: AuditService,
     admins: Arc<dyn AdminRepository>,
     oauth: Option<(OAuthLoginService, OAuthRedirects)>,
-    webhooks: Option<WebhookService>,
-    transactions: Option<PaymentsService>,
     platform: PlatformService,
     settings: Option<SettingsService>,
     password_reset: Option<(PasswordResetService, password_reset::ResetLinkBase)>,
@@ -115,12 +107,6 @@ pub fn router(
     }
     if let Some((oauth, redirects)) = oauth {
         router = router.merge(oauth::routes(oauth, sessions.clone(), audit, redirects));
-    }
-    if let Some(webhooks) = webhooks {
-        router = router.merge(payments_webhook::routes(webhooks));
-    }
-    if let Some(transactions) = transactions {
-        router = router.merge(transactions::routes(transactions, sessions.clone()));
     }
     // CORS wraps every route; the request-context layer is added last so it is
     // the OUTERMOST wrapper — every request (CORS preflight included) runs inside
