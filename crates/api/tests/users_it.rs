@@ -193,8 +193,6 @@ async fn app(pool: sqlx::PgPool, outbox: Option<Arc<Outbox>>) -> axum::Router {
         AuditService::new(Arc::new(PgAuditRepository::new(pool.clone()))),
         admins,
         None,
-        None,
-        None,
         application::PlatformService::new(engine_repo),
         Some(settings),
         Some((

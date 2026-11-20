@@ -14,10 +14,10 @@ afterEach(() => {
 
 describe("redirectToLoginOnUnauthorized", () => {
   it("redirects to /login preserving the current path as ?next", () => {
-    const assign = stubLocation("/transactions", "?status=captured");
+    const assign = stubLocation("/settings/users", "?filter=admins");
     redirectToLoginOnUnauthorized()();
     expect(assign).toHaveBeenCalledWith(
-      `/login?next=${encodeURIComponent("/transactions?status=captured")}`,
+      `/login?next=${encodeURIComponent("/settings/users?filter=admins")}`,
     );
   });
 
