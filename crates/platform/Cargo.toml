@@ -17,7 +17,6 @@ workspace = true
 # driver: persistence is the `PlatformRepository` port, implemented in
 # `infrastructure`.
 [dependencies]
-license-model.workspace = true
 iam.workspace = true
 async-trait.workspace = true
 chrono.workspace = true

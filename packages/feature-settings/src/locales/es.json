@@ -463,7 +463,6 @@
       "admin_ManagePolicies": "Administrar grupos y políticas",
       "admin_ManageSecrets": "Administrar secretos",
       "admin_ViewAudit": "Ver auditoría",
-      "admin_ManageLicense": "Administrar licencia",
       "admin_ManageUpdates": "Administrar actualizaciones",
       "admin_ManageMachines": "Administrar máquinas"
     },

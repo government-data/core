@@ -15,7 +15,6 @@ workspace = true
 # layer. It loads config, builds infrastructure adapters, injects them into the
 # application services, hands those to the API router, and runs the HTTP server.
 [dependencies]
-license-model.workspace = true
 api.workspace = true
 application.workspace = true
 domain.workspace = true
