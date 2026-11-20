@@ -43,13 +43,18 @@ fn guarded() -> (Guard, Arc<Fake>, Registry) {
     (guard, fake, registry)
 }
 
+/// The pause series, sorted: the registry keeps a family's series in a hash
+/// map, so their order in the text changes from run to run.
 fn paused(registry: &Registry) -> Vec<String> {
     let mut text = String::new();
     encode(&mut text, registry).unwrap();
-    text.lines()
+    let mut lines: Vec<String> = text
+        .lines()
         .filter(|l| l.starts_with("qd_worker_claim_paused{"))
         .map(str::to_string)
-        .collect()
+        .collect();
+    lines.sort();
+    lines
 }
 
 #[tokio::test]
