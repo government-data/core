@@ -28,7 +28,7 @@ const fn global(name: &'static str) -> Action {
 }
 
 /// Every action, in display order.
-pub const ACTIONS: [Action; 26] = [
+pub const ACTIONS: [Action; 25] = [
     on("quality:ViewSources", "source"),
     on("quality:ManageSources", "source"),
     on("quality:ViewEtl", "etl"),
@@ -53,7 +53,6 @@ pub const ACTIONS: [Action; 26] = [
     global("admin:ManagePolicies"),
     on("admin:ManageSecrets", "secret"),
     global("admin:ViewAudit"),
-    global("admin:ManageLicense"),
     global("admin:ManageUpdates"),
     // The installation's machines: join tokens, approving, draining and
     // retiring them (decisions 0029 and 0066).
@@ -71,7 +70,6 @@ pub const MANAGE_USERS: &str = "admin:ManageUsers";
 pub const MANAGE_POLICIES: &str = "admin:ManagePolicies";
 pub const MANAGE_SECRETS: &str = "admin:ManageSecrets";
 pub const VIEW_AUDIT: &str = "admin:ViewAudit";
-pub const MANAGE_LICENSE: &str = "admin:ManageLicense";
 pub const MANAGE_UPDATES: &str = "admin:ManageUpdates";
 pub const MANAGE_MACHINES: &str = "admin:ManageMachines";
 pub const VIEW_PERSONAL_DATA: &str = "quality:ViewPersonalData";
@@ -92,7 +90,6 @@ mod tests {
             MANAGE_POLICIES,
             MANAGE_SECRETS,
             VIEW_AUDIT,
-            MANAGE_LICENSE,
             MANAGE_UPDATES,
             MANAGE_MACHINES,
             VIEW_PERSONAL_DATA,
