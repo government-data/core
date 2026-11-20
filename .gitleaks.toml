@@ -5,7 +5,7 @@
 # places that legitimately hold fake credentials: the integration tests and the
 # committed `.env.example`. A real secret anywhere else still fails the scan.
 
-title = "knime-orchestador secret scan"
+title = "quality-data core secret scan"
 
 [extend]
 useDefault = true
@@ -19,9 +19,6 @@ paths = [
   '''.*_it\.rs$''',
   # The example env file ships placeholder values, never real ones.
   '''\.env\.example$''',
-  # The *development* license signing key, committed on purpose (the
-  # binaries say so when they trust it; production builds pass their own
-  # ORQ_LICENSE_PUBKEY and keep the private key out of the repo).
 ]
 # The AWS documentation's example credentials (SigV4 test vector).
 regexes = [
@@ -30,4 +27,15 @@ regexes = [
   # «encriptado» in base64: a sealed value in the contract's unit tests
   # (crates/api/src/contract.rs, earlier contrato.rs).
   '''ZW5jcmlwdGFkbw==''',
+  # A curl user whose password is read at run time, from a file or a
+  # variable (`-u "user:$(cat /pw)"`, `-u "user:${SECRET:?…}"`): the scripts
+  # in tools/verify hold no secret, only where to read it.
+  '''^"?[^:"]*:\$[({]''',
+  # A credential that is fake on purpose (tools/verify/rustfs_mtls.sh checks
+  # that RustFS refuses it).
+  '''^"?qdnotakey:qdnotasecret"?$''',
+  # Object names of a cut in the verify scripts (`Key="cut-2026-06.parquet"`).
+  '''^cut-[0-9]{4}-[0-9]{2}\.parquet$''',
+  # A container image named in a comment (traefik/whoami).
+  '''^traefik/whoami$''',
 ]

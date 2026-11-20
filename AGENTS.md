@@ -156,6 +156,7 @@ commit.
   in code, comments or pull requests; name it by number ("decision 0033").
 
 ## Architecture
+
 - all task always with subagents opus
 - subagents always run with reasoning effort medium
 - fable is orcherstator

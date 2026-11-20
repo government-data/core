@@ -4,7 +4,7 @@
     "title": "knime-orchestador API",
     "description": "The JSON API the admin frontend consumes.",
     "contact": {
-      "name": "knime-orchestador"
+      "name": "quality-data"
     },
     "license": {
       "name": "MIT",
