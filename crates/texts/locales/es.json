@@ -128,20 +128,6 @@
         "title": "Tu cuenta está activa"
       }
     },
-    "licensing": {
-      "becameReadOnly": "Quality Data quedó en solo lectura",
-      "contractExpired": "El contrato de {{customer}} venció el {{format}}.\n\nTodo sigue funcionando hasta el {{format2}}; desde ese día la instalación queda en solo lectura hasta que se renueve.",
-      "contractExpiresOn": "El contrato de {{customer}} (plan {{plan}}) vence el {{format}}.\n\nPara renovarlo, coordina con tu proveedor la orden de compra y la factura: el pago por transferencia suele tardar 30 a 60 días.\n\nSi vence sin renovar, la instalación sigue completa {{CONTRACT_GRACE_DAYS}} días más; después queda en solo lectura: se consulta todo y lo programado sigue corriendo, pero no se crean, cambian ni despliegan flujos.",
-      "emptyKey": "la clave no puede estar vacía",
-      "expired": "La licencia de Quality Data venció",
-      "expiresInDays": "La licencia de Quality Data vence en {{days_left}} días",
-      "graceEnded": "El contrato de {{customer}} venció el {{format}} y terminó el período de gracia.\n\nSe puede consultar todo y las ejecuciones programadas siguen corriendo, pero no se pueden crear, cambiar ni desplegar flujos hasta renovar. Con el pago registrado vuelve a funcionar completa en menos de un día (o al instante con Configuración → Licencia → Renovar ahora).",
-      "invalidPermit": "la clave no tiene un permiso válido de la nube ({{e}})",
-      "label": "Licencia",
-      "noActivationKey": "sin clave de activación",
-      "noPermitYet": "la clave todavía no tiene un permiso de la nube",
-      "permitOfOtherInstallation": "el permiso es de otra instalación"
-    },
     "mail": {
       "brand": "Quality Data",
       "buttonFallback": "Si el botón no funciona, copia este enlace en el navegador:",
@@ -158,7 +144,6 @@
     "platform": {
       "editionExpected": "{{other}}: se espera onpremise u online",
       "forbidden": "sin permiso",
-      "noLicenseUsed": "esta instalación no usa licencia",
       "notFound": "no encontrado",
       "notUpdatedHere": "esta instalación no se actualiza desde aquí",
       "secrets": {

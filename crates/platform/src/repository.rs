@@ -2,8 +2,6 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
-
 use iam::Policy;
 
 use crate::iam::{
@@ -96,13 +94,9 @@ pub trait PlatformRepository: Send + Sync {
     /// Remove it, if it is `owner`'s (or anyone's, with `None`).
     async fn delete_service_account(&self, id: &str, owner: Option<&str>) -> R<()>;
 
-    // --- License -----------------------------------------------------------
+    // --- Notices -----------------------------------------------------------
 
-    /// What is used of the plan: users who are not administrators (admins do
-    /// not count as users). Nothing counts as a workflow or an execution
-    /// until the quality pipelines exist (ADR 0016).
-    async fn usage(&self, since: DateTime<Utc>) -> R<license_model::Usage>;
-    /// The administrators' emails (the license notices).
+    /// The administrators' emails (the update notices).
     async fn admin_emails(&self) -> R<Vec<String>> {
         Ok(Vec::new())
     }

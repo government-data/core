@@ -21,7 +21,6 @@ pub mod directory_accounts;
 pub mod health;
 pub mod lake_http;
 pub mod ldap;
-pub mod license;
 pub mod machines;
 pub mod mail;
 pub mod mimir_series;
@@ -68,7 +67,6 @@ pub use db::{connect, connect_for, run_migrations, PgConfig, PgPool, MIGRATOR};
 pub use directory_accounts::PgDirectoryAccounts;
 pub use health::PgHealthCheck;
 pub use ldap::{ldap_admin_groups_from_env, LdapAuthenticator, LdapConfig};
-pub use license::{HttpLicenseAuthority, PgLicenseStore};
 pub use machines::{
     EmbeddedInstallFiles, PgLakeAdminKeys, PgLakePools, PgLakeRootKeys, PgMachineAlerts,
     PgMachineSessions, PgMachines, PgReplicationState, RingJoinTokenMint,

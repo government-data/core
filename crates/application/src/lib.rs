@@ -9,8 +9,8 @@ use std::sync::Arc;
 use domain::{Health, HealthCheck};
 
 pub mod actors;
+pub mod admins;
 pub mod audit_chain;
-pub mod licensing;
 pub mod machines;
 pub mod payments;
 pub mod payments_webhook;
@@ -18,10 +18,7 @@ pub mod platform;
 pub mod settings;
 pub mod updates;
 
-pub use licensing::{
-    BillingView, LicenseService, LicenseView, PlatformAdmins, HEARTBEAT_EVERY, RENEW_EVERY,
-    RETRY_EVERY,
-};
+pub use admins::{AdminContacts, PlatformAdmins};
 pub use machines::{
     Acceptance, DoltHold, DoltHoldError, DoltStore, InstallError, InstallFileError, Installed,
     IssuedJoinToken, JoinCommand, JoinError, Joined, LakeAdminError, LakeCheckError, MachinesError,
