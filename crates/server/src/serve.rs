@@ -33,7 +33,7 @@ use crate::background::{
 use crate::config::{env_value, public_url_from_env, Config, OAuthSettings};
 use crate::startup::{local_license, oidc_provider};
 use crate::updates_wiring;
-use crate::{init_tracing, machines_wiring, payments_wiring, settings_wiring, tenants};
+use crate::{init_tracing, machines_wiring, settings_wiring, tenants};
 
 /// Where the settings key lives when `SETTINGS_ENCRYPTION_KEY` is not set (a
 /// volume; it is generated the first time).
@@ -265,8 +265,6 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         link_base: public_url_from_env(),
     });
 
-    let (webhooks, transactions) = payments_wiring::payments(&pool)?;
-
     // Online, the common entrance (entrar.<domain>): the email and the
     // password, without the company's address.
     let central = match (&tenancy.directory, &tenancy.domain) {
@@ -345,8 +343,6 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
             audit,
             admins,
             oauth,
-            webhooks,
-            transactions,
             platform,
             Some(settings),
             Some((password_reset, reset_links)),

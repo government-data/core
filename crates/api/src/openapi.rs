@@ -7,9 +7,8 @@
 //! that spec, so front and back share one source of truth.
 //!
 //! The spec covers the JSON API a typed client consumes (auth, audit, health,
-//! transactions). The OAuth endpoints are browser redirects and the payment
-//! webhook is provider-facing, so neither is a typed-client surface and both
-//! are left out. The feature modules' routes for people are not the API's:
+//! machines). The OAuth endpoints are browser redirects, not a typed-client
+//! surface, and are left out. The feature modules' routes for people are not the API's:
 //! each module describes its own (`contracts::Module::openapi`) and `server`
 //! merges them into [`ApiDoc::document`] before writing it.
 
@@ -43,9 +42,6 @@ use utoipa::OpenApi;
         crate::password_reset::check_handler,
         crate::password_reset::confirm_handler,
         crate::audit::list_events,
-        crate::transactions::list_transactions,
-        crate::transactions::get_transaction,
-        crate::transactions::refund_transaction,
         crate::machines::list_machines_handler,
         crate::machines::metrics::metrics_handler,
         crate::machines::issue_token_handler,
@@ -98,11 +94,6 @@ use utoipa::OpenApi;
         crate::password_reset::PasswordPolicyOut,
         crate::password_reset::ResetConfirmBody,
         crate::audit::EventOut,
-        crate::transactions::TransactionOut,
-        crate::transactions::TransactionPage,
-        crate::transactions::StatusChangeOut,
-        crate::transactions::TransactionDetailOut,
-        crate::transactions::RefundOut,
         crate::machines::MachineOut,
         crate::machines::MachinesOut,
         crate::machines::metrics::MachineMetricsOut,
@@ -136,7 +127,6 @@ use utoipa::OpenApi;
     tags(
         (name = "auth", description = "Sign-in, session, and identity"),
         (name = "audit", description = "Authentication audit trail"),
-        (name = "transactions", description = "Payment transactions and refunds"),
         (name = "health", description = "Readiness probe"),
         (name = "machines", description = "The installation's machines and how they join"),
     ),
@@ -179,9 +169,6 @@ mod tests {
             "/users/{id}/activation",
             "/auth/me/identities/{provider}/{subject}",
             "/audit/events",
-            "/transactions",
-            "/transactions/{id}",
-            "/transactions/{id}/refund",
             "/machines",
             "/machines/join-tokens",
             "/machines/{id}/approve",
@@ -197,7 +184,7 @@ mod tests {
         }
         // A schema the client's types come from.
         assert!(json.contains("LoginOk"));
-        assert!(json.contains("TransactionPage"));
+        assert!(json.contains("MachinesOut"));
     }
 
     /// The client generator keys each operation by its id, so two operations
