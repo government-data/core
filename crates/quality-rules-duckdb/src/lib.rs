@@ -45,6 +45,7 @@ mod records;
 mod sample;
 mod sfc;
 mod silver;
+mod source;
 mod tables;
 
 /// One rule's counts over a dataset's cut.
@@ -73,6 +74,9 @@ pub struct Runner {
     datasets: BTreeMap<String, String>,
     /// The datasets loaded through a mapping, with the schema it gives.
     mapped: BTreeMap<String, Schema>,
+    /// Whether extensions load only from an extension directory
+    /// ([`Runner::set_extension_directory`]).
+    offline: bool,
 }
 
 impl std::fmt::Debug for Runner {
@@ -89,6 +93,7 @@ impl Runner {
             con: Connection::open_in_memory()?,
             datasets: BTreeMap::new(),
             mapped: BTreeMap::new(),
+            offline: false,
         })
     }
 
