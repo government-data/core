@@ -16,7 +16,7 @@ use crate::{invalid, quoted, Error, Runner};
 /// A source's connection, as its job got it. The secrets never show in
 /// `Debug`.
 pub struct SourceConnection<'a> {
-    /// `postgres` or `mysql`: the DuckDB extension of the same name.
+    /// `postgres`, `mysql`, `sqlserver` or `oracle` (`Runner::attach_source`).
     pub driver: &'a str,
     pub fields: &'a BTreeMap<String, String>,
     pub secrets: &'a BTreeMap<String, String>,
@@ -32,8 +32,23 @@ impl std::fmt::Debug for SourceConnection<'_> {
     }
 }
 
-/// A source column: its name and its type as DuckDB reads it.
+/// A source column: its name and its type as bronze keeps it.
 pub type Column = (String, String);
+
+/// The type bronze keeps for a source column's type (decision 0077 point
+/// 8): SQL Server's text aliases as `VARCHAR`, `TIMESTAMP_NS` (its
+/// `DATETIME2`) as `TIMESTAMP`, which every Iceberg format version takes;
+/// any other type, Oracle's `DATE` read as `TIMESTAMP` included, as it is.
+pub(crate) fn bronze_type(ty: &str) -> String {
+    let t = ty.to_ascii_uppercase();
+    if t.starts_with("MSSQL_VARCHAR") || t.starts_with("MSSQL_NVARCHAR") {
+        "VARCHAR".into()
+    } else if t == "TIMESTAMP_NS" {
+        "TIMESTAMP".into()
+    } else {
+        ty.to_string()
+    }
+}
 
 /// `src."schema"."table"`, from the mapping's one or two parts.
 pub(crate) fn source_table(table: &str) -> Result<String, Error> {
@@ -50,44 +65,14 @@ fn bronze_table(namespace: &str, table: &str) -> Result<String, Error> {
 }
 
 impl Runner {
-    /// Attaches the source as `src`, read-only. Before [`Runner::attach_lake`],
-    /// which locks the connection.
-    pub fn attach_source(&mut self, source: &SourceConnection) -> Result<(), Error> {
-        let extension = match source.driver {
-            "postgres" => "postgres",
-            "mysql" => "mysql",
-            other => return Err(invalid(format!("no DuckDB driver for {other}"))),
-        };
-        let q = |t: &str| quote_text(t).map_err(invalid);
-        let get = |m: &BTreeMap<String, String>, k: &str| {
-            m.get(k)
-                .cloned()
-                .ok_or_else(|| invalid(format!("the source has no {k}")))
-        };
-        let port = match source.fields.get("port") {
-            Some(p) => p.parse::<u16>().map_err(invalid)?,
-            None => source
-                .default_port
-                .ok_or_else(|| invalid("the source has no port"))?,
-        };
-        self.con.execute_batch(&format!(
-            "INSTALL {extension}; LOAD {extension};\n\
-             CREATE OR REPLACE SECRET src_job (TYPE {extension}, HOST {}, PORT {port}, \
-             DATABASE {}, USER {}, PASSWORD {});\n\
-             ATTACH '' AS src (TYPE {extension}, SECRET src_job, READ_ONLY);",
-            q(&get(source.fields, "host")?)?,
-            q(&get(source.fields, "database")?)?,
-            q(&get(source.secrets, "user")?)?,
-            q(&get(source.secrets, "password")?)?,
-        ))
-    }
-
-    /// The source table's columns, in order, with their types.
+    /// The source table's columns, in order, with the types bronze keeps.
     pub fn source_columns(&self, table: &str) -> Result<Vec<Column>, Error> {
         let mut stmt = self
             .con
             .prepare(&format!("DESCRIBE SELECT * FROM {}", source_table(table)?))?;
-        let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        let rows = stmt.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, bronze_type(&r.get::<_, String>(1)?)))
+        })?;
         rows.collect()
     }
 
@@ -139,15 +124,16 @@ impl Runner {
     ) -> Result<(i64, String), Error> {
         let bronze = bronze_table(namespace, table)?;
         let cut = quote_text(cut).map_err(invalid)?;
-        let mut names = Vec::with_capacity(columns.len());
-        for (name, _) in columns {
+        let (mut names, mut values) = (Vec::new(), Vec::new());
+        for (name, ty) in columns {
             names.push(quoted(name)?);
+            values.push(format!("CAST({} AS {ty})", quoted(name)?));
         }
-        let names = names.join(", ");
+        let (names, values) = (names.join(", "), values.join(", "));
         self.con.execute_batch(&format!(
             "BEGIN;\n\
              DELETE FROM {bronze} WHERE cut = CAST({cut} AS DATE);\n\
-             INSERT INTO {bronze} ({names}, cut) SELECT {names}, CAST({cut} AS DATE) FROM {};\n\
+             INSERT INTO {bronze} ({names}, cut) SELECT {values}, CAST({cut} AS DATE) FROM {};\n\
              COMMIT;",
             source_table(source)?
         ))?;
@@ -172,6 +158,26 @@ mod tests {
             "src.\"public\".\"clients\""
         );
         assert!(source_table("db.public.clients").is_err());
+    }
+
+    #[test]
+    fn bronze_keeps_text_aliases_as_varchar_and_timestamps_in_microseconds() {
+        assert_eq!(bronze_type("MSSQL_VARCHAR(10)"), "VARCHAR");
+        assert_eq!(bronze_type("MSSQL_NVARCHAR(60)"), "VARCHAR");
+        assert_eq!(bronze_type("TIMESTAMP_NS"), "TIMESTAMP");
+        assert_eq!(bronze_type("TIMESTAMP"), "TIMESTAMP", "Oracle's DATE");
+        assert_eq!(bronze_type("DECIMAL(12,2)"), "DECIMAL(12,2)");
+        let runner = Runner::new().unwrap();
+        runner
+            .con
+            .execute_batch(
+                "ATTACH ':memory:' AS src;
+                 CREATE TABLE src.main.clients (id INTEGER, updated TIMESTAMP_NS, code VARCHAR);",
+            )
+            .unwrap();
+        let columns = runner.source_columns("main.clients").unwrap();
+        let types: Vec<_> = columns.iter().map(|(_, t)| t.as_str()).collect();
+        assert_eq!(types, ["INTEGER", "TIMESTAMP", "VARCHAR"]);
     }
 
     #[test]
