@@ -12,9 +12,6 @@ set -a; . ./.env; set +a
 export QD_QUEUE_DATABASE_URL="postgres://qd_queue:${QD_QUEUE_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=disable"
 export QD_API_URL=https://localhost/api QD_CA_FILE="$PWD/infra/traefik/certs/dev-ca.crt"
 export QD_WORKER_CLIENT_ID=qd-worker-dev QD_WORKER_CLIENT_SECRET="$QD_WORKER_DEV_CLIENT_SECRET"
-# Trino's protocol, published on 127.0.0.1 (compose.watch.yml): a source on
-# Trino is listed through its catalog (decision 0048).
-export QD_TRINO_URL=https://127.0.0.1:8490
 # In release, as its image is built: a debug DuckDB asserts on the memory of
 # an extension built for release (postgres, mysql), which an extraction loads
 # (decision 0037, found 2026-10-31).

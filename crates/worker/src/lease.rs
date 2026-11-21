@@ -61,7 +61,7 @@ fn result<E: std::fmt::Display>(
                 JobResult::Failed
             }
         },
-        // Held for Trino's restart: the API put it back, nothing failed.
+        // The API put it back (503): nothing failed.
         Ok(false) if not_now => {
             tracing::info!("the job went back to the queue: {}", api::NotNow);
             JobResult::Cancelled
@@ -109,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn a_job_put_back_for_trino_is_cancelled() {
+    fn a_job_the_api_put_back_is_cancelled() {
         let not_now = Some("the API cannot give the job now (503)");
         assert_eq!(
             result(Finished::Ok(false), not_now, true),

@@ -19,9 +19,15 @@ use uuid::Uuid;
 use crate::job_sources::{self, SourceAccess};
 use crate::mapping::Mapping;
 use crate::source::valid_name;
-use crate::trino_catalog::catalog_name;
 use crate::trino_rules::bronze_schema;
 use crate::worker_api::{job_tenant, WorkerApi};
+
+/// A source's catalog name in Trino, `src_<source>` (decision 0048, point
+/// 1): no source is made a catalog any more (decision 0077), only the
+/// tokens and rules name it, until they go too.
+pub fn catalog_name(source: &str) -> String {
+    format!("src_{source}")
+}
 
 /// A job's token for Trino, as its details carry it. Kept in the worker's
 /// memory only; never printed.
@@ -77,7 +83,7 @@ pub fn resource(source: &str, dataset: Option<&str>) -> String {
 }
 
 /// The dataset an extraction writes, as its `mapping` names it (its bronze
-/// schema, [`crate::trino_extract`]); `None` for any other kind.
+/// schema); `None` for any other kind.
 pub(crate) fn extracted(kind: &str, mapping: Option<&str>) -> Option<String> {
     let mapping = mapping.filter(|_| kind == "extract")?;
     Mapping::parse(mapping).ok().map(|m| m.dataset.value)

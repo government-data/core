@@ -1,8 +1,6 @@
 //! The API as a worker sees it (decisions 0018, 0023): a machine token of
 //! the installation's OIDC provider for the audience `quality-api`, then a
-//! job's details and its report; and, for a source on Trino, Trino's
-//! coordinator (decision 0048), called with the job's own token, never
-//! with this machine's (decision 0062).
+//! job's details and its report.
 //!
 //! The token is asked with the client's secret (development, until the dev
 //! stack moves to certificates), or with the machine's certificate and no
@@ -14,13 +12,11 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use quality::job_trino::TrinoAccess;
 use quality::lake::LakeAccess;
 use quality::worker_api::{JobDetails, AUDIENCE};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use trino_client::TrinoClient;
 use uuid::Uuid;
 
 use crate::machine::MachineHttp;
@@ -61,7 +57,6 @@ pub(crate) struct Api {
     client: Client,
     /// A live token per audience, and when to ask again.
     tokens: Mutex<HashMap<&'static str, (String, Instant)>>,
-    trino: Option<TrinoClient>,
     /// Where this worker reaches the lake, when not where a job says.
     lake_url: Option<String>,
 }
@@ -93,10 +88,8 @@ fn request_id(id: Uuid) -> String {
     format!("{id}.{:016x}", nanos ^ n.rotate_left(32))
 }
 
-/// The API gave no details and said to come back (503): a job on Trino
-/// while Trino is held for its restart went back to the queue, its
-/// attempt not counted (decision 0066, point 9), or something the API
-/// needs did not answer.
+/// The API gave no details and said to come back (503): something the API
+/// needs did not answer, and the job went back to the queue.
 #[derive(Debug)]
 pub(crate) struct NotNow;
 
@@ -123,7 +116,6 @@ impl Api {
             base: base.trim_end_matches('/').to_string(),
             client,
             tokens: Mutex::new(HashMap::new()),
-            trino: None,
             lake_url: None,
         }
     }
@@ -135,17 +127,6 @@ impl Api {
     pub(crate) fn with_lake(mut self, url: String) -> Self {
         self.lake_url = Some(url);
         self
-    }
-
-    /// With Trino's coordinator, for the sources read through it.
-    pub(crate) fn with_trino(mut self, trino: TrinoClient) -> Self {
-        self.trino = Some(trino);
-        self
-    }
-
-    /// Trino's coordinator, if this worker has one.
-    pub(crate) fn trino(&self) -> Option<&TrinoClient> {
-        self.trino.as_ref()
     }
 
     /// The lake's HTTP client, which trusts `QD_CA_FILE` and presents no
@@ -264,11 +245,6 @@ impl Api {
     pub(crate) async fn lake_again(&self, tenant: Uuid, id: Uuid) -> Result<LakeAccess, Failure> {
         let lake = self.job_get(tenant, id, "/lake").await?;
         Ok(reached_at(self.lake_url.as_deref(), lake))
-    }
-
-    /// A job on Trino's token, asked again (decision 0062).
-    pub(crate) async fn trino_again(&self, tenant: Uuid, id: Uuid) -> Result<TrinoAccess, Failure> {
-        self.job_get(tenant, id, "/trino").await
     }
 
     /// A job's report: an evaluation's or an extraction's.

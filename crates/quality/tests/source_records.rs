@@ -1,10 +1,8 @@
 //! A source table's records as asked and reported (decision 0049, point 3),
 //! pure: what can be asked, the page a job reports and how it is masked,
-//! and the statement Trino runs. Synthetic values only.
+//! and how far a page can be. Synthetic values only.
 
-use quality::source_records::{
-    trino_columns, trino_statement, AskError, RecordsAsk, RecordsPage, PAGE,
-};
+use quality::source_records::{AskError, RecordsAsk, RecordsPage, PAGE};
 
 fn ask(table: &str, order: Option<&str>, descending: bool, page: u32) -> RecordsAsk {
     RecordsAsk {
@@ -16,37 +14,21 @@ fn ask(table: &str, order: Option<&str>, descending: bool, page: u32) -> Records
 }
 
 #[test]
-fn trino_reads_a_page_and_one_more_in_the_order_asked() {
+fn a_page_starts_after_the_pages_before_it() {
+    assert_eq!(ask("dbo.clients", None, false, 0).offset(), 0);
     assert_eq!(
-        trino_statement("ledger", &ask("dbo.clients", None, false, 0)).unwrap(),
-        format!(
-            "SELECT * FROM src_ledger.\"dbo\".\"clients\" OFFSET 0 LIMIT {}",
-            PAGE + 1
-        )
+        ask("dbo.clients", Some("id"), true, 2).offset(),
+        2 * u64::from(PAGE)
     );
     assert_eq!(
-        trino_statement("ledger", &ask("dbo.clients", Some("odd\"col"), true, 2)).unwrap(),
-        format!(
-            "SELECT * FROM src_ledger.\"dbo\".\"clients\" ORDER BY \"odd\"\"col\" DESC \
-             OFFSET {} LIMIT {}",
-            2 * PAGE,
-            PAGE + 1
-        )
-    );
-}
-
-#[test]
-fn trino_names_the_tables_columns_in_their_order() {
-    assert_eq!(
-        trino_columns("ledger", &ask("dbo.Clients", None, false, 0)).unwrap(),
-        "SELECT column_name FROM src_ledger.information_schema.columns \
-         WHERE table_schema = 'dbo' AND table_name = 'clients' ORDER BY ordinal_position"
+        ask("dbo.clients", None, false, 0).schema_and_table(),
+        Ok(("dbo", "clients"))
     );
 }
 
 #[test]
 fn what_cannot_be_asked_is_said() {
-    let no_schema = trino_statement("ledger", &ask("clients", None, false, 0));
+    let no_schema = ask("clients", None, false, 0).check();
     assert_eq!(no_schema.unwrap_err(), AskError::Table);
     let three = ask("a.b.c", None, false, 0).check();
     assert_eq!(three.unwrap_err(), AskError::Table);
