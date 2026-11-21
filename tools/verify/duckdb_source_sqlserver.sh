@@ -4,11 +4,12 @@
 # container, a table of invented rows and a read-only login; DuckDB attaches
 # it through the community extension `mssql` (native TDS, no ODBC driver),
 # lists the schema's tables, reads the columns' types and reads rows with
-# filters on decimals, dates and accented text. Then (step 4) the extension
-# is loaded offline from an extension directory, and a case-sensitive filter,
+# filters on decimals, dates and accented text. Then (step 4)
+# the extension is loaded offline from an extension directory, and filters,
 # DISTINCT, GROUP BY and a join run on a case-insensitive column, attached
-# with and without `remote_pushdown false`: with it, each must give DuckDB's
-# answer, not SQL Server's collation's. Run alone (no build at the
+# with and without `remote_pushdown false`. As the user ruled on 2026-11-21
+# (decision 0077 point 8): with the option, filters follow SQL Server's
+# collation, while aggregates, DISTINCT and joins are DuckDB's. Run alone (no build at the
 # same time), from anywhere:
 #
 #   bash tools/verify/duckdb_source_sqlserver.sh
@@ -68,36 +69,40 @@ echo "== The extension from a directory, offline (decision 0077 point 8)"
 ext_install mssql community
 ext_offline mssql
 
-echo "== Case-sensitive filters, with and without remote_pushdown false"
+echo "== Filters follow the server; aggregates, DISTINCT and joins DuckDB's with remote_pushdown false"
 ok "collation of dbo.cased.code: $(sqlserver "SELECT collation_name FROM qs_verify.sys.columns WHERE object_id = OBJECT_ID('qs_verify.dbo.cased') AND name = 'code'" | tr -d '\r')"
-# Each query with what DuckDB gives and what SQL Server's case-insensitive
-# collation gives; the casts point 8 makes into bronze.
+# Each query with what DuckDB gives, what SQL Server's case-insensitive
+# collation gives, and whose answer the ruling wants with the option (the
+# one the reader sets); then the casts point 8 makes into bronze.
 read -r -d '' CHECK2 <<'PY'
 import datetime as dt
+bad = []
+def fail(m):  # goes on, so every case is seen; the run fails at the end
+    bad.append(m); print(f"[FAIL] {m}", flush=True)
 with_option = os.environ["OPTION"] == "on"
 con.execute(os.environ["SECRET_SQL"].replace("@PASSWORD@", os.environ["SRC_PASSWORD"].replace("'", "''")))
 attach = "ATTACH '' AS src (TYPE mssql, SECRET src_secret, READ_ONLY%s)" % (", remote_pushdown false" if with_option else "")
 con.execute(attach)
 ok(f"attached: {attach}")
 t = "src.dbo.cased"
+SERVER, DUCK = "SQL Server's collation", "DuckDB's"
 cases = [
-    ("WHERE code = 'abc'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code = 'abc'", [1], [1, 2, 3]),
-    ("WHERE code LIKE 'a%'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code LIKE 'a%'", [1], [1, 2, 3]),
-    ("WHERE code IN ('abc', 'xyz')", f"SELECT list(id ORDER BY id) FROM {t} WHERE code IN ('abc', 'xyz')", [1, 4], [1, 2, 3, 4]),
-    ("count(DISTINCT code)", f"SELECT count(DISTINCT code) FROM {t}", 4, 2),
-    ("GROUP BY code", f"SELECT count(*) FROM (SELECT code FROM {t} GROUP BY code)", 4, 2),
-    ("a join on code", f"SELECT count(*) FROM {t} a JOIN {t} b ON a.code = b.code", 4, 10),
+    ("WHERE code = 'abc'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code = 'abc'", [1], [1, 2, 3], SERVER),
+    ("WHERE code LIKE 'a%'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code LIKE 'a%'", [1], [1, 2, 3], SERVER),
+    ("WHERE code IN ('abc', 'xyz')", f"SELECT list(id ORDER BY id) FROM {t} WHERE code IN ('abc', 'xyz')", [1, 4], [1, 2, 3, 4], SERVER),
+    ("count(DISTINCT code)", f"SELECT count(DISTINCT code) FROM {t}", 4, 2, DUCK),
+    ("GROUP BY code", f"SELECT count(*) FROM (SELECT code FROM {t} GROUP BY code)", 4, 2, DUCK),
+    ("a join on code", f"SELECT count(*) FROM {t} a JOIN {t} b ON a.code = b.code", 4, 10, DUCK),
 ]
-server, wrong = [], []
-for name, sql, duck, collation in cases:
+server = []
+for name, sql, duck, collation, ruled in cases:
     got = con.execute(sql).fetchone()[0]
-    whose = "DuckDB's" if got == duck else "SQL Server's collation" if got == collation else "neither"
-    line = f"{name}: {got!r}, {whose}"
-    if whose == "SQL Server's collation":
+    whose = DUCK if got == duck else SERVER if got == collation else "neither"
+    if whose == SERVER:
         server.append(name)
-    if with_option and whose != "DuckDB's":
-        wrong.append(name)
-        print(f"[FAIL] {line}", flush=True)
+    line = f"{name}: {got!r}, {whose}"
+    if with_option:
+        ok(f"{line}, as ruled") if whose == ruled else fail(f"{line}, the ruling wants {ruled}")
     else:
         ok(line)
 if not with_option:
@@ -105,11 +110,15 @@ if not with_option:
 con.execute("""CREATE TEMP TABLE bronze AS SELECT CAST(code AS VARCHAR) AS code, CAST(name AS VARCHAR) AS name,
     CAST(updated AS TIMESTAMP) AS updated FROM src.dbo.clients""")
 types = [r[1] for r in con.execute("DESCRIBE bronze").fetchall()]
-ok(f"cast into bronze: {types}") if types == ["VARCHAR", "VARCHAR", "TIMESTAMP"] else ko(f"cast into bronze: {types}")
+ok(f"cast into bronze: {types}") if types == ["VARCHAR", "VARCHAR", "TIMESTAMP"] else fail(f"cast into bronze: {types}")
 got = con.execute("SELECT updated FROM bronze WHERE code = '300'").fetchone()[0]
-ok(f"DATETIME2 as TIMESTAMP: {got}") if got == dt.datetime(2026, 11, 20, 23, 59, 59) else ko(f"DATETIME2 as TIMESTAMP: {got}")
-if wrong:
-    ko(f"with the option, SQL Server's collation still decides: {wrong}")
+ok(f"DATETIME2 as TIMESTAMP: {got}") if got == dt.datetime(2026, 11, 20, 23, 59, 59) else fail(f"DATETIME2 as TIMESTAMP: {got}")
+# Extraction copies first and filters in DuckDB (point 8): DuckDB's answer.
+con.execute(f"CREATE TEMP TABLE copied AS SELECT * FROM {t}")
+got = con.execute("SELECT list(id ORDER BY id) FROM copied WHERE code = 'abc'").fetchone()[0]
+ok(f"copied first, then filtered in DuckDB: {got}") if got == [1] else fail(f"copied first, then filtered in DuckDB: {got}")
+if bad:
+    sys.exit(1)
 PY
 SECRET="CREATE SECRET src_secret (TYPE mssql, host '$MSSQL', port 1433, database 'qs_verify', user 'qs_reader', password '@PASSWORD@', trust_server_certificate true)"
 for option in off on; do

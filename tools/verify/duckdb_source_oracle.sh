@@ -5,8 +5,16 @@
 # DuckDB attaches it through the community extension `oracle_scanner` (Oracle's
 # TNS/TTC protocol spoken by the extension, no Oracle client), lists the
 # schema's tables, reads the columns' types and reads rows with filters on
-# decimals, dates and accented text. Run alone (no build at the same time),
-# from anywhere:
+# decimals, dates and accented text. Then (step 4) the extension is loaded
+# offline from an extension directory; on a session whose NLS_COMP is
+# LINGUISTIC and NLS_SORT BINARY_CI (set by a logon trigger, as a DBA
+# would), filters, DISTINCT, GROUP BY, joins and top-N run on a text column
+# with the extension's pushdown on and off, against the user's ruling of
+# 2026-11-21 (decision 0077 point 8): filters follow the server; aggregates,
+# DISTINCT and joins with pushdown off are DuckDB's. Last, how the extension
+# lists and reads the connected user's tables and another owner's, with
+# SCHEMA at ATTACH and without. Run alone (no build at the same time), from
+# anywhere:
 #
 #   bash tools/verify/duckdb_source_oracle.sh
 #
@@ -56,6 +64,27 @@ WHENEVER SQLERROR EXIT FAILURE
 CREATE USER qs_reader IDENTIFIED BY "$READER";
 GRANT CREATE SESSION TO qs_reader;
 GRANT SELECT ON qs_app.clients TO qs_reader;
+-- Step 4: the reader owns a table too, for the owner checks.
+ALTER USER qs_reader QUOTA 10M ON users;
+CREATE TABLE qs_reader.own_rows (id NUMBER(10) PRIMARY KEY);
+INSERT INTO qs_reader.own_rows VALUES (7);
+-- Step 4: a table of cased codes, and a user whose sessions compare text
+-- ignoring case, by a logon trigger.
+CREATE TABLE qs_app.cased (id NUMBER(10) PRIMARY KEY, code VARCHAR2(10));
+INSERT INTO qs_app.cased VALUES (1, 'abc');
+INSERT INTO qs_app.cased VALUES (2, 'ABC');
+INSERT INTO qs_app.cased VALUES (3, 'Abc');
+INSERT INTO qs_app.cased VALUES (4, 'xyz');
+COMMIT;
+CREATE USER qs_ci IDENTIFIED BY "$READER";
+GRANT CREATE SESSION TO qs_ci;
+GRANT SELECT ON qs_app.cased TO qs_ci;
+CREATE OR REPLACE TRIGGER qs_ci_session AFTER LOGON ON qs_ci.SCHEMA
+BEGIN
+  EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_COMP = LINGUISTIC';
+  EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_SORT = BINARY_CI';
+END;
+/
 SQL
 ok "invented rows: $(printf 'SET HEADING OFF FEEDBACK OFF\nSELECT count(*) FROM clients;\n' | sqlplus qs_app "$APP" | tr -d ' \t\n')"
 
@@ -69,5 +98,99 @@ duckdb_check -e EXT=oracle_scanner -e REPO=community -e SRC_PASSWORD="$READER" \
 echo "== The extension from a directory, offline (decision 0077 point 8)"
 ext_install oracle_scanner community
 ext_offline oracle_scanner
+
+echo "== A case-insensitive session: filters follow the server; aggregates, DISTINCT and joins DuckDB's with pushdown off"
+# Each query with what DuckDB gives, what the session's BINARY_CI gives, and
+# whose answer the ruling wants with pushdown off (what the reader sets).
+read -r -d '' CHECK2 <<'PY'
+bad = []
+def fail(m):  # goes on, so every case is seen; the run fails at the end
+    bad.append(m); print(f"[FAIL] {m}", flush=True)
+off = os.environ["PUSHDOWN"] == "off"
+con.execute(os.environ["SECRET_SQL"].replace("@PASSWORD@", os.environ["SRC_PASSWORD"].replace("'", "''")))
+if off:
+    for s in ("oracle_aggregate_pushdown", "oracle_join_pushdown", "oracle_top_n_pushdown"):
+        con.execute(f"SET {s} = false")
+    ok("SET oracle_aggregate_pushdown, oracle_join_pushdown, oracle_top_n_pushdown = false")
+con.execute("ATTACH 'src_secret' AS src (TYPE oracle_scanner, SCHEMA 'QS_APP', READ_ONLY)")
+oracle = lambda sql: con.execute("SELECT * FROM oracle_query('src_secret', '%s')" % sql.replace("'", "''")).fetchall()
+nls = dict(oracle("SELECT parameter, value FROM nls_session_parameters WHERE parameter IN ('NLS_COMP', 'NLS_SORT')"))
+ok(f"the extension's session: {nls}") if nls == {"NLS_COMP": "LINGUISTIC", "NLS_SORT": "BINARY_CI"} else fail(f"the extension's session: {nls}")
+raw = oracle("SELECT count(*) FROM qs_app.cased WHERE code = 'abc'")[0][0]
+ok(f"Oracle itself, code = 'abc': {raw} rows") if int(raw) == 3 else fail(f"Oracle itself, code = 'abc': {raw} rows, expected 3")
+t = "src.main.cased"
+SERVER, DUCK = "the server's BINARY_CI", "DuckDB's"
+cases = [
+    ("WHERE code = 'abc'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code = 'abc'", [1], [1, 2, 3], SERVER),
+    ("WHERE code LIKE 'a%'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code LIKE 'a%'", [1], [1, 2, 3], SERVER),
+    ("WHERE code IN ('abc', 'xyz')", f"SELECT list(id ORDER BY id) FROM {t} WHERE code IN ('abc', 'xyz')", [1, 4], [1, 2, 3, 4], SERVER),
+    ("WHERE code > 'B'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code > 'B'", [1, 4], [4], SERVER),
+    ("count(DISTINCT code)", f"SELECT count(DISTINCT code) FROM {t}", 4, 2, DUCK),
+    ("GROUP BY code", f"SELECT count(*) FROM (SELECT code FROM {t} GROUP BY code)", 4, 2, DUCK),
+    ("a join on code", f"SELECT count(*) FROM {t} a JOIN {t} b ON a.code = b.code", 4, 10, DUCK),
+    ("a join on id", f"SELECT count(*) FROM {t} a JOIN {t} b ON a.id = b.id", 4, 4, DUCK),
+    ("top-N on id", f"SELECT list(id) FROM (SELECT id FROM {t} ORDER BY id DESC LIMIT 2)", [4, 3], [4, 3], DUCK),
+    ("top-N on code", f"SELECT list(code) FROM (SELECT code FROM {t} ORDER BY code, id LIMIT 2)", ["ABC", "Abc"], ["abc", "ABC"], DUCK),
+]
+for name, sql, duck, server, ruled in cases:
+    got = con.execute(sql).fetchone()[0]
+    whose = "both" if duck == server == got else DUCK if got == duck else SERVER if got == server else "neither"
+    line = f"{name}: {got!r}, {whose}"
+    if not off:
+        ok(line)
+    else:
+        ok(f"{line}, as ruled") if whose in (ruled, "both") else fail(f"{line}, the ruling expects {ruled}")
+if bad:
+    sys.exit(1)
+PY
+SECRET_CI="CREATE SECRET src_secret (TYPE oracle, HOST '$ORA', PORT 1521, SERVICE_NAME 'FREEPDB1', USER 'qs_ci', PASSWORD '@PASSWORD@')"
+for pushdown in on off; do
+  echo "-- the extension's pushdown of aggregates, joins and top-N: $pushdown"
+  ext_check oracle_scanner -e PUSHDOWN=$pushdown -e SRC_PASSWORD="$READER" -e SECRET_SQL="$SECRET_CI"
+done
+
+echo "== Owners: the connected user's tables and another owner's"
+# qs_reader owns OWN_ROWS and may select QS_APP.CLIENTS. For each ATTACH,
+# what duckdb_tables() lists, before and after the reads, and which names
+# read.
+read -r -d '' CHECK2 <<'PY'
+bad = []
+def fail(m):
+    bad.append(m); print(f"[FAIL] {m}", flush=True)
+con.execute(os.environ["SECRET_SQL"].replace("@PASSWORD@", os.environ["SRC_PASSWORD"].replace("'", "''")))
+names = ["src.own_rows", "src.main.own_rows", "src.QS_READER.own_rows", "src.qs_reader.own_rows",
+         "src.clients", "src.main.clients", "src.QS_APP.clients", "src.qs_app.clients"]
+# What the extension documents: main is the default owner (the connected
+# user, or SCHEMA's), and every owner reads by its name.
+expected = {
+    "": {"src.main.own_rows", "src.QS_READER.own_rows", "src.QS_APP.clients"},
+    "QS_APP": {"src.main.clients", "src.QS_APP.clients", "src.QS_READER.own_rows"},
+    "QS_READER": {"src.main.own_rows", "src.QS_READER.own_rows", "src.QS_APP.clients"},
+}
+listed = lambda: [r[0] for r in con.execute(
+    "SELECT schema_name || '.' || table_name FROM duckdb_tables() WHERE database_name = 'src' ORDER BY 1").fetchall()]
+for schema in ["", "QS_APP", "QS_READER"]:
+    option = f", SCHEMA '{schema}'" if schema else ""
+    attach = f"ATTACH 'src_secret' AS src (TYPE oracle_scanner{option}, READ_ONLY)"
+    con.execute(attach)
+    ok(f"{attach}: duckdb_tables() lists {listed()}")
+    ok("  duckdb_schemas(): %s" % [r[0] for r in con.execute(
+        "SELECT schema_name FROM duckdb_schemas() WHERE database_name = 'src' ORDER BY 1").fetchall()])
+    reads = set()
+    for n in names:
+        try:
+            c = con.execute(f"SELECT count(*) FROM {n}").fetchone()[0]
+            reads.add(n); ok(f"  {n} reads, {c} rows")
+        except Exception as e:
+            ok(f"  {n} does not read: {str(e).splitlines()[0][:100]}")
+    missing = expected[schema] - reads
+    fail(f"  expected to read {sorted(missing)}") if missing else ok(f"  reads {sorted(expected[schema])}, as documented")
+    ok(f"  duckdb_tables() after the reads: {listed()}")
+    con.execute("DETACH src")
+if bad:
+    sys.exit(1)
+PY
+SECRET="CREATE SECRET src_secret (TYPE oracle, HOST '$ORA', PORT 1521, SERVICE_NAME 'FREEPDB1', USER 'qs_reader', PASSWORD '@PASSWORD@')"
+ext_check oracle_scanner -e SRC_PASSWORD="$READER" -e SECRET_SQL="$SECRET"
 
 verdict "Oracle"
