@@ -224,8 +224,14 @@ jobs:
 
   # The images, built as a release builds them but not pushed: a Dockerfile
   # that no longer matches the workspace fails here, not at release time.
-  # On GitHub's runners (they have Docker and the Actions cache), with no
-  # secrets: the token only reads.
+  # On GitHub's runners (they have Docker), with no secrets: the token only
+  # reads.
+  #
+  # The API image has no Actions cache: a release build with DuckDB would add
+  # gigabytes to the repository's 10 GB and evict the backend's Rust caches.
+  # It only has to prove the image builds, and runs only when its inputs
+  # change. The runner's disk is freed first: a release build with DuckDB can
+  # need more than the free space an ubuntu-latest runner starts with.
   image-api:
     needs: check
     if: ${{ needs.check.outputs.image-api == 'true' }}
@@ -233,6 +239,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc "$RUNNER_TOOL_CACHE"
+          df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build the API image
@@ -241,8 +252,9 @@ jobs:
           context: .
           file: infra/docker/api.Dockerfile
           push: false
-          cache-from: type=gha,scope=image-api
-          cache-to: type=gha,scope=image-api,mode=max
+
+  # The web image keeps a small Actions cache (about 180 MB), deleted with the
+  # PR's other caches when it closes (cache-cleanup.yml).
 
   image-web:
     needs: check

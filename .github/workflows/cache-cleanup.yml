@@ -1,0 +1,33 @@
+name: Cache cleanup
+
+# When a PR closes (merged or not), delete the Actions caches of its merge ref:
+# no other run can read them, and they count against the repository's 10 GB.
+# Not a required check and not part of `ci`: a fork's PR gets a read-only
+# token, so the deletion may be refused without failing anything.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  actions: write
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the PR's caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          ids=$(gh cache list --ref "$REF" --limit 1000 --json id --jq '.[].id') || {
+            echo "Could not list the caches of $REF"; exit 0
+          }
+          if [ -z "$ids" ]; then
+            echo "No caches for $REF"; exit 0
+          fi
+          for id in $ids; do
+            gh cache delete "$id" || echo "Could not delete cache $id"
+          done
