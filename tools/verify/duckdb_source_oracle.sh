@@ -9,9 +9,10 @@
 # offline from an extension directory; on a session whose NLS_COMP is
 # LINGUISTIC and NLS_SORT BINARY_CI (set by a logon trigger, as a DBA
 # would), filters, DISTINCT, GROUP BY, joins and top-N run on a text column
-# with the extension's pushdown on and off, against the user's ruling of
-# 2026-11-21 (decision 0077 point 8): filters follow the server; aggregates,
-# DISTINCT and joins with pushdown off are DuckDB's. Last, how the extension
+# with the extension's pushdown on and off, against the user's rulings of
+# 2026-11-21 (decision 0077 point 8): through the extension, filters,
+# aggregates, DISTINCT and joins are DuckDB's, with aggregate and join
+# pushdown off as the reader sets them. Last, how the extension
 # lists and reads the connected user's tables and another owner's, with
 # SCHEMA at ATTACH and without. Run alone (no build at the same time), from
 # anywhere:
@@ -99,9 +100,10 @@ echo "== The extension from a directory, offline (decision 0077 point 8)"
 ext_install oracle_scanner community
 ext_offline oracle_scanner
 
-echo "== A case-insensitive session: filters follow the server; aggregates, DISTINCT and joins DuckDB's with pushdown off"
-# Each query with what DuckDB gives, what the session's BINARY_CI gives, and
-# whose answer the ruling wants with pushdown off (what the reader sets).
+echo "== A case-insensitive session: filters, aggregates, DISTINCT and joins are DuckDB's"
+# Each query with what DuckDB gives and what the session's BINARY_CI gives;
+# the ruling wants DuckDB's, checked with aggregate and join pushdown off
+# (what the reader sets; top-N pushdown stays on, as it changes nothing).
 read -r -d '' CHECK2 <<'PY'
 bad = []
 def fail(m):  # goes on, so every case is seen; the run fails at the end
@@ -109,9 +111,9 @@ def fail(m):  # goes on, so every case is seen; the run fails at the end
 off = os.environ["PUSHDOWN"] == "off"
 con.execute(os.environ["SECRET_SQL"].replace("@PASSWORD@", os.environ["SRC_PASSWORD"].replace("'", "''")))
 if off:
-    for s in ("oracle_aggregate_pushdown", "oracle_join_pushdown", "oracle_top_n_pushdown"):
+    for s in ("oracle_aggregate_pushdown", "oracle_join_pushdown"):
         con.execute(f"SET {s} = false")
-    ok("SET oracle_aggregate_pushdown, oracle_join_pushdown, oracle_top_n_pushdown = false")
+    ok("SET oracle_aggregate_pushdown, oracle_join_pushdown = false")
 con.execute("ATTACH 'src_secret' AS src (TYPE oracle_scanner, SCHEMA 'QS_APP', READ_ONLY)")
 oracle = lambda sql: con.execute("SELECT * FROM oracle_query('src_secret', '%s')" % sql.replace("'", "''")).fetchall()
 nls = dict(oracle("SELECT parameter, value FROM nls_session_parameters WHERE parameter IN ('NLS_COMP', 'NLS_SORT')"))
@@ -121,10 +123,10 @@ ok(f"Oracle itself, code = 'abc': {raw} rows") if int(raw) == 3 else fail(f"Orac
 t = "src.main.cased"
 SERVER, DUCK = "the server's BINARY_CI", "DuckDB's"
 cases = [
-    ("WHERE code = 'abc'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code = 'abc'", [1], [1, 2, 3], SERVER),
-    ("WHERE code LIKE 'a%'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code LIKE 'a%'", [1], [1, 2, 3], SERVER),
-    ("WHERE code IN ('abc', 'xyz')", f"SELECT list(id ORDER BY id) FROM {t} WHERE code IN ('abc', 'xyz')", [1, 4], [1, 2, 3, 4], SERVER),
-    ("WHERE code > 'B'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code > 'B'", [1, 4], [4], SERVER),
+    ("WHERE code = 'abc'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code = 'abc'", [1], [1, 2, 3], DUCK),
+    ("WHERE code LIKE 'a%'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code LIKE 'a%'", [1], [1, 2, 3], DUCK),
+    ("WHERE code IN ('abc', 'xyz')", f"SELECT list(id ORDER BY id) FROM {t} WHERE code IN ('abc', 'xyz')", [1, 4], [1, 2, 3, 4], DUCK),
+    ("WHERE code > 'B'", f"SELECT list(id ORDER BY id) FROM {t} WHERE code > 'B'", [1, 4], [4], DUCK),
     ("count(DISTINCT code)", f"SELECT count(DISTINCT code) FROM {t}", 4, 2, DUCK),
     ("GROUP BY code", f"SELECT count(*) FROM (SELECT code FROM {t} GROUP BY code)", 4, 2, DUCK),
     ("a join on code", f"SELECT count(*) FROM {t} a JOIN {t} b ON a.code = b.code", 4, 10, DUCK),
@@ -139,13 +141,13 @@ for name, sql, duck, server, ruled in cases:
     if not off:
         ok(line)
     else:
-        ok(f"{line}, as ruled") if whose in (ruled, "both") else fail(f"{line}, the ruling expects {ruled}")
+        ok(f"{line}, as ruled") if whose in (ruled, "both") else fail(f"{line}, the ruling wants {ruled}")
 if bad:
     sys.exit(1)
 PY
 SECRET_CI="CREATE SECRET src_secret (TYPE oracle, HOST '$ORA', PORT 1521, SERVICE_NAME 'FREEPDB1', USER 'qs_ci', PASSWORD '@PASSWORD@')"
 for pushdown in on off; do
-  echo "-- the extension's pushdown of aggregates, joins and top-N: $pushdown"
+  echo "-- the extension's pushdown of aggregates and joins: $pushdown"
   ext_check oracle_scanner -e PUSHDOWN=$pushdown -e SRC_PASSWORD="$READER" -e SECRET_SQL="$SECRET_CI"
 done
 
