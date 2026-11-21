@@ -5,7 +5,6 @@ import {
   filterTables,
   missing,
   refusalText,
-  saveFailure,
   sourceBody,
   tableRef,
   validName,
@@ -60,11 +59,10 @@ describe("names and refusals", () => {
     expect(refusalText({ code: "something_new" })).not.toBe("");
   });
 
-  it("says when Trino did not take the source's catalog", () => {
-    const trino = new QualityError(502, { error: "trino" });
-    expect(saveFailure(trino)).toContain("Trino");
-    expect(deleteRefusal(trino)).toContain("Trino");
-    expect(saveFailure(new QualityError(500, null))).not.toContain("Trino");
+  it("says which datasets keep a source from being deleted", () => {
+    const inUse = new QualityError(409, { datasets: ["loans", "clients"] });
+    expect(deleteRefusal(inUse)).toContain("loans, clients");
+    expect(deleteRefusal(new QualityError(502, null))).toBe(deleteRefusal(new Error("x")));
   });
 });
 

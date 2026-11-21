@@ -15,7 +15,6 @@ const rule = (id: string, field: string, pattern: string, dimension: string): Ru
   fails: `${field} está vacío`,
   skips: null,
   duckdb: "SELECT 1",
-  trino: "SELECT 1",
 });
 
 const out: RulesOut = {

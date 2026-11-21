@@ -13,7 +13,7 @@ import type { JoinToken, MachinesApi } from "./machinesApi";
  * installation (0066 point 16), and a lake pool's node (`lake`), whose token
  * names it and is asked in Settings → Lake (0066 step 11, ruling 1).
  */
-export const JOIN_ROLES = ["worker", "trino-coordinator", "trino-worker", "lake-replica"] as const;
+export const JOIN_ROLES = ["worker", "lake-replica"] as const;
 
 export type JoinRole = (typeof JOIN_ROLES)[number] | "lake";
 

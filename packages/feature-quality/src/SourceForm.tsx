@@ -2,7 +2,7 @@ import { createSignal, For, Show, type Component } from "solid-js";
 import { Modal } from "@knime-orchestador/feature-kit/ui";
 import { QualityError, sourcesApi, type Driver, type Refusal, type SourceView } from "./api";
 import { t } from "./i18n";
-import { fieldLabel, missing, refusalText, saveFailure, sourceBody, validName } from "./sources";
+import { fieldLabel, missing, refusalText, sourceBody, validName } from "./sources";
 
 /**
  * A source's form (decision 0036): its fields come from the driver catalog,
@@ -48,7 +48,7 @@ export const SourceForm: Component<{
     } catch (err) {
       const body = err instanceof QualityError ? (err.body as { errors?: Refusal[] }) : undefined;
       if (body?.errors) setRefusals(body.errors);
-      else setFailed(saveFailure(err));
+      else setFailed(t("quality:common.saveError"));
     } finally {
       setSaving(false);
     }

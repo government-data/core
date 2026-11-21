@@ -56,8 +56,6 @@
     "deleteTitle": "Eliminar la fuente {{name}}",
     "deleteBody": "Se borran sus credenciales, también la versión anterior. No se puede deshacer.",
     "inUse": "No se puede eliminar: la leen estos datasets: {{datasets}}.",
-    "trinoSave": "La fuente quedó guardada, pero Trino no creó su catálogo. Guárdala otra vez para reintentarlo.",
-    "trinoDelete": "Trino no borró el catálogo de la fuente, así que no se eliminó. Inténtalo otra vez.",
     "refusal": {
       "name": "El nombre no es válido.",
       "unknown_driver": "Ese motor no existe.",

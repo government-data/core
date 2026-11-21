@@ -56,8 +56,6 @@
     "deleteTitle": "Delete the source {{name}}",
     "deleteBody": "Its credentials go, the previous version too. This cannot be undone.",
     "inUse": "It cannot be deleted: these datasets read it: {{datasets}}.",
-    "trinoSave": "The source was saved, but Trino did not create its catalog. Save it again to retry.",
-    "trinoDelete": "Trino did not drop the source's catalog, so it was not deleted. Try again.",
     "refusal": {
       "name": "The name is not valid.",
       "unknown_driver": "That engine does not exist.",

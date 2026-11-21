@@ -98,10 +98,8 @@ function MenuFoot(props: { signOut: () => void }) {
         <span class="profile-menu__lang-label">{t("web:shell.theme")}</span>
         <ThemeSwitch />
       </div>
-      {/* The language is hidden while an application without
-          translations is open (AppFrame: app-frame-no-lang). */}
-      <div class="profile-menu__divider profile-menu__language" />
-      <div class="profile-menu__lang profile-menu__language">
+      <div class="profile-menu__divider" />
+      <div class="profile-menu__lang">
         <span class="profile-menu__lang-label">{t("web:shell.language")}</span>
         <LangSwitch onSave={saveLocale} />
       </div>
