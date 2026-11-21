@@ -14,7 +14,9 @@
 # aggregates, DISTINCT and joins are DuckDB's, with aggregate and join
 # pushdown off as the reader sets them. Last, how the extension
 # lists and reads the connected user's tables and another owner's, with
-# SCHEMA at ATTACH and without. Run alone (no build at the same time), from
+# SCHEMA at ATTACH and without, and with an owner typed in lower case (kept
+# as typed by the source form, which says Oracle stores unquoted names in
+# upper case). Run alone (no build at the same time), from
 # anywhere:
 #
 #   bash tools/verify/duckdb_source_oracle.sh
@@ -154,7 +156,8 @@ done
 echo "== Owners: the connected user's tables and another owner's"
 # qs_reader owns OWN_ROWS and may select QS_APP.CLIENTS. For each ATTACH,
 # what duckdb_tables() lists, before and after the reads, and which names
-# read.
+# read. A lower-case owner (`qs_app`) is recorded, not asserted: the reader
+# passes it as typed, so what it reads is what the extension makes of it.
 read -r -d '' CHECK2 <<'PY'
 bad = []
 def fail(m):
@@ -168,10 +171,11 @@ expected = {
     "": {"src.main.own_rows", "src.QS_READER.own_rows", "src.QS_APP.clients"},
     "QS_APP": {"src.main.clients", "src.QS_APP.clients", "src.QS_READER.own_rows"},
     "QS_READER": {"src.main.own_rows", "src.QS_READER.own_rows", "src.QS_APP.clients"},
+    "qs_app": None,
 }
 listed = lambda: [r[0] for r in con.execute(
     "SELECT schema_name || '.' || table_name FROM duckdb_tables() WHERE database_name = 'src' ORDER BY 1").fetchall()]
-for schema in ["", "QS_APP", "QS_READER"]:
+for schema in ["", "QS_APP", "QS_READER", "qs_app"]:
     option = f", SCHEMA '{schema}'" if schema else ""
     attach = f"ATTACH 'src_secret' AS src (TYPE oracle_scanner{option}, READ_ONLY)"
     con.execute(attach)
@@ -185,8 +189,12 @@ for schema in ["", "QS_APP", "QS_READER"]:
             reads.add(n); ok(f"  {n} reads, {c} rows")
         except Exception as e:
             ok(f"  {n} does not read: {str(e).splitlines()[0][:100]}")
-    missing = expected[schema] - reads
-    fail(f"  expected to read {sorted(missing)}") if missing else ok(f"  reads {sorted(expected[schema])}, as documented")
+    if expected[schema] is None:
+        main = "reads" if "src.main.clients" in reads else "does not read"
+        ok(f"  a lower-case owner, as typed: src.main.clients {main}; reads {sorted(reads)}")
+    else:
+        missing = expected[schema] - reads
+        fail(f"  expected to read {sorted(missing)}") if missing else ok(f"  reads {sorted(expected[schema])}, as documented")
     ok(f"  duckdb_tables() after the reads: {listed()}")
     con.execute("DETACH src")
 if bad:

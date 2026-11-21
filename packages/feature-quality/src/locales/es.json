@@ -48,7 +48,7 @@
       "trust_server_certificate": "Confiar en el certificado del servidor"
     },
     "fieldHint": {
-      "owner": "Vacío: el usuario conectado.",
+      "owner": "Vacío: el usuario conectado. Oracle guarda en mayúsculas los nombres sin comillas.",
       "trust_server_certificate": "Aceptar el certificado del servidor sin verificarlo (un servidor autofirmado)."
     },
     "engine": {

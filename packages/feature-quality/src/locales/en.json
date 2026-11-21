@@ -48,7 +48,7 @@
       "trust_server_certificate": "Trust the server certificate"
     },
     "fieldHint": {
-      "owner": "Empty: the connected user.",
+      "owner": "Empty: the connected user. Oracle stores unquoted names in upper case.",
       "trust_server_certificate": "Accept the server certificate without verifying it (a self-signed server)."
     },
     "engine": {
