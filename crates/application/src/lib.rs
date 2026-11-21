@@ -40,8 +40,9 @@ pub use settings::{
     StoredSection,
 };
 pub use updates::{
-    DrainStatus, HistoryEntry, Maintenance, MaintenanceError, UpdatePolicy, UpdateRequest,
-    UpdaterRow, UpdatesError, UpdatesService, UpdatesStore, UpdatesView,
+    DrainStatus, HistoryEntry, Maintenance, MaintenanceError, ModuleWork, ModulesWork,
+    UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError, UpdatesService, UpdatesStore,
+    UpdatesView,
 };
 
 /// Application service exposing the health use case.

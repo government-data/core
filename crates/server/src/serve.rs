@@ -28,6 +28,7 @@ use infrastructure::{
 
 use crate::background::{spawn_background, spawn_scheduler};
 use crate::config::{env_value, public_url_from_env, Config, OAuthSettings};
+use crate::drain_wiring;
 use crate::startup::oidc_provider;
 use crate::updates_wiring;
 use crate::{init_tracing, machines_wiring, settings_wiring, tenants};
@@ -279,6 +280,11 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         callers,
         dolt,
     )?;
+    // What the update agent waits for: each module's own work (0003).
+    let updates = updates.with_modules_work(Arc::new(drain_wiring::CodeModules::of(
+        &modules,
+        drain_wiring::ANSWER_WITHIN,
+    )));
     // The machines: Settings → Execution, the install routes (their own
     // limit) and the route they join with (the login's).
     let machine_routes = machines_wiring::routes(

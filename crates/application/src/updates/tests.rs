@@ -9,7 +9,6 @@ use super::*;
 #[derive(Default)]
 pub(crate) struct MemoryMaintenance {
     pub(crate) current: Mutex<Option<Maintenance>>,
-    pub(crate) drain: Mutex<DrainStatus>,
     pub(crate) row: Mutex<UpdaterRow>,
     pub(crate) history: Mutex<Vec<HistoryEntry>>,
 }
@@ -46,9 +45,6 @@ impl UpdatesStore for MemoryMaintenance {
             }
         }
         Ok(())
-    }
-    async fn drain_status(&self, _horizon: Duration) -> Result<DrainStatus, String> {
-        Ok(*self.drain.lock().unwrap())
     }
     async fn updater(&self) -> Result<UpdaterRow, String> {
         Ok(self.row.lock().unwrap().clone())
@@ -362,5 +358,46 @@ fn drained_means_nothing_half_done() {
     assert!(!d.is_drained());
     d.running = 0;
     d.deploying = 1;
+    assert!(!d.is_drained());
+    d.deploying = 0;
+    d.not_answering = vec!["silent".into()];
+    assert!(
+        !d.is_drained(),
+        "a module that does not answer may be running"
+    );
+}
+
+/// Two modules that answer and one that does not.
+struct Modules;
+
+#[async_trait::async_trait]
+impl ModulesWork for Modules {
+    async fn work(&self, horizon: Duration) -> Vec<(String, Result<ModuleWork, String>)> {
+        assert_eq!(horizon, Duration::from_secs(60));
+        let w = |running, queued, scheduled_soon| ModuleWork {
+            running,
+            queued,
+            scheduled_soon,
+        };
+        vec![
+            ("a".into(), Ok(w(1, 2, 0))),
+            ("b".into(), Ok(w(0, 1, 3))),
+            ("c".into(), Err("timed out".into())),
+        ]
+    }
+}
+
+#[tokio::test]
+async fn the_drain_adds_every_modules_work_and_names_the_silent_ones() {
+    let (updates, _) = service();
+    let nothing = updates.drain_status(Duration::from_secs(60)).await;
+    assert!(nothing.is_drained(), "without modules nothing runs");
+    let updates = updates.with_modules_work(Arc::new(Modules));
+    let d = updates.drain_status(Duration::from_secs(60)).await;
+    assert_eq!(
+        (d.running, d.deploying, d.queued, d.scheduled_soon),
+        (1, 0, 3, 3)
+    );
+    assert_eq!(d.not_answering, ["c"]);
     assert!(!d.is_drained());
 }

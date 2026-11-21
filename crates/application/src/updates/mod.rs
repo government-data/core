@@ -19,17 +19,19 @@ use chrono::Utc;
 use crate::admins::AdminContacts;
 use crate::settings::MailSlot;
 
+mod drain;
 mod policy;
 mod report;
 mod store;
 #[cfg(test)]
 pub(crate) mod tests;
 
+pub use drain::{DrainStatus, ModuleWork, ModulesWork};
 pub use policy::UpdatePolicy;
 pub use report::{DaemonReport, Outcome};
 pub use store::{
-    DrainStatus, HistoryEntry, Maintenance, MaintenanceError, UpdateRequest, UpdaterRow,
-    UpdatesError, UpdatesStore, UpdatesView,
+    HistoryEntry, Maintenance, MaintenanceError, UpdateRequest, UpdaterRow, UpdatesError,
+    UpdatesStore, UpdatesView,
 };
 
 /// If the daemon reports nothing in this time, the page warns that it does
@@ -46,6 +48,8 @@ pub struct UpdatesService {
     store: Arc<dyn UpdatesStore>,
     /// The Settings mail, and whom to tell.
     notices: Option<(MailSlot, Arc<dyn AdminContacts>)>,
+    /// Where the modules' work in flight comes from.
+    modules: Vec<Arc<dyn ModulesWork>>,
 }
 
 impl std::fmt::Debug for UpdatesService {
@@ -59,6 +63,7 @@ impl UpdatesService {
         Self {
             store,
             notices: None,
+            modules: Vec::new(),
         }
     }
 
@@ -66,6 +71,12 @@ impl UpdatesService {
     /// ended.
     pub fn with_notices(mut self, mail: MailSlot, admins: Arc<dyn AdminContacts>) -> Self {
         self.notices = Some((mail, admins));
+        self
+    }
+
+    /// Count the work in flight of the modules `work` answers for too.
+    pub fn with_modules_work(mut self, work: Arc<dyn ModulesWork>) -> Self {
+        self.modules.push(work);
         self
     }
 
@@ -121,8 +132,13 @@ impl UpdatesService {
         Ok(())
     }
 
-    pub async fn drain_status(&self, horizon: Duration) -> Result<DrainStatus, String> {
-        self.store.drain_status(horizon).await
+    /// What every module still runs, and what is due within `horizon`.
+    pub async fn drain_status(&self, horizon: Duration) -> DrainStatus {
+        let mut status = DrainStatus::default();
+        for modules in &self.modules {
+            status.add(modules.work(horizon).await);
+        }
+        status
     }
 
     fn policy_of(row: &UpdaterRow) -> UpdatePolicy {

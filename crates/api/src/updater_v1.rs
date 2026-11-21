@@ -145,13 +145,11 @@ struct DrainQuery {
 }
 
 /// `GET /updater/v1/drain?horizon_secs=N`: `{drained, running, deploying,
-/// scheduled_soon}`, with `queued` and the maintenance in force.
+/// scheduled_soon}`, with `queued`, the modules that did not answer
+/// (`not_answering`) and the maintenance in force.
 async fn drain(State(updates): State<UpdatesService>, Query(q): Query<DrainQuery>) -> Response {
     let horizon = q.horizon_secs.map_or(DEFAULT_HORIZON, Duration::from_secs);
-    let status = match updates.drain_status(horizon).await {
-        Ok(status) => status,
-        Err(e) => return logged_unavailable("drain", &e),
-    };
+    let status = updates.drain_status(horizon).await;
     let maintenance = match updates.active().await {
         Ok(m) => m,
         Err(e) => return logged_unavailable("drain", &e),
@@ -162,6 +160,7 @@ async fn drain(State(updates): State<UpdatesService>, Query(q): Query<DrainQuery
         "deploying": status.deploying,
         "queued": status.queued,
         "scheduled_soon": status.scheduled_soon,
+        "not_answering": &status.not_answering,
         "maintenance": maintenance,
     }))
     .into_response()
