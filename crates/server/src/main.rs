@@ -38,6 +38,7 @@ mod quality;
 mod quality_catalog;
 mod replication_wiring;
 mod serve;
+mod serve_services;
 mod settings_wiring;
 mod startup;
 mod tenants;

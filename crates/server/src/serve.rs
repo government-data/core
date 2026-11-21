@@ -5,41 +5,36 @@
 //! 3. Connect the database pool and run migrations (startup schema check),
 //!    then apply each module's own migrations.
 //! 4. Initialize the modules.
-//! 5. Build the router: health, sign-in, the platform, settings,
-//!    and each module's routes, behind the tenant and language layers.
+//! 5. Build the services ([`serve_services`]) and the router: health,
+//!    sign-in, the platform, settings, and each module's routes, behind the
+//!    tenant and language layers.
 //! 6. Start the HTTP server (and the internal routes, on their own port).
+//!
+//! [`serve_services`]: crate::serve_services
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use application::{
-    Edition, EnvSettings, HealthService, PlatformService, SettingsService, SettingsTargets,
-};
-use auth_gateway::{AuditService, OAuthLoginService, SessionService};
-use auth_gateway::{LoginService, PasswordResetService};
+use api::internal::AdminAccessRoute;
+use application::{Edition, MachinesService};
+use auth_gateway::http::client_cert::ClientCertificates;
+use auth_gateway::{AdminRepository, AuditService, AuthorizationServer};
+use auth_gateway::{LoginService, SessionService};
+use axum::Router;
+use contracts::ModuleRegistry;
 use infrastructure::auth_config::AuthConfig;
-use infrastructure::{
-    Argon2Hasher, OAuthSecrets, PgAdminRepository, PgAuditRepository, PgConfig,
-    PgDirectoryAccounts, PgHealthCheck, PgIpLockoutStore, PgOAuthIdentityRepository,
-    PgPasswordResetStore, PgPendingAuthStore, PgPlatformRepository, PgSessionRepository,
-    PgSettingsStore, ReqwestHttpClient, ResetTokenAdapter, SecretBox, SecureRandomTokens,
-    SystemClock,
-};
+use infrastructure::{PgAuditRepository, PgConfig, ResetTokenAdapter, SecretBox, SystemClock};
 
-use crate::background::{spawn_background, spawn_scheduler};
-use crate::config::{env_value, public_url_from_env, Config, OAuthSettings};
-use crate::drain_wiring;
+use crate::config::{public_url_from_env, Config};
+use crate::serve_services::{services, Services};
 use crate::startup::oidc_provider;
-use crate::updates_wiring;
-use crate::{init_tracing, machines_wiring, settings_wiring, tenants};
+use crate::tenants::Tenancy;
+use crate::{drain_wiring, init_tracing, machines_wiring, tenants};
 
-/// Where the settings key lives when `SETTINGS_ENCRYPTION_KEY` is not set (a
-/// volume; it is generated the first time).
-const DEFAULT_SETTINGS_KEY_FILE: &str = "/var/lib/orquestador/settings/settings.key";
+type Failure = Box<dyn std::error::Error>;
 
 /// Run the HTTP server (the default command).
-#[allow(clippy::too_many_lines)] // TODO(0034): split
-pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) async fn serve() -> Result<(), Failure> {
     init_tracing();
 
     // 1. Configuration from the environment.
@@ -70,185 +65,64 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // 4. Initialize the modules once their schema is in place.
     modules.init()?;
 
-    // 5. The services. The health probe reflects live database connectivity;
-    // the login service verifies admin credentials with argon2id,
-    // constant-time equalization, and progressive account/IP lockout.
-    let health = HealthService::new(Arc::new(PgHealthCheck::new(pool.clone())));
-    let admins: Arc<dyn auth_gateway::AdminRepository> =
-        Arc::new(PgAdminRepository::new(pool.clone()));
-    let platform_repo: Arc<dyn platform::PlatformRepository> =
-        Arc::new(PgPlatformRepository::new(pool.clone()));
-    let login = LoginService::new(
-        admins.clone(),
-        Arc::new(PgIpLockoutStore::new(pool.clone())),
-        Arc::new(Argon2Hasher::new(auth.argon2)?),
-        Arc::new(SystemClock),
-        auth.lockout_policy,
-    );
+    // 5. The services and the routes.
+    let services = services(&tenancy, &auth, edition).await?;
+    let (app, updates, admin_access) = app(services, tenancy, &config, &auth, edition)?;
 
-    // The key that seals the settings' secrets and the global secrets: `SETTINGS_ENCRYPTION_KEY` or, without it, the file in
-    // `SETTINGS_KEY_FILE`.
-    let secret_box = SecretBox::from_env_or_file(
-        env_value("SETTINGS_KEY_FILE").unwrap_or_else(|| DEFAULT_SETTINGS_KEY_FILE.into()),
-    )?;
-    let key_source = secret_box.source();
+    crate::startup::internal_routes(updates, admin_access).await?;
 
-    // The platform: the actor and IAM, secrets and updates.
-    tracing::info!(?edition, "edition");
-    let platform = PlatformService::new(platform_repo.clone())
-        .with_edition(edition)
-        .with_cipher(Arc::new(settings_wiring::Cipher(secret_box.clone())))
-        .with_tokens(Arc::new(infrastructure::ServiceTokenMint));
-    // When what someone can do changes (here, in another replica or directly
-    // in the database), the Actor kept in memory stops being valid (ADR 0013).
-    {
-        let platform = platform.clone();
-        infrastructure::permission_notices::spawn_listener(pool.clone(), move |tenant| {
-            platform.invalidate_permissions(tenant)
-        });
-    }
-    // Update maintenance: while it lasts, no new work starts.
-    let updates = application::UpdatesService::new(Arc::new(updates_wiring::Store(
-        infrastructure::PgMaintenanceStore::new(pool.clone()),
-    )));
-    let platform = platform.with_updates(updates.clone());
-    let sessions = SessionService::new(
-        Arc::new(PgSessionRepository::new(pool.clone())),
-        Arc::new(SecureRandomTokens),
-        Arc::new(SystemClock),
-        auth.session_policy,
+    // 6. Serve. `into_make_service_with_connect_info` records each connection's
+    // peer address so the login handler can fall back to it for per-IP lockout
+    // when no forwarded header is present.
+    let listener = tokio::net::TcpListener::bind(config.socket_addr()).await?;
+    tracing::info!(addr = %listener.local_addr()?, "listening");
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    // Service accounts call the API with their token (ADR 0016).
-    .with_service_tokens(Arc::new(infrastructure::PgServiceTokens::new(pool.clone())));
-    let audit = AuditService::new(Arc::new(PgAuditRepository::new(pool.clone())));
+    .await?;
 
-    // OAuth: the routes are always mounted (with no providers they list none
-    // and answer `404`), so providers added in the settings work at once. The
-    // generic OIDC adapter serves every provider off one shared HTTP client.
-    let http: Arc<dyn infrastructure::HttpClient> = Arc::new(ReqwestHttpClient::new());
-    let env_oauth = OAuthSettings::from_env()?;
-    let (redirect_base, redirects) = OAuthSettings::redirects_from_env();
-    let oauth_service = OAuthLoginService::new(
-        Vec::new(),
-        Arc::new(PgPendingAuthStore::new(pool.clone())),
-        Arc::new(PgOAuthIdentityRepository::new(pool.clone())),
-        Arc::new(PgAdminRepository::new(pool.clone())),
-        Arc::new(OAuthSecrets),
-        Arc::new(SystemClock),
-        redirect_base,
-    );
+    Ok(())
+}
 
-    // The system settings (LDAP, mail, OAuth), edited from the UI and applied
-    // live. What was never stored takes `LDAP_*` / `OAUTH_*` from the
-    // environment.
-    let settings = SettingsService::new(
-        Arc::new(settings_wiring::Store(PgSettingsStore::new(pool.clone()))),
-        Arc::new(settings_wiring::Cipher(secret_box.clone())),
-        Arc::new(settings_wiring::Connectors { http: http.clone() }),
-        SettingsTargets {
-            directory: login.directory_slot(),
-            directory_accounts: Arc::new(PgDirectoryAccounts::new(pool.clone())),
-            oauth: oauth_service.clone(),
-        },
-        EnvSettings {
-            ldap: settings_wiring::ldap_from_env()?,
-            oauth: env_oauth
-                .as_ref()
-                .and_then(|o| settings_wiring::oauth_from_env(&o.providers)),
-            reset_link_minutes: auth.password_reset_ttl.as_secs() / 60,
-        },
-    )
-    .with_key_source(match key_source {
-        infrastructure::KeySource::Environment => "environment",
-        infrastructure::KeySource::File => "file",
-        infrastructure::KeySource::Generated => "generated",
-    });
-    settings.init().await?;
-    let (captcha, _) = settings_wiring::captcha_from_env()?;
-    // The background round of every tenant (the platform mail), once the
-    // settings are loaded.
-    spawn_background(
-        settings.clone(),
-        tenancy.directory.clone(),
-        tenancy.cell.clone(),
-    );
-    // The schedules (decision 0035): only the VM holding the lock fires.
-    spawn_scheduler(
-        pool.clone(),
-        tenancy.directory.clone(),
-        tenancy.cell.clone(),
-    );
-    // Every new version and how each attempt ended, emailed to the
-    // administrators (the daemon reports it through the internal routes).
-    let updates = updates.with_notices(
-        settings.mailer(),
-        Arc::new(application::PlatformAdmins(platform_repo.clone())),
-    );
-    tracing::info!(
-        ldap = settings.ldap().value.enabled,
-        mail = settings.mail().value.enabled,
-        oauth_providers = oauth_service.provider_ids().len(),
-        key = ?key_source,
-        "system settings applied"
-    );
-    // The security notices to each account (it was locked, a provider was
-    // linked or unlinked) go out with the settings' mail.
-    let login = login.with_mail(settings.mailer());
-    let oauth_service = oauth_service.with_mail(settings.mailer());
-    let oauth = Some((oauth_service, redirects));
-
-    // Password recovery: a link by email (the settings' mail) that expires
-    // after `PASSWORD_RESET_TTL_MINUTES`. On-premise the link points to the
-    // configured public address; online, to the subdomain of the company
-    // that asked for it (the tenant middleware already rejected any other).
-    let password_reset = PasswordResetService::new(
-        admins.clone(),
-        Arc::new(PgPasswordResetStore::new(pool.clone())),
-        Arc::new(ResetTokenAdapter),
-        Arc::new(Argon2Hasher::new(auth.argon2)?),
-        Arc::new(SystemClock),
-        settings.mailer(),
-        auth.password_policy,
-        auth.password_reset_ttl,
-    );
-    let reset_links = match edition {
-        Edition::OnPremise => api::password_reset::ResetLinkBase::Fixed(public_url_from_env()),
-        Edition::Online => api::password_reset::ResetLinkBase::FromHost,
-    };
-    // The administrator's entry from the server (internal routes): on-premise
-    // only, where there is one company and a fixed public address.
-    let admin_access = (edition == Edition::OnPremise).then(|| api::internal::AdminAccessRoute {
-        service: password_reset.clone(),
-        audit: audit.clone(),
-        link_base: public_url_from_env(),
-    });
-
-    // Online, the common entrance (entrar.<domain>): the email and the
-    // password, without the company's address.
-    let central = match (&tenancy.directory, &tenancy.domain) {
-        (Some(directory), Some(domain)) => Some(api::central::routes(
-            auth_gateway::CentralLoginService::new(
-                login.clone(),
-                directory.clone(),
-                Arc::new(infrastructure::PgLoginHandoffs::new(pool.clone())),
-                admins.clone(),
-                Arc::new(ResetTokenAdapter),
-                Arc::new(SystemClock),
-                tenancy.cell.clone(),
-                domain.clone(),
-            )
-            .with_audit(audit.clone()),
-            sessions.clone(),
-            audit.clone(),
-            auth.login_rate_limit,
-        )),
-        _ => None,
-    };
+/// The routes on the services, and what the internal routes need: the
+/// updates and the administrator's entry.
+fn app(
+    services: Services,
+    tenancy: Tenancy,
+    config: &Config,
+    auth: &AuthConfig,
+    edition: Edition,
+) -> Result<
+    (
+        Router,
+        application::UpdatesService,
+        Option<AdminAccessRoute>,
+    ),
+    Failure,
+> {
+    let Services {
+        health,
+        admins,
+        login,
+        secret_box,
+        platform,
+        updates,
+        sessions,
+        audit,
+        oauth,
+        settings,
+        captcha,
+        password_reset,
+        admin_access,
+    } = services;
+    let central = central(&tenancy, &login, &admins, &sessions, &audit, auth);
     // The gateway as an OIDC provider (with OIDC_SIGNING_KEY): the
     // applications registered with `server oidc-client` let their users in
     // with this installation's accounts.
     let oidc_issuer = format!("{}/api", public_url_from_env().trim_end_matches('/'));
-    let provider = infrastructure::oidc::provider_from_env(&pool, admins.clone(), &oidc_issuer)?;
+    let provider =
+        infrastructure::oidc::provider_from_env(&tenancy.pool, admins.clone(), &oidc_issuer)?;
     let certificates = machines_wiring::client_certificates_from_env()?;
     let oidc = oidc_provider(
         provider.clone(),
@@ -260,26 +134,7 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // Who the session is, for every route that requires a capability: the
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
-    let dolt = crate::catalog_wiring::DoltSnapshots::from_env()?;
-    let machines = machines_wiring::service(
-        &pool,
-        provider.clone(),
-        (&tenancy).into(),
-        secret_box.clone(),
-    )?;
-    let machines = match &dolt {
-        Some(d) => machines.with_dolt(d.clone()),
-        None => machines,
-    };
-    let callers = machines_wiring::certificate_callers(&certificates, &machines);
-    let modules = crate::modules::serving(
-        &pool,
-        provider,
-        secret_box.clone(),
-        (&tenancy).into(),
-        callers,
-        dolt,
-    )?;
+    let (machines, modules) = machines_and_modules(&tenancy, provider, &secret_box, &certificates)?;
     // What the update agent waits for: each module's own work (0003).
     let updates = updates.with_modules_work(Arc::new(drain_wiring::CodeModules::of(
         &modules,
@@ -296,7 +151,7 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let module_users = crate::callers::user_routes(
         &modules,
         sessions.clone(),
-        Arc::new(PgAuditRepository::new(pool.clone())),
+        Arc::new(PgAuditRepository::new(tenancy.pool.clone())),
     );
     let app = modules
         .router(api::router(
@@ -308,7 +163,7 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
             oauth,
             platform,
             Some(settings),
-            Some((password_reset, reset_links)),
+            Some(password_reset),
             config.cors_allowed_origins(),
             auth.login_rate_limit,
         ))
@@ -325,9 +180,86 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         None => app,
     };
     let app = app.layer(axum::Extension(resolver));
+    Ok((
+        layered(app, tenancy, oidc, captcha, machines),
+        updates,
+        admin_access,
+    ))
+}
+
+/// Online, the common entrance (entrar.<domain>): the email and the
+/// password, without the company's address.
+fn central(
+    tenancy: &Tenancy,
+    login: &LoginService,
+    admins: &Arc<dyn AdminRepository>,
+    sessions: &SessionService,
+    audit: &AuditService,
+    auth: &AuthConfig,
+) -> Option<Router> {
+    let (Some(directory), Some(domain)) = (&tenancy.directory, &tenancy.domain) else {
+        return None;
+    };
+    Some(api::central::routes(
+        auth_gateway::CentralLoginService::new(
+            login.clone(),
+            directory.clone(),
+            Arc::new(infrastructure::PgLoginHandoffs::new(tenancy.pool.clone())),
+            admins.clone(),
+            Arc::new(ResetTokenAdapter),
+            Arc::new(SystemClock),
+            tenancy.cell.clone(),
+            domain.clone(),
+        )
+        .with_audit(audit.clone()),
+        sessions.clone(),
+        audit.clone(),
+        auth.login_rate_limit,
+    ))
+}
+
+/// The machines (with the catalog, `DOLT_URL`) and the feature modules with
+/// the services their routes use.
+fn machines_and_modules(
+    tenancy: &Tenancy,
+    provider: Option<AuthorizationServer>,
+    secret_box: &SecretBox,
+    certificates: &ClientCertificates,
+) -> Result<(MachinesService, ModuleRegistry), Failure> {
+    let dolt = crate::catalog_wiring::DoltSnapshots::from_env()?;
+    let machines = machines_wiring::service(
+        &tenancy.pool,
+        provider.clone(),
+        tenancy.into(),
+        secret_box.clone(),
+    )?;
+    let machines = match &dolt {
+        Some(d) => machines.with_dolt(d.clone()),
+        None => machines,
+    };
+    let callers = machines_wiring::certificate_callers(certificates, &machines);
+    let modules = crate::modules::serving(
+        &tenancy.pool,
+        provider,
+        secret_box.clone(),
+        tenancy.into(),
+        callers,
+        dolt,
+    )?;
+    Ok((machines, modules))
+}
+
+/// The layers around every route, modules included.
+fn layered(
+    app: Router,
+    tenancy: Tenancy,
+    oidc: Option<Router>,
+    captcha: api::captcha::Captcha,
+    machines: MachinesService,
+) -> Router {
     // This installation's applications, for the avatar's «Aplicaciones».
     let app = app.layer(axum::Extension(api::settings::LocalApps(Arc::new(
-        infrastructure::oidc::PgOidcClients::new(pool.clone()),
+        infrastructure::oidc::PgOidcClients::new(tenancy.pool.clone()),
     ))));
     let app = match oidc {
         Some(provider) => app.merge(provider),
@@ -345,7 +277,7 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // Each request counted by its route's template, and its metrics file
     // (decision 0071), with the approved machines' gauge (0072).
     let metrics = crate::metrics_wiring::start(
-        pool.clone(),
+        tenancy.pool.clone(),
         tenancy.directory.clone(),
         tenancy.cell.clone(),
         machines,
@@ -356,22 +288,7 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     ));
     // Outside it, every request's id and span: the modules' routes too,
     // merged after `api::router` put its own (which then only passes on).
-    let app = app.layer(axum::middleware::from_fn(
+    app.layer(axum::middleware::from_fn(
         http_kit::telemetry::request_context,
-    ));
-
-    crate::startup::internal_routes(updates, admin_access).await?;
-
-    // 6. Serve. `into_make_service_with_connect_info` records each connection's
-    // peer address so the login handler can fall back to it for per-IP lockout
-    // when no forwarded header is present.
-    let listener = tokio::net::TcpListener::bind(config.socket_addr()).await?;
-    tracing::info!(addr = %listener.local_addr()?, "listening");
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await?;
-
-    Ok(())
+    ))
 }
