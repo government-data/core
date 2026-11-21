@@ -53,11 +53,14 @@ impl Runner {
     /// Installs the extensions a job needs in DuckDB's extension
     /// directory, so it loads them without fetching anything: the lake's
     /// (`iceberg`, the `avro` it loads, `httpfs`) and each source driver's
-    /// ([`Runner::attach_source`]: `postgres`, `mysql`). The worker's image
-    /// does it once, when it is built.
+    /// ([`Runner::attach_source`]: `postgres`, `mysql`, and the community's
+    /// `mssql` and `oracle_scanner`). The worker's image does it once, when
+    /// it is built, and checks each source extension's hash (decision 0077
+    /// point 8).
     pub fn install_extensions() -> Result<(), Error> {
         Runner::new()?.con.execute_batch(
-            "INSTALL avro; INSTALL iceberg; INSTALL httpfs; INSTALL postgres; INSTALL mysql;",
+            "INSTALL avro; INSTALL iceberg; INSTALL httpfs; INSTALL postgres; INSTALL mysql;\n\
+             INSTALL mssql FROM community; INSTALL oracle_scanner FROM community;",
         )
     }
 

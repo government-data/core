@@ -38,11 +38,10 @@ pub(crate) struct Plan {
     started: Instant,
 }
 
-/// A runner with the job's source attached (its current credentials, then
-/// the previous ones if refused) and the lake, locked down.
 /// A runner with the job's source attached, read-only: its current
-/// credentials, then the previous ones if refused (decision 0030). `stage`
-/// names the job in its errors.
+/// credentials, then the previous ones if refused (decision 0030), its
+/// extensions loaded offline from the image's directory (decision 0077).
+/// `stage` names the job in its errors.
 pub(crate) fn with_source(job: &JobDetails, stage: &str) -> Result<Runner, Failed> {
     let source = job
         .source
@@ -55,14 +54,25 @@ pub(crate) fn with_source(job: &JobDetails, stage: &str) -> Result<Runner, Faile
             source.name
         ))
     };
+    let dir = crate::config::extension_directory()
+        .ok_or_else(|| failed(format!("{stage}: the worker has no extension directory")))?;
     let mut runner = Runner::new().map_err(engine("starting"))?;
+    runner
+        .set_extension_directory(&dir)
+        .map_err(engine("setting the extension directory"))?;
+    // An Oracle source's owner; left out, the connected user (decision
+    // 0077 point 8).
+    let owner = source.fields.get("owner").map(String::as_str);
     let mut attach = |secrets| {
-        runner.attach_source(&SourceConnection {
-            driver: &source.driver,
-            fields: &source.fields,
-            secrets,
-            default_port,
-        })
+        runner.attach_source_as(
+            &SourceConnection {
+                driver: &source.driver,
+                fields: &source.fields,
+                secrets,
+                default_port,
+            },
+            owner.filter(|_| source.driver == "oracle"),
+        )
     };
     if attach(&source.secrets).is_err() {
         let previous = source.previous.as_ref().ok_or_else(refused)?;

@@ -1,18 +1,21 @@
 //! A source attached for a job (decisions 0036 and 0077): read-only, through
 //! its driver's DuckDB extension, `src` to every reader (listing, profile,
-//! records, extraction). With an extension directory set, every extension
-//! loads from it and nothing is installed (decision 0077 point 8,
-//! `tools/verify/duckdb_source_*.sh`); without one, only `postgres` and
-//! `mysql` attach, installed as before, until the worker ships them all.
+//! records, extraction). Every extension loads from the extension
+//! directory the worker's image fills, and nothing is installed at run time
+//! (decision 0077 point 8, `tools/verify/duckdb_source_*.sh`): without one
+//! set, no source attaches.
 //!
 //! What is the server's and what is DuckDB's (decision 0077 point 8): SQL
 //! Server is attached with `remote_pushdown false`, so aggregates,
-//! `DISTINCT` and joins are DuckDB's while filters follow its collation;
+//! `DISTINCT` and joins are DuckDB's while filters follow its collation,
+//! its certificate verified unless the source's `trust_server_certificate`
+//! is set;
 //! Oracle with `oracle_scanner`'s aggregate and join pushdown off, and its
 //! owner as the attachment's `main`.
 
 use std::collections::BTreeMap;
 
+use quality::source::flag;
 use quality_rules_sql::quote_text;
 
 use crate::{invalid, Error, Runner, SourceConnection};
@@ -76,15 +79,12 @@ fn attach_sql(
             source.driver
         )));
     }
-    let load = match (offline, ext) {
-        (true, _) => format!("LOAD {ext};"),
-        (false, "postgres" | "mysql") => format!("INSTALL {ext}; LOAD {ext};"),
-        (false, _) => {
-            return Err(invalid(format!(
-                "{ext} loads only from an extension directory"
-            )))
-        }
-    };
+    if !offline {
+        return Err(invalid(format!(
+            "{ext} loads only from an extension directory"
+        )));
+    }
+    let load = format!("LOAD {ext};");
     let q = |t: &str| quote_text(t).map_err(invalid);
     let get = |m: &BTreeMap<String, String>, k: &str| {
         m.get(k)
@@ -103,10 +103,11 @@ fn attach_sql(
     let attach = match source.driver {
         "sqlserver" => format!(
             "CREATE OR REPLACE SECRET src_job (TYPE mssql, host {host}, port {port}, \
-             database {}, user {}, password {password});\n\
+             database {}, user {}, password {password}, trust_server_certificate {});\n\
              ATTACH '' AS src (TYPE mssql, SECRET src_job, READ_ONLY, remote_pushdown false);",
             q(&get(source.fields, "database")?)?,
             q(&user)?,
+            flag(source.fields, "trust_server_certificate"),
         ),
         "oracle" => {
             // Oracle keeps an unquoted user name in upper case.
@@ -167,7 +168,32 @@ mod tests {
         assert!(s.starts_with("LOAD mssql;"), "{s}");
         assert!(s.contains("TYPE mssql, host 'db.example', port 1000, database 'core'"));
         assert!(s.contains("READ_ONLY, remote_pushdown false)"));
+        assert!(
+            s.contains("trust_server_certificate false)"),
+            "verified unless set"
+        );
         assert!(!s.contains("INSTALL"));
+    }
+
+    #[test]
+    fn sql_server_trusts_its_certificate_only_when_the_source_says_so() {
+        let fields = map(&[
+            ("host", "db.example"),
+            ("database", "core"),
+            ("trust_server_certificate", "true"),
+        ]);
+        let secrets = map(&[("user", "qs_reader"), ("password", "synthetic")]);
+        let source = SourceConnection {
+            driver: "sqlserver",
+            fields: &fields,
+            secrets: &secrets,
+            default_port: Some(1433),
+        };
+        let s = attach_sql(&source, None, true).unwrap();
+        assert!(
+            s.contains("password 'synthetic', trust_server_certificate true)"),
+            "{s}"
+        );
     }
 
     #[test]
@@ -187,20 +213,23 @@ mod tests {
     }
 
     #[test]
-    fn postgres_and_mysql_install_only_without_an_extension_directory() {
+    fn postgres_and_mysql_load_offline_too() {
         for driver in ["postgres", "mysql"] {
-            let offline = sql(driver, None, true).unwrap();
-            assert!(offline.starts_with(&format!("LOAD {driver};")));
-            assert!(!offline.contains("INSTALL"));
-            let online = sql(driver, None, false).unwrap();
-            assert!(online.starts_with(&format!("INSTALL {driver}; LOAD {driver};")));
+            let s = sql(driver, None, true).unwrap();
+            assert!(s.starts_with(&format!("LOAD {driver};")), "{s}");
+            assert!(!s.contains("INSTALL"));
+            assert!(!s.contains("trust_server_certificate"));
         }
     }
 
     #[test]
     fn what_cannot_be_attached_is_refused() {
-        assert!(sql("sqlserver", None, false).is_err(), "never installed");
-        assert!(sql("oracle", None, false).is_err(), "never installed");
+        for driver in ["postgres", "mysql", "sqlserver", "oracle"] {
+            assert!(
+                sql(driver, None, false).is_err(),
+                "{driver}: never installed"
+            );
+        }
         assert!(sql("postgres", Some("HR"), true).is_err(), "no owner");
         assert!(sql("sqlserver", Some("dbo"), true).is_err(), "no owner");
         assert!(sql("openedge", None, true).is_err());
