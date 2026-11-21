@@ -219,6 +219,15 @@ pub async fn get(pool: &PgPool, id: Uuid) -> Result<Option<StoredSchedule>, sqlx
     Ok(row.map(StoredSchedule::from))
 }
 
+/// The platform's time zone (decision 0079): what it saved in Settings, or
+/// UTC when it saved none or one that does not parse.
+pub async fn platform_timezone(pool: &PgPool) -> Result<String, sqlx::Error> {
+    let saved: Option<String> = sqlx::query_scalar("SELECT public.platform_timezone()")
+        .fetch_one(pool)
+        .await?;
+    Ok(schedule_core::timezone_or_utc(saved.as_deref()))
+}
+
 /// Saves a new schedule, already checked, with its first fire.
 pub async fn create(
     pool: &PgPool,

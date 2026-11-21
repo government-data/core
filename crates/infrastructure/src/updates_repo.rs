@@ -45,6 +45,15 @@ impl PgMaintenanceStore {
         Self { pool }
     }
 
+    /// The platform's time zone as saved (`public.platform_timezone()`,
+    /// decision 0079), `None` when it never was.
+    pub async fn platform_timezone(&self) -> Result<Option<String>, String> {
+        sqlx::query_scalar("SELECT public.platform_timezone()")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(db)
+    }
+
     pub async fn maintenance(&self) -> Result<Option<MaintenanceRow>, String> {
         sqlx::query_as("SELECT reason, started_at, until FROM orq_maintenance")
             .fetch_optional(&self.pool)

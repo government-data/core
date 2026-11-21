@@ -178,7 +178,8 @@ async fn a_steward_creates_edits_and_deletes_a_schedule_audited() {
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(
         (made["timezone"].as_str(), made["rerun"].as_str()),
-        (Some("America/Bogota"), Some("block"))
+        (Some("UTC"), Some("block")),
+        "without the platform's time zone, UTC"
     );
     assert!(made["next_fire_at"].is_string(), "its first fire");
     let uri = format!("/quality/schedules/{}", made["id"].as_str().unwrap());
@@ -318,4 +319,26 @@ async fn a_schedule_with_cuts_is_disabled_not_deleted() {
         (status, out["error"].as_str()),
         (StatusCode::CONFLICT, Some("has_cuts"))
     );
+}
+
+#[tokio::test]
+async fn a_schedule_without_a_time_zone_takes_the_platforms() {
+    let f = fixture().await;
+    sqlx::query(
+        "INSERT INTO system_settings (section, data) VALUES ('platform', '{\"timezone\": \"Europe/Madrid\"}')",
+    )
+    .execute(&f.db.pool)
+    .await
+    .unwrap();
+    let (status, made) = f
+        .call(false, "POST", "/quality/schedules", Some(daily("loans")))
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(made["timezone"], "Europe/Madrid");
+
+    let mut own = daily("loans");
+    own["timezone"] = json!("America/Bogota");
+    let (status, made) = f.call(false, "POST", "/quality/schedules", Some(own)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(made["timezone"], "America/Bogota", "one it names, it keeps");
 }

@@ -2862,7 +2862,7 @@ export interface components {
             parameters?: Record<string, never> | null;
             /** @description A cut's: `block` (the default) or `replace`. */
             rerun?: string | null;
-            /** @description IANA; `America/Bogota` when left out. */
+            /** @description IANA; the platform's time zone when left out (UTC if it has none). */
             timezone?: string | null;
             /**
              * @description In the style of the Windows Task Scheduler: a start, how often
