@@ -87,8 +87,7 @@
     "switchApp": "Cambiar de aplicación",
     "app": {
       "gestion": "Gestión",
-      "gestionDetail": "El panel de la plataforma",
-      "trial": "Prueba"
+      "gestionDetail": "El panel de la plataforma"
     },
     "language": "Idioma",
     "notFound": {

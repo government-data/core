@@ -1,8 +1,7 @@
-# Floci: local AWS (S3, ECR, EC2, Route 53, SSM, SES, Cost Explorer…) to test
-# what infra/aws creates and the licensing cloud without deploying. The
-# resources live in memory: they are lost when the container is recreated;
-# seed.sh creates them again. Lambda, ECS and the ECR registry run as
-# containers of this machine, hence the Docker socket.
+# Floci: local AWS (S3, ECR, STS, SES…) so development and tests never touch
+# a real account. The resources live in memory: they are lost when the
+# container is recreated. Lambda, ECS and the ECR registry run as containers
+# of this machine, hence the Docker socket.
 name: floci
 
 services:

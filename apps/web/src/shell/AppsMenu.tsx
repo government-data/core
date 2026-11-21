@@ -16,8 +16,6 @@ function inLang(app: AccountApp): AccountApp {
         name: t("web:shell.app.gestion"),
         detail: t("web:shell.app.gestionDetail"),
       };
-    case "trial":
-      return { ...app, name: t("web:shell.app.trial") };
     default:
       return app;
   }

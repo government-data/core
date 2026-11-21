@@ -44,6 +44,8 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      image-api: ${{ steps.filter.outputs.image-api }}
+      image-web: ${{ steps.filter.outputs.image-web }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -78,6 +80,25 @@ jobs:
               - 'tools/grafana/**'
               - 'crates/quality/charts/**'
               - 'crates/quality/src/charts.rs'
+              - '.github/workflows/ci.yml'
+            # What goes into each image: a broken Dockerfile fails the PR.
+            image-api:
+              - 'infra/docker/api.Dockerfile'
+              - '.dockerignore'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/ci.yml'
+            image-web:
+              - 'infra/docker/web.Dockerfile'
+              - 'infra/web/**'
+              - '.dockerignore'
+              - 'apps/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig*.json'
               - '.github/workflows/ci.yml'
             dependencies:
               - 'Cargo.lock'
@@ -201,11 +222,51 @@ jobs:
       - name: Fail if the Grafana dashboards are out of date
         run: pnpm run check:grafana
 
+  # The images, built as a release builds them but not pushed: a Dockerfile
+  # that no longer matches the workspace fails here, not at release time.
+  # On GitHub's runners (they have Docker and the Actions cache), with no
+  # secrets: the token only reads.
+  image-api:
+    needs: check
+    if: ${{ needs.check.outputs.image-api == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the API image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/api.Dockerfile
+          push: false
+          cache-from: type=gha,scope=image-api
+          cache-to: type=gha,scope=image-api,mode=max
+
+  image-web:
+    needs: check
+    if: ${{ needs.check.outputs.image-web == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the web image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/web.Dockerfile
+          push: false
+          cache-from: type=gha,scope=image-web
+          cache-to: type=gha,scope=image-web,mode=max
+
   # Single required status check for branch protection: green when every
   # affected job passed. Skipped stacks (unaffected) do not fail the gate.
   ci:
     if: always()
-    needs: [check, backend, frontend]
+    needs: [check, backend, frontend, image-api, image-web]
     runs-on: ${{ fromJSON(vars.CI_RUNNER_LIVIANO || '"ubuntu-latest"') }}
     steps:
       - name: Aggregate result
@@ -214,10 +275,12 @@ jobs:
           if [ "${{ needs.check.result }}" != "success" ]; then
             echo "check job did not succeed"; exit 1
           fi
-          for stack in backend frontend; do
+          for stack in backend frontend image-api image-web; do
             case "$stack" in
               backend) result="${{ needs.backend.result }}" ;;
               frontend) result="${{ needs.frontend.result }}" ;;
+              image-api) result="${{ needs.image-api.result }}" ;;
+              image-web) result="${{ needs.image-web.result }}" ;;
             esac
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
               echo "$stack job $result"; exit 1
