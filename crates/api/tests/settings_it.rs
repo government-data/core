@@ -406,3 +406,48 @@ async fn the_platform_saves_settings_without_an_admin() {
     assert_eq!(row.updated_by, None);
     assert_eq!(row.data["platform"], true);
 }
+
+#[tokio::test]
+async fn the_platform_time_zone_is_saved_and_read_by_the_database() {
+    let db = testkit::spawn_test_db().await;
+    seed(db.pool.clone()).await;
+    let app = router(db.pool.clone()).await;
+    let admin = Client::login(&app, ADMIN_EMAIL, ADMIN_PASSWORD).await;
+    let stored = || async {
+        sqlx::query_scalar::<_, Option<String>>("SELECT public.platform_timezone()")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap()
+    };
+
+    let (_, body) = admin.call("GET", "/settings", None, false).await;
+    assert_eq!(body["platform"]["value"]["timezone"], "UTC");
+    assert_eq!(stored().await, None, "never saved: the reader falls back");
+
+    let (status, body) = admin
+        .call(
+            "PUT",
+            "/settings/platform",
+            Some(json!({ "timezone": "Mars/Olympus" })),
+            true,
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+
+    let (status, body) = admin
+        .call(
+            "PUT",
+            "/settings/platform",
+            Some(json!({ "timezone": "Europe/Madrid" })),
+            true,
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["value"]["timezone"], "Europe/Madrid");
+    assert_eq!(stored().await.as_deref(), Some("Europe/Madrid"));
+
+    let (status, body) = admin.call("DELETE", "/settings/platform", None, true).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["platform"]["value"]["timezone"], "UTC");
+    assert_eq!(stored().await, None);
+}

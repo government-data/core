@@ -18,6 +18,20 @@ use croner::Cron;
 /// The default time zone of a schedule.
 pub const DEFAULT_TIMEZONE: &str = "America/Bogota";
 
+/// The platform's time zone when it was never set or does not parse
+/// (decision 0079).
+pub const PLATFORM_DEFAULT_TIMEZONE: &str = "UTC";
+
+/// `name` if it is a known IANA time zone, trimmed; otherwise
+/// [`PLATFORM_DEFAULT_TIMEZONE`].
+#[must_use]
+pub fn timezone_or_utc(name: Option<&str>) -> String {
+    name.map(str::trim)
+        .filter(|n| Tz::from_str(n).is_ok())
+        .unwrap_or(PLATFORM_DEFAULT_TIMEZONE)
+        .to_string()
+}
+
 /// Why a schedule is not valid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScheduleError {
@@ -173,5 +187,13 @@ mod tests {
             validate_schedule("0 6 * * *", "Mars/Olympus", now),
             Err(ScheduleError::Timezone(_))
         ));
+    }
+
+    #[test]
+    fn the_platform_zone_falls_back_to_utc() {
+        assert_eq!(timezone_or_utc(Some(" Europe/Madrid ")), "Europe/Madrid");
+        assert_eq!(timezone_or_utc(Some("Mars/Olympus")), "UTC");
+        assert_eq!(timezone_or_utc(Some("")), "UTC");
+        assert_eq!(timezone_or_utc(None), "UTC");
     }
 }

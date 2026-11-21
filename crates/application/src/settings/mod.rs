@@ -1,6 +1,6 @@
 //! System settings editable from the UI: the LDAP directory, outgoing mail
-//! (SMTP, or Microsoft Graph for Office 365) and OAuth2/OIDC sign-in
-//! providers.
+//! (SMTP, or Microsoft Graph for Office 365), OAuth2/OIDC sign-in providers
+//! and the platform's own (its time zone).
 //!
 //! Each section is stored as a JSON document with its secrets encrypted
 //! ([`SecretCipher`]); saving it applies it live, without a restart. A section
@@ -23,6 +23,7 @@ pub use auth_gateway::{MailNotice, MailSlot, MailTone, Mailer, OutgoingMail};
 mod ldap;
 mod mail;
 mod oauth;
+mod platform;
 mod ports;
 mod sections;
 #[cfg(test)]
@@ -35,7 +36,7 @@ pub use ports::{
 use sections::Secrets;
 pub use sections::{
     entra_own_tenant, LdapSettings, MailSettings, MailTransport, OAuthProviderSettings,
-    OAuthSettings, SmtpSecurity, DEFAULT_LDAP_USER_FILTER,
+    OAuthSettings, PlatformSettings, SmtpSecurity, DEFAULT_LDAP_USER_FILTER,
 };
 
 /// Where a section's settings in use come from.
@@ -100,6 +101,7 @@ pub const MAX_RESET_LINK_MINUTES: u64 = 24 * 60;
 const LDAP: &str = "ldap";
 const MAIL: &str = "mail";
 const OAUTH: &str = "oauth";
+const PLATFORM: &str = "platform";
 
 /// What the environment variables bring, for the sections never saved.
 #[derive(Debug, Clone, Default)]
@@ -117,6 +119,7 @@ struct Current {
     ldap: Section<LdapSettings>,
     mail: Section<MailSettings>,
     oauth: Section<OAuthSettings>,
+    platform: Section<PlatformSettings>,
 }
 
 /// Reads, validates, saves, tests and applies the system settings.
@@ -200,7 +203,7 @@ impl SettingsService {
         self.key_source
     }
 
-    /// Load the three sections (the database or, if never saved, the
+    /// Load the sections (the database or, if never saved, the
     /// environment) and apply them. A saved section that can no longer be
     /// applied (a secret that does not decrypt with the current key, for
     /// example) is logged and left off: it does not stop the start-up.
@@ -224,7 +227,13 @@ impl SettingsService {
             tracing::error!("OAuth could not be applied, no providers: {e}");
             self.oauth.set_providers(Vec::new());
         }
-        self.current.set(Current { ldap, mail, oauth });
+        let platform = self.load_section(PLATFORM, None).await?;
+        self.current.set(Current {
+            ldap,
+            mail,
+            oauth,
+            platform,
+        });
         if let Err(e) = self.seed_loaded().await {
             tracing::error!("the platform mail could not be set for this company: {e}");
         }
@@ -335,7 +344,7 @@ impl SettingsService {
 
     /// Go back to what the environment variables say.
     pub async fn reset(&self, section: &str, actor: &str) -> Result<(), SettingsError> {
-        if ![LDAP, MAIL, OAUTH].contains(&section) {
+        if ![LDAP, MAIL, OAUTH, PLATFORM].contains(&section) {
             return Err(invalid(
                 "section",
                 &texts::tr!("app.settings.unknownSection"),
@@ -366,6 +375,10 @@ impl SettingsService {
                 self.mail.set_reset_link_minutes(0);
                 self.mail.set_notice_language(texts::Language::default());
                 self.current.update(|c| c.mail = s);
+            }
+            PLATFORM => {
+                let s = self.load_section(PLATFORM, None).await?;
+                self.current.update(|c| c.platform = s);
             }
             _ => {
                 let s = self.load_section(OAUTH, self.env.oauth.clone()).await?;

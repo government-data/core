@@ -556,3 +556,31 @@ async fn with_the_common_account_only_it_signs_in_and_oauth_is_not_editable() {
     svc.set_platform_oauth(None).await.unwrap();
     assert_eq!(svc.oauth.provider_ids(), vec!["google".to_string()]);
 }
+
+#[tokio::test]
+async fn the_platform_time_zone_is_utc_until_a_known_one_is_saved() {
+    let store = Arc::new(MemStore::default());
+    let (svc, _) = service(store.clone(), EnvSettings::default());
+    svc.init().await.unwrap();
+    assert_eq!(svc.platform().value.timezone, "UTC");
+    assert!(matches!(svc.platform().source, SettingsSource::Unset));
+
+    let unknown = PlatformSettings {
+        timezone: "Mars/Olympus".into(),
+    };
+    let Err(SettingsError::Invalid(fields)) = svc.save_platform(unknown, "admin").await else {
+        panic!("an unknown zone is refused");
+    };
+    assert!(fields.contains_key("timezone"));
+    assert_eq!(svc.platform().value.timezone, "UTC");
+
+    let madrid = PlatformSettings {
+        timezone: " Europe/Madrid ".into(),
+    };
+    let saved = svc.save_platform(madrid, "admin").await.unwrap();
+    assert_eq!(saved.value.timezone, "Europe/Madrid");
+    assert_eq!(svc.platform().value.timezone, "Europe/Madrid");
+
+    svc.reset("platform", "admin").await.unwrap();
+    assert_eq!(svc.platform().value.timezone, "UTC");
+}

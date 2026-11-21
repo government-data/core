@@ -174,7 +174,8 @@
       "testLabel": "Test",
       "testMailBody": "If you get this message, Quality Data's outgoing mail is configured correctly.",
       "testMailSubject": "Quality Data test email",
-      "unknownSection": "unknown section"
+      "unknownSection": "unknown section",
+      "unknownTimezone": "Not a known time zone (an IANA name such as America/Bogota or UTC)"
     },
     "updates": {
       "alreadyInProgress": "an update is already in progress ({{phase}})",
