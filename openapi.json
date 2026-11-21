@@ -6921,12 +6921,6 @@
               "string",
               "null"
             ]
-          },
-          "trino": {
-            "type": [
-              "string",
-              "null"
-            ]
           }
         }
       },

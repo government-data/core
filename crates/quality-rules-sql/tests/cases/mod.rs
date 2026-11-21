@@ -1,7 +1,6 @@
 //! The semantics of decision 0033 as cases: synthetic rows, rules in YAML,
 //! and the result each rule must give on each row (`None` does not apply).
-//! The DuckDB test runs them; `examples/cases.rs` writes them for Trino
-//! (tools/verify/rules_sql_equivalence.sh). Shared by both.
+//! The DuckDB test runs them.
 
 #![allow(dead_code)]
 

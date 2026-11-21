@@ -1,8 +1,8 @@
-//! Writes the tree node by node. Where the engines differ (verified
-//! 2026-10-30, DuckDB 2.0.0 and Trino 484) the writer says so: DuckDB has
-//! no `regexp_like` and replaces only the first match unless told `'g'`;
-//! both trim the given characters, take `INTERVAL '18' YEAR`, `TRY_CAST`,
-//! `date_diff`, windows and `?` parameters the same way.
+//! Writes the tree node by node, as DuckDB's SQL (verified 2026-10-30,
+//! DuckDB 2.0.0): DuckDB has no `regexp_like` and replaces only the first
+//! match unless told `'g'`; it trims the given characters and takes
+//! `INTERVAL '18' YEAR`, `TRY_CAST`, `date_diff`, windows and `?`
+//! parameters.
 
 use quality_rules_tree::{BinaryOp, Expr, Function, IntervalUnit, Literal, Type};
 
@@ -129,7 +129,6 @@ impl<'a> Writer<'a> {
                 self.text_of(x)?;
                 self.push(match self.engine {
                     Engine::DuckDb => r", '[^\p{L}\p{N}]', '', 'g'))",
-                    Engine::Trino => r", '[^\p{L}\p{N}]', ''))",
                 });
             }
             Expr::Duplicated(key) => {
@@ -164,7 +163,7 @@ impl<'a> Writer<'a> {
 
     fn binary(&mut self, op: BinaryOp, left: &Expr, right: &Expr) -> Result<(), Error> {
         if op == BinaryOp::Divide {
-            // Trino divides integers as integers; both divide doubles alike.
+            // A division is of doubles, whatever its operands' types.
             self.wrap("(CAST(", left, " AS DOUBLE) / ")?;
             return self.wrap("", right, ")");
         }
@@ -208,7 +207,6 @@ impl<'a> Writer<'a> {
     fn regex(&mut self, e: &Expr, pattern: &str) -> Result<(), Error> {
         self.push(match self.engine {
             Engine::DuckDb => "regexp_matches(",
-            Engine::Trino => "regexp_like(",
         });
         self.text_of(e)?;
         self.push(&format!(", {})", quote_text(&format!("^(?:{pattern})$"))?));
@@ -324,7 +322,7 @@ fn op_sql(op: BinaryOp) -> &'static str {
     }
 }
 
-/// The functions both engines spell alike.
+/// The functions spelled as the tree names them.
 fn plain_name(f: Function) -> &'static str {
     match f {
         Function::Upper => "upper",
