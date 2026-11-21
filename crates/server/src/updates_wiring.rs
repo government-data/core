@@ -3,16 +3,12 @@
 //!
 //! [`UpdatesService`]: application::UpdatesService
 
-use std::time::Duration;
-
-use application::{
-    DrainStatus, HistoryEntry, Maintenance, UpdateRequest, UpdaterRow, UpdatesStore,
-};
+use application::{HistoryEntry, Maintenance, UpdateRequest, UpdaterRow, UpdatesStore};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use infrastructure::{HistoryRecord, MaintenanceRow, PgMaintenanceStore};
 
-/// [`UpdatesStore`] sobre Postgres.
+/// [`UpdatesStore`] on Postgres.
 pub(crate) struct Store(pub(crate) PgMaintenanceStore);
 
 fn maintenance((reason, started_at, until): MaintenanceRow) -> Maintenance {
@@ -43,16 +39,6 @@ impl UpdatesStore for Store {
 
     async fn end_maintenance(&self) -> Result<(), String> {
         self.0.end().await
-    }
-
-    async fn drain_status(&self, horizon: Duration) -> Result<DrainStatus, String> {
-        let d = self.0.drain(horizon).await?;
-        Ok(DrainStatus {
-            running: d.running,
-            deploying: d.deploying,
-            queued: d.queued,
-            scheduled_soon: d.scheduled_soon,
-        })
     }
 
     async fn updater(&self) -> Result<UpdaterRow, String> {

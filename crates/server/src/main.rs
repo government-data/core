@@ -29,6 +29,7 @@ mod callers;
 mod catalog_wiring;
 mod commands;
 mod config;
+mod drain_wiring;
 mod machine_gauge;
 mod machines_wiring;
 mod metrics_wiring;

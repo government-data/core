@@ -1,13 +1,12 @@
-//! The updates' maintenance in Postgres (`orq_maintenance`) and what still
-//! runs. The composition root connects it to the application's port.
-
-use std::time::Duration;
+//! The updates' maintenance in Postgres (`orq_maintenance`), the daemon's
+//! report and the policy. The composition root connects it to the
+//! application's port.
 
 use chrono::{DateTime, Utc};
 use sqlx::postgres::PgPool;
 use sqlx::Row;
 
-/// Maintenance and what runs, in Postgres.
+/// Maintenance, the report and the policy, in Postgres.
 #[derive(Debug, Clone)]
 pub struct PgMaintenanceStore {
     pool: PgPool,
@@ -35,15 +34,6 @@ pub struct HistoryRecord {
     pub from_version: String,
     pub detail: String,
     pub at: DateTime<Utc>,
-}
-
-/// What runs: taken, deploying, queued and scheduled soon.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct DrainRow {
-    pub running: u64,
-    pub deploying: u64,
-    pub queued: u64,
-    pub scheduled_soon: u64,
 }
 
 fn db(e: sqlx::Error) -> String {
@@ -90,33 +80,6 @@ impl PgMaintenanceStore {
             .await
             .map_err(db)?;
         Ok(())
-    }
-
-    /// In a local installation everything belongs to the main tenant (the
-    /// one of a connection without a tenant), so everything there is counted.
-    pub async fn drain(&self, horizon: Duration) -> Result<DrainRow, String> {
-        let row = sqlx::query(
-            "SELECT
-                 (SELECT count(*) FROM executions WHERE state = 'running') AS running,
-                 (SELECT count(*) FROM executions WHERE state = 'queued') AS queued,
-                 0::bigint AS deploying,
-                 (SELECT count(*) FROM schedules
-                   WHERE enabled AND next_run_at <= now() + make_interval(secs => $1)) AS scheduled_soon",
-        )
-        .bind(horizon.as_secs_f64())
-        .fetch_one(&self.pool)
-        .await
-        .map_err(db)?;
-        let n = |c: &str| -> Result<u64, String> {
-            let v: i64 = row.try_get(c).map_err(db)?;
-            Ok(u64::try_from(v).unwrap_or_default())
-        };
-        Ok(DrainRow {
-            running: n("running")?,
-            deploying: n("deploying")?,
-            queued: n("queued")?,
-            scheduled_soon: n("scheduled_soon")?,
-        })
     }
 
     pub async fn updater(&self) -> Result<UpdaterRecord, String> {

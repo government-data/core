@@ -2,24 +2,20 @@
 //! cases on PostgreSQL, a CA made in the test, the update agent's
 //! certificate as the installer signs it and the header as Traefik writes
 //! it. Each call answers the agent, and only the agent. What runs comes
-//! from a fixed count ([`Running`]): the route is what is tested here, not
-//! the store's count. Needs Docker.
+//! from fixed modules ([`Running`]): the route is what is tested here, not
+//! a module's count. Needs Docker.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 mod machine_certs;
 
-use application::{
-    DrainStatus, HistoryEntry, Installed, MachinesService, Maintenance, UpdateRequest, UpdaterRow,
-    UpdatesService, UpdatesStore,
-};
+use application::{Installed, MachinesService, ModuleWork, ModulesWork, UpdatesService};
 use async_trait::async_trait;
 use auth_gateway::http::client_cert::ClientCertificates;
 use auth_gateway::MachineRole;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use chrono::{DateTime, Utc};
 use infrastructure::ca::{Ca, X509CertificateReader, DEFAULT_CA_VALIDITY};
 use infrastructure::{
     PgAuditRepository, PgMachines, PgMaintenanceStore, RingJoinTokenMint, SystemClock,
@@ -50,7 +46,7 @@ async fn world(trusted: bool) -> World {
     )
     .with_signer(Arc::new(Ca::load(&made.cert_pem, &made.key_pem).unwrap()));
     let store = Store(PgMaintenanceStore::new(pool));
-    let updates = UpdatesService::new(Arc::new(Running(store)));
+    let updates = UpdatesService::new(Arc::new(store)).with_modules_work(Arc::new(Running));
     let certificates = if trusted {
         ClientCertificates::trusting(Arc::new(X509CertificateReader))
     } else {
@@ -63,55 +59,24 @@ async fn world(trusted: bool) -> World {
     }
 }
 
-/// The store on PostgreSQL, but for what runs: two executions running and
-/// one schedule due.
-struct Running(Store);
+/// What runs: a module with two running, three queued and one schedule
+/// due, and a module that does not answer.
+struct Running;
 
 #[async_trait]
-impl UpdatesStore for Running {
-    async fn maintenance(&self) -> Result<Option<Maintenance>, String> {
-        self.0.maintenance().await
-    }
-    async fn begin_maintenance(
-        &self,
-        why: &str,
-        until: DateTime<Utc>,
-    ) -> Result<Maintenance, String> {
-        self.0.begin_maintenance(why, until).await
-    }
-    async fn end_maintenance(&self) -> Result<(), String> {
-        self.0.end_maintenance().await
-    }
-    async fn drain_status(&self, horizon: Duration) -> Result<DrainStatus, String> {
+impl ModulesWork for Running {
+    async fn work(&self, horizon: Duration) -> Vec<(String, Result<ModuleWork, String>)> {
         assert_eq!(horizon, Duration::from_secs(60), "the agent's horizon");
-        let (running, deploying, queued, scheduled_soon) = (2, 0, 3, 1);
-        Ok(DrainStatus {
+        let (running, queued, scheduled_soon) = (2, 3, 1);
+        let busy = ModuleWork {
             running,
-            deploying,
             queued,
             scheduled_soon,
-        })
-    }
-    async fn updater(&self) -> Result<UpdaterRow, String> {
-        self.0.updater().await
-    }
-    async fn save_report(&self, report: &Value) -> Result<(), String> {
-        self.0.save_report(report).await
-    }
-    async fn save_policy(&self, policy: &Value, admin_id: &str) -> Result<(), String> {
-        self.0.save_policy(policy, admin_id).await
-    }
-    async fn new_request(&self, admin_id: &str) -> Result<UpdateRequest, String> {
-        self.0.new_request(admin_id).await
-    }
-    async fn mark_notified(&self, a: Option<&str>, r: Option<&str>) -> Result<(), String> {
-        self.0.mark_notified(a, r).await
-    }
-    async fn add_history(&self, entry: &HistoryEntry) -> Result<(), String> {
-        self.0.add_history(entry).await
-    }
-    async fn history(&self, limit: u32) -> Result<Vec<HistoryEntry>, String> {
-        self.0.history(limit).await
+        };
+        vec![
+            ("busy".into(), Ok(busy)),
+            ("silent".into(), Err("no answer".into())),
+        ]
     }
 }
 
@@ -192,6 +157,7 @@ async fn every_call_answers_the_update_agent() {
     assert_eq!(counts, (&json!(2), &json!(3), &json!(1)));
     assert_eq!(drain["drained"], false, "two running");
     assert_eq!(drain["deploying"], 0);
+    assert_eq!(drain["not_answering"], json!(["silent"]));
     assert_eq!(drain["maintenance"]["reason"], "update to 1.3.0");
 
     let end = json!({ "active": false });

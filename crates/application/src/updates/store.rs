@@ -1,8 +1,6 @@
 //! What the updates use case stores and shows, and the port it stores it
 //! through.
 
-use std::time::Duration;
-
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
@@ -20,26 +18,6 @@ pub struct Maintenance {
 impl Maintenance {
     pub fn active_at(&self, now: DateTime<Utc>) -> bool {
         now < self.until
-    }
-}
-
-/// What still runs: the daemon waits for it to be zero to update.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
-pub struct DrainStatus {
-    /// Executions already taken by a runner.
-    pub running: u64,
-    /// Deployments being installed.
-    pub deploying: u64,
-    /// Queued executions (they run when maintenance ends).
-    pub queued: u64,
-    /// Schedules that fire within the requested horizon.
-    pub scheduled_soon: u64,
-}
-
-impl DrainStatus {
-    /// Nothing half done: it can update without cutting anything.
-    pub fn is_drained(&self) -> bool {
-        self.running == 0 && self.deploying == 0
     }
 }
 
@@ -96,7 +74,7 @@ pub struct UpdaterRow {
 }
 
 /// Port: where maintenance, what the daemon reports and what the
-/// administrator decided are stored, and where what runs comes from.
+/// administrator decided are stored.
 #[async_trait::async_trait]
 pub trait UpdatesStore: Send + Sync {
     /// The current maintenance or the last one (active or not).
@@ -110,9 +88,6 @@ pub trait UpdatesStore: Send + Sync {
     ) -> Result<Maintenance, String>;
     /// Leave now (it does nothing if it was not in maintenance).
     async fn end_maintenance(&self) -> Result<(), String>;
-    /// What runs, and what is scheduled within `horizon`.
-    async fn drain_status(&self, horizon: Duration) -> Result<DrainStatus, String>;
-
     async fn updater(&self) -> Result<UpdaterRow, String>;
     async fn save_report(&self, report: &serde_json::Value) -> Result<(), String>;
     async fn save_policy(&self, policy: &serde_json::Value, admin_id: &str) -> Result<(), String>;

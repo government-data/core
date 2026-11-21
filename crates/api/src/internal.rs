@@ -208,10 +208,7 @@ struct DrainQuery {
 /// What is still running, and whether it can update now without cutting anything.
 async fn drain(State(s): State<Internal>, Query(q): Query<DrainQuery>) -> Response {
     let horizon = q.horizon_secs.map_or(DEFAULT_HORIZON, Duration::from_secs);
-    let status = match s.updates.drain_status(horizon).await {
-        Ok(status) => status,
-        Err(e) => return unavailable(&e),
-    };
+    let status = s.updates.drain_status(horizon).await;
     let maintenance = match s.updates.active().await {
         Ok(m) => m,
         Err(e) => return unavailable(&e),
@@ -221,6 +218,7 @@ async fn drain(State(s): State<Internal>, Query(q): Query<DrainQuery>) -> Respon
         "deploying": status.deploying,
         "queued": status.queued,
         "scheduled_soon": status.scheduled_soon,
+        "not_answering": &status.not_answering,
         "drained": status.is_drained(),
         "maintenance": maintenance,
     }))
