@@ -27,7 +27,6 @@ pub struct Explanation {
     pub severity: String,
     /// `None` when the platform did not resolve a reference it reads.
     pub duckdb: Option<String>,
-    pub trino: Option<String>,
 }
 
 impl Explanation {
@@ -48,10 +47,8 @@ impl Explanation {
             self.dimension,
             self.severity
         ));
-        for (engine, sql) in [("DuckDB", &self.duckdb), ("Trino", &self.trino)] {
-            if let Some(sql) = sql {
-                lines.push(format!("{engine}: {sql}"));
-            }
+        if let Some(sql) = &self.duckdb {
+            lines.push(format!("DuckDB: {sql}"));
         }
         lines.join("\n")
     }
@@ -83,7 +80,6 @@ pub fn explain(rule: &Compiled, language: Language, tables: &Tables) -> Explanat
         dimension: t(format!("dimension.{}", rule.dimension.name())),
         severity: t(format!("severity.{}", rule.severity.name())),
         duckdb: sql(Engine::DuckDb),
-        trino: sql(Engine::Trino),
     }
 }
 
