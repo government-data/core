@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use axum::Router;
-use contracts::{Migration, Module};
+use contracts::{Drain, Migration, Module};
 use sqlx::PgPool;
 
 use crate::catalog::Catalog;
@@ -16,6 +16,7 @@ use crate::delete_api;
 use crate::deploy_api;
 use crate::draft_api::{self, DraftCatalog};
 use crate::draft_history;
+use crate::drain::QualityDrain;
 use crate::edit_api;
 use crate::field_api;
 use crate::lake_tables;
@@ -214,6 +215,16 @@ impl Module for QualityModule {
                 include_str!("../migrations/0026_jobs_uses_trino.sql"),
             ),
         ]
+    }
+
+    /// Its jobs and schedules, counted on the pool its routes use.
+    fn drain(&self) -> Option<Arc<dyn Drain>> {
+        let pool = match (&self.sources, &self.workers) {
+            (Some(s), _) => s.pool.clone(),
+            (None, Some((pool, _))) => pool.clone(),
+            (None, None) => return None,
+        };
+        Some(Arc::new(QualityDrain::new(pool)))
     }
 
     fn router(&self) -> Router {

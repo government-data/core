@@ -2,10 +2,12 @@
 
 use std::error::Error;
 use std::fmt;
+use std::sync::Arc;
 
 use axum::Router;
 use utoipa::openapi::OpenApi;
 
+use crate::drain::Drain;
 use crate::migration::Migration;
 
 /// A pluggable feature module.
@@ -62,6 +64,12 @@ pub trait Module: Send + Sync {
     /// generated. Defaults to none.
     fn openapi(&self) -> OpenApi {
         OpenApi::default()
+    }
+
+    /// How the module counts its work in flight, for the update agent to
+    /// wait for it. Defaults to none: a module without work of its own.
+    fn drain(&self) -> Option<Arc<dyn Drain>> {
+        None
     }
 }
 

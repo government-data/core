@@ -16,6 +16,7 @@ pub mod deploy_api;
 pub mod draft_api;
 pub mod draft_catalog;
 pub mod draft_history;
+pub mod drain;
 pub mod edit_api;
 pub mod entity_key;
 pub mod field_api;
