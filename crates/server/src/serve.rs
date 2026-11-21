@@ -136,10 +136,14 @@ fn app(
     let resolver = api::iam::resolver(platform.clone());
     let (machines, modules) = machines_and_modules(&tenancy, provider, &secret_box, &certificates)?;
     // What the update agent waits for: each module's own work (0003).
-    let updates = updates.with_modules_work(Arc::new(drain_wiring::CodeModules::of(
-        &modules,
-        drain_wiring::ANSWER_WITHIN,
-    )));
+    let updates = updates
+        .with_modules_work(Arc::new(drain_wiring::CodeModules::of(
+            &modules,
+            drain_wiring::ANSWER_WITHIN,
+        )))
+        .with_modules_work(Arc::new(drain_wiring::AppModules::installed(
+            drain_wiring::ANSWER_WITHIN,
+        )?));
     // The machines: Settings → Execution, the install routes (their own
     // limit) and the route they join with (the login's).
     let machine_routes = machines_wiring::routes(

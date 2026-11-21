@@ -24,6 +24,7 @@ pub mod ldap;
 pub mod machines;
 pub mod mail;
 pub mod mimir_series;
+pub mod module_drain;
 pub mod module_migrations;
 pub mod oauth_http;
 pub mod oauth_provider;
