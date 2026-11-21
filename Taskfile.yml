@@ -204,11 +204,10 @@ tasks:
       - tools/verify/observability_check.sh
 
   floci:
-    desc: Start Floci (local AWS) and seed what infra/aws creates
+    desc: Start Floci (local AWS)
     cmds:
       - docker start floci 2>/dev/null || {{.DC}} -f infra/floci/compose.yml up -d
       - until curl -fsS http://localhost:4566/_floci/health >/dev/null 2>&1; do sleep 1; done
-      - infra/floci/seed.sh
 
   floci:logs:
     desc: Follow Floci logs

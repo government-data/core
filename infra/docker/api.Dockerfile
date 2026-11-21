@@ -25,7 +25,7 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Build: cook the dependencies from the recipe (cached across app-only edits),
-# then compile just the server binaries.
+# then compile just the server binary.
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
@@ -35,19 +35,11 @@ ARG ORQ_VERSION=""
 ARG ORQ_COMMIT=""
 RUN if [ -n "$ORQ_VERSION" ]; then export ORQ_VERSION; else unset ORQ_VERSION; fi; \
     if [ -n "$ORQ_COMMIT" ]; then export ORQ_COMMIT; else unset ORQ_COMMIT; fi; \
-    cargo build --release --locked -p server -p account
+    cargo build --release --locked -p server
 # The folder of the key that encrypts the Settings secrets: the final image
 # has no shell to create it, and a new volume inherits its owner. The same
 # for the metrics file's folder (decision 0071), shared with Alloy.
 RUN mkdir -p /out/settings /out/qd-metrics
-
-# The cloud's common account (cuenta.<domain>; another image, same build):
-#   docker build -f infra/docker/api.Dockerfile --target cuenta -t orquestador-cuenta .
-FROM gcr.io/distroless/cc-debian12:nonroot AS cuenta
-COPY --from=builder /app/target/release/account /usr/local/bin/account
-EXPOSE 8080
-USER nonroot
-ENTRYPOINT ["/usr/local/bin/account"]
 
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 WORKDIR /app

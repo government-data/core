@@ -70,12 +70,11 @@ export async function accountUrl(): Promise<string | null> {
 
 /**
  * A place the common account lets this person go (`current`: this one). The
- * names come in Spanish; `kind` lets the menu translate the platform panel,
- * and the trials.
+ * names come in Spanish; `kind` lets the menu translate the platform panel.
  */
 export interface AccountApp {
   /** `app`: one that signs in with this installation (RustFS…). */
-  kind?: "management" | "instance" | "trial" | "app";
+  kind?: "management" | "instance" | "app";
   /** Of an `app`: its client id, for its page (`/apps/<id>`). */
   id?: string;
   name: string;

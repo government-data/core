@@ -87,8 +87,7 @@
     "switchApp": "Switch application",
     "app": {
       "gestion": "Management",
-      "gestionDetail": "The platform panel",
-      "trial": "Trial"
+      "gestionDetail": "The platform panel"
     },
     "language": "Language",
     "notFound": {
