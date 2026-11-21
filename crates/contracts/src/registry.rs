@@ -2,10 +2,12 @@
 
 use std::collections::HashSet;
 use std::fmt;
+use std::sync::Arc;
 
 use axum::Router;
 use utoipa::openapi::OpenApi;
 
+use crate::drain::Drain;
 use crate::migration::{MigrationError, MigrationExecutor, MigrationReport};
 use crate::module::{InitError, Module};
 
@@ -62,6 +64,15 @@ impl ModuleRegistry {
         self.modules
             .iter()
             .fold(base, |doc, module| doc.merge_from(module.openapi()))
+    }
+
+    /// Every module's [`Module::drain`], by module name, in registration
+    /// order.
+    pub fn drains(&self) -> Vec<(&'static str, Arc<dyn Drain>)> {
+        self.modules
+            .iter()
+            .filter_map(|m| m.drain().map(|d| (m.name(), d)))
+            .collect()
     }
 
     /// Apply every module's pending migrations, isolated per module and in order.

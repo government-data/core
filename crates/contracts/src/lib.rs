@@ -22,12 +22,14 @@
 //! compilation of the others.
 
 mod access;
+mod drain;
 mod migration;
 mod module;
 mod registry;
 mod view;
 
 pub use access::{Access, AuditEntry, AuditTrail, Caller, Change};
+pub use drain::{Drain, Work};
 pub use migration::{
     InMemoryExecutor, Migration, MigrationError, MigrationExecutor, MigrationReport,
 };
@@ -207,5 +209,40 @@ mod tests {
         assert_eq!(doc.info.title, "installation");
         let paths: Vec<_> = doc.paths.paths.keys().cloned().collect();
         assert_eq!(paths, ["/alpha/ping", "/beta/ping"]);
+    }
+
+    /// A module with work of its own.
+    struct Busy;
+
+    #[async_trait::async_trait]
+    impl Drain for Busy {
+        async fn work(&self, _horizon: std::time::Duration) -> Result<Work, String> {
+            Ok(Work {
+                running: 2,
+                ..Work::default()
+            })
+        }
+    }
+
+    impl Module for Busy {
+        fn name(&self) -> &'static str {
+            "busy"
+        }
+
+        fn drain(&self) -> Option<std::sync::Arc<dyn Drain>> {
+            Some(std::sync::Arc::new(Busy))
+        }
+    }
+
+    #[tokio::test]
+    async fn drains_lists_only_the_modules_that_count_their_work() {
+        let registry = ModuleRegistry::new()
+            .register(StubModule::new("alpha", Vec::new()))
+            .register(Busy);
+        let drains = registry.drains();
+        assert_eq!(drains.len(), 1);
+        assert_eq!(drains[0].0, "busy");
+        let work = drains[0].1.work(std::time::Duration::ZERO).await.unwrap();
+        assert_eq!(work.running, 2);
     }
 }
