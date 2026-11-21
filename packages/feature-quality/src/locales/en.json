@@ -52,8 +52,7 @@
       "trust_server_certificate": "Accept the server certificate without verifying it (a self-signed server)."
     },
     "engine": {
-      "duckdb": "Read directly (DuckDB)",
-      "trino": "Read through Trino"
+      "duckdb": "Read directly (DuckDB)"
     },
     "created": "Source {{name}} created.",
     "updated": "Source {{name}} updated.",

@@ -52,8 +52,7 @@
       "trust_server_certificate": "Aceptar el certificado del servidor sin verificarlo (un servidor autofirmado)."
     },
     "engine": {
-      "duckdb": "Lectura directa (DuckDB)",
-      "trino": "Lectura por Trino"
+      "duckdb": "Lectura directa (DuckDB)"
     },
     "created": "Fuente {{name}} creada.",
     "updated": "Fuente {{name}} actualizada.",

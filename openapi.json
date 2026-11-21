@@ -3552,9 +3552,6 @@
                 }
               }
             }
-          },
-          "502": {
-            "description": "Saved and audited, but Trino did not take its catalog: saving it again retries"
           }
         }
       },
@@ -3597,9 +3594,6 @@
                 }
               }
             }
-          },
-          "502": {
-            "description": "Trino did not drop its catalog: nothing deleted"
           },
           "503": {
             "description": "No catalog to ask which mappings read it"
@@ -4855,8 +4849,7 @@
         "type": "string",
         "description": "The engine that reads a driver's sources.",
         "enum": [
-          "duckdb",
-          "trino"
+          "duckdb"
         ]
       },
       "ErrorResponse": {

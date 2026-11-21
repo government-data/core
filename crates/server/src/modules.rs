@@ -49,8 +49,8 @@ pub(crate) fn registry() -> ModuleRegistry {
 /// same issuer. The sources' routes for people seal their secrets with the
 /// installation's key, as the settings do, and ask the catalog which
 /// mappings read a source before deleting it. With Trino
-/// (`QUALITY_TRINO_URL`), a source on it keeps its catalog there; Trino
-/// reads its rules from here with its certificate (`machines`, 0066 point
+/// (`QUALITY_TRINO_URL`), its jobs' tokens are signed here; Trino reads
+/// its rules from here with its certificate (`machines`, 0066 point
 /// 9), or in development with `QUALITY_TRINO_RULES_KEY` (0062).
 pub(crate) fn serving(
     pool: &PgPool,
@@ -98,10 +98,6 @@ pub(crate) fn serving(
     .with_patterns(semantic_patterns()?);
     let quality = match review {
         Some(review) => quality.with_drafts(review),
-        None => quality,
-    };
-    let quality = match trino {
-        Some(trino) => quality.with_trino(Arc::new(trino)),
         None => quality,
     };
     let quality = match crate::trino_wiring::rules_from_env(tenants, machines)? {

@@ -12,8 +12,6 @@ use std::time::Duration;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::source_catalog::has_catalog;
-
 /// The lock a claim takes shared and a hold alone (0066, point 9), so
 /// that a claim is either counted or sees the hold.
 const HOLD_LOCK: i64 = 6_600_009;
@@ -116,9 +114,9 @@ pub async fn at_details(
 /// `records`) by its source's driver, an extraction by the source its
 /// dataset's mapping names, `extracted_from`, if the enqueuer read it. As
 /// its details will say ([`crate::job_sources::SourceAccess::on_trino`]):
-/// the driver has a catalog on Trino. `None` (held while Trino is) when
-/// not known: no source named, or none of that name; and for a kind that
-/// never reads through Trino, which no hold looks at.
+/// never since decision 0077, as no driver is read by Trino. `None` (held
+/// while Trino is) when not known: no source named, or none of that name;
+/// and for a kind that never reads through Trino, which no hold looks at.
 pub(crate) async fn known_use<'c>(
     db: impl sqlx::PgExecutor<'c>,
     kind: &str,
@@ -138,5 +136,5 @@ pub(crate) async fn known_use<'c>(
             .bind(source)
             .fetch_optional(db)
             .await?;
-    Ok(driver.map(|d| has_catalog(&d)))
+    Ok(driver.map(|_| false))
 }

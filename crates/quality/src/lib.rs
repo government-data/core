@@ -57,7 +57,6 @@ pub mod scheduler;
 pub mod sla_api;
 pub mod source;
 pub mod source_api;
-pub mod source_catalog;
 pub mod source_records;
 pub mod source_store;
 pub mod source_tables;

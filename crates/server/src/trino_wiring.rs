@@ -1,8 +1,8 @@
-//! The API as Trino's client (decision 0048): a source on Trino keeps its
-//! catalog there. Each statement goes with a fresh token of the API's own
-//! machine client, signed here by the OIDC provider. A job that reads a
-//! source on Trino gets a token of its own, signed the same way (decision
-//! 0062), and Trino reads its access-control rules from the API, which
+//! The API as Trino's client: no source keeps a catalog there any more
+//! (decision 0077); the API asks it what it runs, with a fresh token of
+//! its own machine client, signed here by the OIDC provider. A job that
+//! reads a source on Trino gets a token of its own, signed the same way
+//! (decision 0062), and Trino reads its access-control rules from the API, which
 //! knows the coordinator by its certificate (0066, point 9), or in
 //! development by a secret in the query.
 
@@ -15,10 +15,9 @@ use auth_gateway::AuthorizationServer;
 use infrastructure::PgPool;
 use quality::job_trino::{TrinoAccess, TrinoJobTokens};
 use quality::machine_certs::MachineCertificates;
-use quality::source_catalog::Trino;
 use quality::trino_hold;
 use quality::trino_rules_api::{RulesAccess, RulesKey, Tenants};
-use trino_client::{TrinoClient, TrinoError};
+use trino_client::TrinoClient;
 
 /// The audience of Trino's tokens (decision 0030).
 const AUDIENCE: &str = "trino";
@@ -200,26 +199,5 @@ impl TrinoJobs for QueueTrinoJobs {
             }
         }
         failed.map_or(Ok(in_force), Err)
-    }
-}
-
-#[async_trait]
-impl Trino for ApiTrino {
-    async fn run(&self, sql: &str) -> Result<(), String> {
-        let token = self
-            .provider
-            .own_machine_token(&self.client_id, AUDIENCE)
-            .await
-            .map_err(|e| format!("token of {}: {}", self.client_id, e.code()))?;
-        self.client
-            .execute(&token.access_token, sql)
-            .await
-            .map(|_| ())
-            // Trino's message may quote the statement, credentials and all:
-            // only its error's name is said.
-            .map_err(|e| match e {
-                TrinoError::Failed { name, .. } => format!("trino: {name}"),
-                other => other.to_string(),
-            })
     }
 }

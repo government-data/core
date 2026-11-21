@@ -27,7 +27,6 @@ use crate::rules_api;
 use crate::schedule_api;
 use crate::sla_api;
 use crate::source_api;
-use crate::source_catalog::Trino;
 use crate::source_store::Sealer;
 use crate::split_api;
 use crate::tables_api;
@@ -42,7 +41,6 @@ pub struct QualityModule {
     sources: Option<SourceServices>,
     patterns: Patterns,
     drafts: Option<Arc<dyn DraftCatalog>>,
-    trino: Option<Arc<dyn Trino>>,
     trino_rules: Option<RulesAccess>,
 }
 
@@ -70,7 +68,6 @@ impl QualityModule {
             sources: None,
             patterns: Patterns::default(),
             drafts: None,
-            trino: None,
             trino_rules: None,
         }
     }
@@ -98,13 +95,6 @@ impl QualityModule {
     #[must_use]
     pub fn with_patterns(mut self, patterns: Patterns) -> Self {
         self.patterns = patterns;
-        self
-    }
-
-    /// With Trino, where a source on it keeps its catalog (decision 0048).
-    #[must_use]
-    pub fn with_trino(mut self, trino: Arc<dyn Trino>) -> Self {
-        self.trino = Some(trino);
         self
     }
 
@@ -291,26 +281,21 @@ impl Module for QualityModule {
             _ => Router::new(),
         };
         drafts.merge(tests).merge(match &self.sources {
-            Some(s) => source_api::routes(
-                s.pool.clone(),
-                s.sealer.clone(),
-                s.catalog.clone(),
-                self.trino.clone(),
-            )
-            .merge(cut_api::routes(s.pool.clone(), s.catalog.clone()))
-            .merge(dataset_api::routes(s.pool.clone(), s.catalog.clone()))
-            .merge(chart_api::routes(s.pool.clone(), s.catalog.clone()))
-            .merge(sla_api::routes(s.pool.clone(), s.catalog.clone()))
-            .merge(schedule_api::routes(s.pool.clone(), s.catalog.clone()))
-            .merge(map_api::routes(
-                s.pool.clone(),
-                self.patterns.clone(),
-                s.catalog.clone(),
-            ))
-            .merge(tables_api::routes(s.pool.clone()))
-            .merge(records_api::routes(s.pool.clone(), s.catalog.clone()))
-            .merge(console_api::routes(s.pool.clone()))
-            .merge(lake_tables::routes(s.pool.clone())),
+            Some(s) => source_api::routes(s.pool.clone(), s.sealer.clone(), s.catalog.clone())
+                .merge(cut_api::routes(s.pool.clone(), s.catalog.clone()))
+                .merge(dataset_api::routes(s.pool.clone(), s.catalog.clone()))
+                .merge(chart_api::routes(s.pool.clone(), s.catalog.clone()))
+                .merge(sla_api::routes(s.pool.clone(), s.catalog.clone()))
+                .merge(schedule_api::routes(s.pool.clone(), s.catalog.clone()))
+                .merge(map_api::routes(
+                    s.pool.clone(),
+                    self.patterns.clone(),
+                    s.catalog.clone(),
+                ))
+                .merge(tables_api::routes(s.pool.clone()))
+                .merge(records_api::routes(s.pool.clone(), s.catalog.clone()))
+                .merge(console_api::routes(s.pool.clone()))
+                .merge(lake_tables::routes(s.pool.clone())),
             None => Router::new(),
         })
     }

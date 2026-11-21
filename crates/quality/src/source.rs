@@ -1,7 +1,9 @@
-//! Sources (decision 0036): a source is a connection of a driver, the same
-//! shape for every engine. The drivers are a catalog: each says its fields,
-//! which of them are secret, and the engine that reads it. Pure: the store
-//! seals the secrets, the worker connects.
+//! Sources (decision 0036): a source is a connection of a driver. The
+//! drivers are a catalog: each says its fields, which of them are secret,
+//! and the DuckDB extension that reads it (decision 0077). Pure: the store
+//! seals the secrets, the worker connects. A saved source of a driver not
+//! in the catalog (OpenEdge's, once read by Trino) stays saved, and is
+//! neither listed nor read.
 
 use std::collections::BTreeMap;
 
@@ -10,8 +12,6 @@ use std::collections::BTreeMap;
 pub enum Engine {
     /// DuckDB with the extension it loads.
     DuckDb { extension: &'static str },
-    /// Trino with the connector of the source's catalog (decision 0029).
-    Trino { connector: &'static str },
 }
 
 /// What a field holds, and so how it is kept and shown.
@@ -112,14 +112,6 @@ pub const DRIVERS: &[Driver] = &[
             field("owner", FieldKind::Text, false),
         ],
     },
-    Driver {
-        id: "openedge",
-        engine: Engine::Trino {
-            connector: "openedge",
-        },
-        default_port: None,
-        fields: SERVER,
-    },
 ];
 
 /// The driver `id`, if there is one.
@@ -155,7 +147,7 @@ pub enum SourceError {
 /// The longest value a field may have.
 pub const MAX_VALUE: usize = 1_000;
 
-/// A source's name: what a mapping and a Trino catalog call it.
+/// A source's name: what a mapping calls it.
 pub fn valid_name(name: &str) -> bool {
     let b = name.as_bytes();
     (1..=63).contains(&b.len())
@@ -278,6 +270,8 @@ mod tests {
             }
         );
         assert!(driver("excel").is_none());
+        // OpenEdge was read by Trino only: no driver any more (decision 0077).
+        assert!(driver("openedge").is_none());
     }
 
     #[test]
@@ -359,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn a_name_is_what_a_mapping_and_a_trino_catalog_can_call_it() {
+    fn a_name_is_what_a_mapping_can_call_it() {
         assert!(valid_name("core_2"));
         for bad in ["", "2core", "Core", "core-2", &"a".repeat(64)] {
             assert!(!valid_name(bad), "{bad}");

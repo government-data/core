@@ -79,11 +79,9 @@ pub fn system_schemas(driver: &str) -> &'static [&'static str] {
     }
 }
 
-/// Whether a source of this driver can be listed: DuckDB reads it, or it
-/// has a catalog on Trino (decision 0048).
+/// Whether a source of this driver can be listed: DuckDB reads it.
 pub fn listable(driver_name: &str) -> bool {
     driver(driver_name).is_some_and(|d| matches!(d.engine, Engine::DuckDb { .. }))
-        || crate::source_catalog::has_catalog(driver_name)
 }
 
 /// Queues the listing of `source`.
@@ -377,10 +375,11 @@ mod tests {
     }
 
     #[test]
-    fn duckdb_drivers_and_trino_catalogs_are_listed() {
+    fn duckdb_drivers_are_listed() {
         assert!(listable("postgres") && listable("mysql"));
-        // A source on Trino is listed through its catalog (decision 0048).
+        // Read through DuckDB's extensions (decision 0077).
         assert!(listable("sqlserver") && listable("oracle"));
-        assert!(!listable("nope"));
+        // A driver this installation does not have (decision 0077).
+        assert!(!listable("openedge") && !listable("nope"));
     }
 }

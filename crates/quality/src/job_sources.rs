@@ -16,7 +16,6 @@ use axum::http::{HeaderMap, StatusCode};
 use crate::lake::{self, LakeAccess, LakeIssuer};
 use crate::mapping::Mapping;
 use crate::source::{driver, Engine};
-use crate::source_catalog::has_catalog;
 use crate::source_store::{self, Sealer, StoreError};
 
 /// Where credentials issued to jobs are recorded (the audit log, 0026).
@@ -49,9 +48,10 @@ pub struct SourceAccess {
 }
 
 impl SourceAccess {
-    /// Read through its catalog on Trino: it carries no credentials.
+    /// Read through a catalog on Trino: never since decision 0077, every
+    /// driver is DuckDB's. Kept for the worker's Trino path until it goes.
     pub fn on_trino(&self) -> bool {
-        has_catalog(&self.driver)
+        false
     }
 }
 
@@ -77,10 +77,8 @@ pub enum SourceIssue {
 /// reads: an extraction's, from its dataset's mapping (`from`); a map's,
 /// from its parameters (`source`, `table`: it has no mapping yet, decision
 /// 0038); a page of records' too (0049); a listing's, from its parameters
-/// too, with no table (0042). A
-/// listing or an extraction of a source on Trino gets its name, driver and
-/// table only: Trino reads its own catalog, and the worker never sees its
-/// credentials (0048). Not yet recorded.
+/// too, with no table (0042). A source of a driver this installation does
+/// not have is not read (decision 0077, point 4). Not yet recorded.
 pub async fn source_for(
     pool: &PgPool,
     sealer: &dyn Sealer,
@@ -114,16 +112,7 @@ pub async fn source_for(
     let on_duckdb = driver(&credentials.source.driver)
         .is_some_and(|d| matches!(d.engine, Engine::DuckDb { .. }));
     if !on_duckdb {
-        let listed = matches!(kind, "tables" | "extract" | "records" | "map")
-            && has_catalog(&credentials.source.driver);
-        return Ok(listed.then(|| SourceAccess {
-            name: credentials.source.name,
-            driver: credentials.source.driver,
-            table,
-            fields: BTreeMap::new(),
-            secrets: BTreeMap::new(),
-            previous: None,
-        }));
+        return Ok(None);
     }
     let source = credentials.source;
     Ok(Some(SourceAccess {
