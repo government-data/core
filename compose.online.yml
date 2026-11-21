@@ -31,7 +31,7 @@ services:
       ORQ_DOMINIO: ${ORQ_DOMINIO:?ORQ_DOMINIO is missing}
       # The platform's mail is sent by gestión: each company's is optional.
     labels:
-      - "traefik.http.routers.api.rule=HostRegexp(`^[a-z0-9-]+\\.${ORQ_DOMINIO}$$`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && Header(`X-Origen-Secreto`, `${ORQ_ORIGEN_SECRETO:?ORQ_ORIGEN_SECRETO is missing}`)"
+      - "traefik.http.routers.api.rule=HostRegexp(`^[a-z0-9-]+\\.${ORQ_DOMINIO}$$`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`) && Header(`X-Origen-Secreto`, `${ORQ_ORIGEN_SECRETO:?ORQ_ORIGEN_SECRETO is missing}`)"
       - "traefik.http.routers.api.tls.domains[0].main=${ORQ_DOMINIO}"
       - "traefik.http.routers.api.tls.domains[0].sans=*.${ORQ_DOMINIO}"
       - "traefik.http.routers.api.middlewares=api-chain-cdn@file"

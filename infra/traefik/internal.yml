@@ -92,6 +92,18 @@ http:
       service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
       middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
 
+    # The update agent (decision 0003) calls updater/v1 with its certificate
+    # (role `updater`, `server updater-certificate`): /api/updater/v1/…,
+    # which the API answers only for that role. The public routers leave
+    # this path alone.
+    updater:
+      rule: "Host(`{{ $internal }}`) && PathPrefix(`/api/updater/v1/`)"
+      entryPoints: [internal]
+      tls:
+        options: machines
+      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
+      middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
+
     # The lake's check, asked by the gate in front of RustFS (0066, point
     # 10), on the gates' entry point, where the header that names the
     # machine at the gate arrives. The certificate header is the gate's

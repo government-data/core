@@ -57,6 +57,10 @@
     "platform": {
       "notFoundOrNoAccess": "It does not exist or you do not have access.",
       "roleForbids": "Your role in this area does not allow this action."
+    },
+    "updater": {
+      "notTheAgent": "Only the update agent's certificate calls updater/v1.",
+      "unavailable": "The database does not answer."
     }
   },
   "app": {

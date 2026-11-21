@@ -6,10 +6,10 @@
 # shared middlewares of ./dynamic.
 http:
   routers:
-    # Not the machines' routes: those only on the internal entry point
-    # (internal.yml).
+    # Not the machines' or the update agent's routes: those only on the
+    # internal entry point (internal.yml).
     api-host:
-      rule: "Host(`localhost`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`)"
+      rule: "Host(`localhost`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`)"
       entryPoints: [websecure]
       tls: {}
       priority: 100

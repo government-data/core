@@ -57,6 +57,10 @@
     "platform": {
       "notFoundOrNoAccess": "No existe o no tienes acceso.",
       "roleForbids": "Tu rol en esta área no permite esta acción."
+    },
+    "updater": {
+      "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
+      "unavailable": "La base de datos no responde."
     }
   },
   "app": {

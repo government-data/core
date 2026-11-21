@@ -147,9 +147,10 @@ services:
       # API router: Host + "/api" prefix, higher priority so it wins over the
       # web catch-all. The api-chain middleware strips "/api", rate-limits,
       # applies security headers and compresses. The machines' routes
-      # (/api/internal/machines/…) are not served here: only on the internal
-      # entry point, with a client certificate (infra/traefik/internal.yml).
-      - "traefik.http.routers.api.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`)"
+      # (/api/internal/machines/…) and the update agent's (/api/updater/…)
+      # are not served here: only on the internal entry point, with a client
+      # certificate (infra/traefik/internal.yml).
+      - "traefik.http.routers.api.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`)"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api.priority=100"
