@@ -46,6 +46,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       image-api: ${{ steps.filter.outputs.image-api }}
       image-web: ${{ steps.filter.outputs.image-web }}
+      image-worker: ${{ steps.filter.outputs.image-worker }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -84,6 +85,15 @@ jobs:
             # What goes into each image: a broken Dockerfile fails the PR.
             image-api:
               - 'infra/docker/api.Dockerfile'
+              - '.dockerignore'
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/ci.yml'
+            # The worker links the crates it reads sources and the lake with:
+            # any crate can change it, as for the API.
+            image-worker:
+              - 'infra/docker/worker.Dockerfile'
               - '.dockerignore'
               - 'crates/**'
               - 'Cargo.toml'
@@ -253,6 +263,31 @@ jobs:
           file: infra/docker/api.Dockerfile
           push: false
 
+  # The worker's image, as the API's: a release build with DuckDB, so no
+  # Actions cache and the disk freed first. It also installs DuckDB's
+  # extensions and checks each source driver's SHA-256, failing on a
+  # mismatch.
+  image-worker:
+    needs: check
+    if: ${{ needs.check.outputs.image-worker == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc "$RUNNER_TOOL_CACHE"
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the worker image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/worker.Dockerfile
+          push: false
+
   # The web image keeps a small Actions cache (about 180 MB), deleted with the
   # PR's other caches when it closes (cache-cleanup.yml).
 
@@ -278,7 +313,7 @@ jobs:
   # affected job passed. Skipped stacks (unaffected) do not fail the gate.
   ci:
     if: always()
-    needs: [check, backend, frontend, image-api, image-web]
+    needs: [check, backend, frontend, image-api, image-web, image-worker]
     runs-on: ${{ fromJSON(vars.CI_RUNNER_LIVIANO || '"ubuntu-latest"') }}
     steps:
       - name: Aggregate result
@@ -287,12 +322,13 @@ jobs:
           if [ "${{ needs.check.result }}" != "success" ]; then
             echo "check job did not succeed"; exit 1
           fi
-          for stack in backend frontend image-api image-web; do
+          for stack in backend frontend image-api image-web image-worker; do
             case "$stack" in
               backend) result="${{ needs.backend.result }}" ;;
               frontend) result="${{ needs.frontend.result }}" ;;
               image-api) result="${{ needs.image-api.result }}" ;;
               image-web) result="${{ needs.image-web.result }}" ;;
+              image-worker) result="${{ needs.image-worker.result }}" ;;
             esac
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
               echo "$stack job $result"; exit 1
