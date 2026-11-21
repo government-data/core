@@ -90,16 +90,14 @@ pub const DRIVERS: &[Driver] = &[
     },
     Driver {
         id: "sqlserver",
-        engine: Engine::Trino {
-            connector: "sqlserver",
-        },
+        engine: Engine::DuckDb { extension: "mssql" },
         default_port: Some(1433),
         fields: SQLSERVER,
     },
     Driver {
         id: "oracle",
-        engine: Engine::Trino {
-            connector: "oracle",
+        engine: Engine::DuckDb {
+            extension: "oracle_scanner",
         },
         default_port: Some(1521),
         fields: &[
@@ -268,10 +266,17 @@ mod tests {
                 extension: "postgres"
             }
         );
-        assert!(matches!(
+        // Read through DuckDB's extensions, not Trino (decision 0077).
+        assert_eq!(
             driver("sqlserver").unwrap().engine,
-            Engine::Trino { .. }
-        ));
+            Engine::DuckDb { extension: "mssql" }
+        );
+        assert_eq!(
+            driver("oracle").unwrap().engine,
+            Engine::DuckDb {
+                extension: "oracle_scanner"
+            }
+        );
         assert!(driver("excel").is_none());
     }
 

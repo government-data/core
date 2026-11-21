@@ -201,7 +201,7 @@ async fn a_listing_that_failed_an_attempt_says_it_retries_and_why() {
 }
 
 #[tokio::test]
-async fn a_listing_of_a_source_on_trino_gets_its_name_and_a_token_of_its_own() {
+async fn a_listing_of_a_sql_server_source_gets_its_credentials_for_duckdb() {
     let f = fixture().await;
     source_on(&f, "sqlserver").await;
     let job = listing_job(&f, 0).await;
@@ -214,15 +214,12 @@ async fn a_listing_of_a_source_on_trino_gets_its_name_and_a_token_of_its_own() {
         (source.name.as_str(), source.driver.as_str()),
         ("core", "sqlserver")
     );
-    assert!(source.on_trino() && source.secrets.is_empty() && source.fields.is_empty());
-    assert!(source.previous.is_none());
-    // Trino reads its own catalog: the job gets its own token for it
-    // (decision 0062), recorded first.
-    let trino = details.trino.expect("a listing on Trino gets its token");
-    assert_eq!(trino.token, format!("job:{B}:{job}:read:src_core|w1"));
+    // DuckDB reads it (decision 0077): its credentials, no token for Trino.
+    assert!(!source.on_trino() && source.secrets.contains_key("password"));
+    assert!(details.trino.is_none());
     assert_eq!(
         *f.issued.given.lock().unwrap(),
-        vec![(job, "w1".into(), "trino/src_core".into())]
+        vec![(job, "w1".into(), "source/core".into())]
     );
 
     let report = format!("{uri}/report");
@@ -239,7 +236,7 @@ async fn a_listing_of_a_source_on_trino_gets_its_name_and_a_token_of_its_own() {
 }
 
 #[tokio::test]
-async fn a_map_of_a_source_on_trino_gets_its_table_and_a_token_of_its_own() {
+async fn a_map_of_a_sql_server_source_gets_its_table_and_credentials() {
     let f = fixture().await;
     source_on(&f, "sqlserver").await;
     let job: Uuid = sqlx::query_scalar(
@@ -261,16 +258,15 @@ async fn a_map_of_a_source_on_trino_gets_its_table_and_a_token_of_its_own() {
         .await;
     assert_eq!(status, StatusCode::OK);
     let details: JobDetails = serde_json::from_slice(&body).unwrap();
-    let source = details.source.expect("a map on Trino is given its source");
+    let source = details.source.expect("a map is given its source");
     assert_eq!(
         (source.name.as_str(), source.table.as_str()),
         ("core", "dbo.clients")
     );
-    assert!(source.on_trino() && source.secrets.is_empty());
-    let trino = details.trino.expect("a map on Trino gets its token");
-    assert_eq!(trino.token, format!("job:{B}:{job}:read:src_core|w1"));
+    assert!(!source.on_trino() && source.secrets.contains_key("password"));
+    assert!(details.trino.is_none());
     assert_eq!(
         *f.issued.given.lock().unwrap(),
-        vec![(job, "w1".into(), "trino/src_core".into())]
+        vec![(job, "w1".into(), "source/core".into())]
     );
 }
