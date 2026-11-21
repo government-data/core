@@ -1,15 +1,14 @@
 //! A source table's records, read as a database client reads them (decision
 //! 0049, point 3), pure: what is asked (a page of [`PAGE`] records, the
 //! first ones, the last ones by a column, or page _n_ in an order), the page
-//! a `records` job reports, masked for whoever may not see personal data,
-//! and the statement Trino runs for a source on it. DuckDB reads the same
-//! page through `quality-rules-duckdb`. Never more than a page at a time.
+//! a `records` job reports, masked for whoever may not see personal data.
+//! DuckDB reads the page through `quality-rules-duckdb`. Never more than a
+//! page at a time.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::rule_test::mask;
-use crate::trino_catalog::catalog_name;
 
 /// The records of a page.
 pub const PAGE: u32 = 1000;
@@ -119,44 +118,4 @@ impl RecordsPage {
         }
         self
     }
-}
-
-fn quoted(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
-}
-
-/// The statement Trino runs for `ask` on the source `source`'s catalog:
-/// one record more than a page, to know whether there are more.
-pub fn trino_statement(source: &str, ask: &RecordsAsk) -> Result<String, AskError> {
-    ask.check()?;
-    let (schema, table) = ask.schema_and_table()?;
-    let order = ask.order.as_deref().map_or(String::new(), |c| {
-        let way = if ask.descending { "DESC" } else { "ASC" };
-        format!(" ORDER BY {} {way}", quoted(c))
-    });
-    Ok(format!(
-        "SELECT * FROM {}.{}.{}{order} OFFSET {} LIMIT {}",
-        catalog_name(source),
-        quoted(schema),
-        quoted(table),
-        ask.offset(),
-        PAGE + 1
-    ))
-}
-
-fn literal(text: &str) -> String {
-    format!("'{}'", text.replace('\'', "''"))
-}
-
-/// The statement Trino runs for the names of the table's columns, in the
-/// order `SELECT *` gives them: its answer has values only.
-pub fn trino_columns(source: &str, ask: &RecordsAsk) -> Result<String, AskError> {
-    let (schema, table) = ask.schema_and_table()?;
-    Ok(format!(
-        "SELECT column_name FROM {}.information_schema.columns \
-         WHERE table_schema = {} AND table_name = {} ORDER BY ordinal_position",
-        catalog_name(source),
-        literal(&schema.to_lowercase()),
-        literal(&table.to_lowercase()),
-    ))
 }

@@ -49,7 +49,7 @@ pub struct SourceAccess {
 
 impl SourceAccess {
     /// Read through a catalog on Trino: never since decision 0077, every
-    /// driver is DuckDB's. Kept for the worker's Trino path until it goes.
+    /// driver is DuckDB's. Kept for the API's Trino paths until they go.
     pub fn on_trino(&self) -> bool {
         false
     }

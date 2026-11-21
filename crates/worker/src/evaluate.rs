@@ -156,7 +156,7 @@ fn pinned(job: &JobDetails) -> Result<Option<i64>, Failed> {
 
 /// Which silver the evaluation reads (decision 0061): the snapshot its
 /// extraction wrote; with none, silver's current one unless bronze is
-/// pinned (a cut extracted before silver, or through Trino: bronze).
+/// pinned (a cut extracted before silver, or with bronze only).
 fn silver_at(job: &JobDetails, pinned: Option<i64>) -> Result<Option<SilverAt>, Failed> {
     match job.parameters.get("silver_snapshot") {
         Some(s) => s

@@ -19,8 +19,5 @@ services:
       QD_WORKER_CLIENT_ID: qd-worker-dev
       QD_WORKER_CLIENT_SECRET: ${QD_WORKER_DEV_CLIENT_SECRET:?register qd-worker-dev (see .env.example)}
       QD_CA_FILE: /etc/qd/dev-ca.crt
-      # Trino's protocol, published on 127.0.0.1 (compose.watch.yml), for
-      # the sources read through it (decision 0048).
-      QD_TRINO_URL: https://127.0.0.1:8490
     volumes:
       - ./infra/traefik/certs/dev-ca.crt:/etc/qd/dev-ca.crt:ro

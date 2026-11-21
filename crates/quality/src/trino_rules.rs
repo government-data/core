@@ -11,9 +11,11 @@ use std::collections::BTreeSet;
 
 use serde_json::{json, Value};
 
+use crate::job_trino::catalog_name;
 use crate::source::valid_name;
-use crate::trino_catalog::catalog_name;
-use crate::trino_extract::LAKE;
+
+/// The static catalog of the lake in Trino: the main tenant's warehouse.
+const LAKE: &str = "lake";
 
 /// People: their e-mail (the Web UI's sign-in).
 const PEOPLE: &str = ".*@.*";

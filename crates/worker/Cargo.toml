@@ -33,8 +33,6 @@ hmac.workspace = true
 # A maintain job's requests to the catalog and the bucket (decision 0039).
 chrono.workspace = true
 sigv4.workspace = true
-# A source on Trino read through its catalog (decision 0048).
-trino-client.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
 tracing.workspace = true

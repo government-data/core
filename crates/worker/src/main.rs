@@ -29,15 +29,13 @@
 //!   `quality-api` (with a certificate, the role's client, e.g.
 //!   `qd-worker`, registered with `--machine-role worker`);
 //! - `QD_MACHINE_DIR`, or `QD_WORKER_CLIENT_SECRET`: the mode, above;
-//! - `QD_CA_FILE`: a CA to trust for the lake and Trino, and for the API
+//! - `QD_CA_FILE`: a CA to trust for the lake, and for the API
 //!   with a secret (development);
 //! - `QD_LAKE_URL`: the lake as this worker reaches it, when the lake
 //!   takes only machines' certificates (decision 0066, point 10): the proxy
 //!   on its loopback (`infra/worker/lake.yml`), which presents the
 //!   machine's, `https://<machine name>:9000`. The worker waits for it, and
 //!   reaches every job's lake there;
-//! - `QD_TRINO_URL`: Trino's coordinator (`https://…:8490`), for the sources
-//!   read through it, each job with its own token (decision 0062);
 //! - `QD_WORKER_SLOTS`: jobs at a time (1);
 //! - `QD_WORKER_MIN_FREE_BYTES` (5 GB) and `QD_WORKER_MIN_FREE_MEMORY_PCT`
 //!   (10): below either no job is claimed (`guard.rs`, decision 0072);
@@ -55,7 +53,6 @@ mod config;
 mod distribution;
 mod evaluate;
 mod extract;
-mod extract_trino;
 mod findings;
 mod guard;
 mod icd;
@@ -75,7 +72,6 @@ mod tables;
 mod test_rule;
 #[cfg(test)]
 mod testing;
-mod trino_job;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -120,10 +116,6 @@ async fn run() -> Result<(), Failure> {
     }
     let queue = queue_conn::options(&config::value("QD_QUEUE_DATABASE_URL")?, mode.files())?;
     let mut api = mode.api(http.build()?, &config::value("QD_API_URL")?)?;
-    if let Some(url) = config::env("QD_TRINO_URL") {
-        let pem = ca.as_deref().map(std::fs::read).transpose()?;
-        api = api.with_trino(trino_client::TrinoClient::new(&url, pem.as_deref())?);
-    }
     if let Some(url) = config::env("QD_LAKE_URL") {
         config::wait_for_lake(&url).await?;
         api = api.with_lake(url);
@@ -211,15 +203,6 @@ async fn run_job(api: &api::Api, ca: Option<&str>, job: &ClaimedJob) -> Result<(
         Err(e) => return Err(format!("job details: {e}").into()),
     };
     let ca = ca.map(str::to_string);
-    let trino = trino_job::JobTrino::of_job(api, job, &details)?;
-    if let (Some(trino), "extract") = (&trino, details.kind.as_str()) {
-        let report = extract_trino::extract(&details, trino).await?;
-        tracing::info!(
-            rows = report.ranges.iter().map(|r| r.rows).sum::<i64>(),
-            "extracted through Trino"
-        );
-        return send_report(api, job, &report).await;
-    }
     if details.kind == "extract" {
         return run_extract(api, job, details, ca).await;
     }
@@ -229,11 +212,7 @@ async fn run_job(api: &api::Api, ca: Option<&str>, job: &ClaimedJob) -> Result<(
         return send_report(api, job, &report).await;
     }
     if details.kind == "map" {
-        let report = if let Some(trino) = &trino {
-            map::map_on_trino(&details, trino).await?
-        } else {
-            job_span::blocking(move || map::map(&details)).await??
-        };
+        let report = job_span::blocking(move || map::map(&details)).await??;
         tracing::info!(
             columns = report.profile.columns.len(),
             sampled = report.profile.sampled,
@@ -263,11 +242,7 @@ async fn run_job(api: &api::Api, ca: Option<&str>, job: &ClaimedJob) -> Result<(
         return send_report(api, job, &report).await;
     }
     if details.kind == "records" {
-        let page = if let Some(trino) = &trino {
-            records::read_on_trino(&details, trino).await?
-        } else {
-            job_span::blocking(move || records::read(&details)).await??
-        };
+        let page = job_span::blocking(move || records::read(&details)).await??;
         // Counts only: the values are the API's to mask and audit.
         tracing::info!(records = page.rows.len(), more = page.more, "read a page");
         return send_report(api, job, &page).await;
@@ -284,11 +259,7 @@ async fn run_job(api: &api::Api, ca: Option<&str>, job: &ClaimedJob) -> Result<(
         return send_report(api, job, &result).await;
     }
     if details.kind == "tables" {
-        let report = if let Some(trino) = &trino {
-            tables::list_on_trino(&details, trino).await?
-        } else {
-            job_span::blocking(move || tables::list(&details)).await??
-        };
+        let report = job_span::blocking(move || tables::list(&details)).await??;
         tracing::info!(
             tables = report.tables.len(),
             truncated = report.truncated,
