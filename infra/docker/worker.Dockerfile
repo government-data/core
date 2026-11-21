@@ -17,7 +17,7 @@
 # engine the `duckdb` crate bundles (v2.0.0) on linux_amd64 (decision 0077
 # point 8): the build fails if one differs. A new version of an extension,
 # or of DuckDB, is reviewed before its hash changes here (`mssql` v0.3.0,
-# hugr-lab, MIT; `oracle_scanner` 0.8.0, krokozyab, Apache-2.0;
+# hugr-lab, MIT; `oracle_scanner` 0.8.1, krokozyab, Apache-2.0;
 # `postgres_scanner` and `mysql_scanner`, DuckDB's, MIT).
 
 FROM rust:1.90-bookworm AS chef
@@ -39,7 +39,7 @@ RUN cd /out/home/.duckdb/extensions/v2.0.0/linux_amd64 && printf '%s  %s\n' \
       39e661c5cfb678c9472f5acd88235f84f3ef4126e7444c7c8a01214d9b291601 postgres_scanner.duckdb_extension \
       6055f1a59dc527df795afccbf59279500d1ddc239608dd310c3eba0e98d1a11c mysql_scanner.duckdb_extension \
       473b2980d494df2a0653ec9a8a82588ae102a9ab25d5a2b117a6e9fcd5fc20c5 mssql.duckdb_extension \
-      0c8b42d0e7c8cccff78c97e2bd1c09e42f0e28b31af527d72c27fc12c21d673a oracle_scanner.duckdb_extension \
+      20fe6e698f29be6d01435422c04115adb0dbdee073e003432a159d4665be3dc3 oracle_scanner.duckdb_extension \
     | sha256sum --check --strict
 # The agent's directory, the user's: a volume mounted there takes it.
 RUN mkdir -m 0700 -p /out/qd-node
