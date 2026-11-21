@@ -4,8 +4,7 @@
 //! [`Caller`] (`quality:ViewSources`, `quality:ManageSources` on
 //! `source/<name>`), and every change is audited through it, secrets as
 //! changed. A request's body may carry secrets: it is never logged. A
-//! source a mapping on the catalog's `main` reads is not deleted. A source
-//! on Trino keeps its catalog there (decision 0048, [`source_catalog`]).
+//! source a mapping on the catalog's `main` reads is not deleted.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -25,7 +24,6 @@ use uuid::Uuid;
 use crate::catalog::{Catalog, DatasetMapping};
 use crate::mapping::Mapping;
 use crate::source::{Driver, Engine, FieldKind, Source, SourceError, DRIVERS};
-use crate::source_catalog::{self, Trino};
 use crate::source_store::{self, Put, Sealer, SourceView, StoreError};
 use crate::tables_api;
 
@@ -37,17 +35,11 @@ struct SourceApi {
     pool: PgPool,
     sealer: Arc<dyn Sealer>,
     catalog: Option<Arc<dyn Catalog>>,
-    trino: Option<Arc<dyn Trino>>,
 }
 
 /// `GET /quality/drivers`, `GET /quality/sources`,
 /// `PUT` and `DELETE /quality/sources/{name}`.
-pub fn routes(
-    pool: PgPool,
-    sealer: Arc<dyn Sealer>,
-    catalog: Option<Arc<dyn Catalog>>,
-    trino: Option<Arc<dyn Trino>>,
-) -> Router {
+pub fn routes(pool: PgPool, sealer: Arc<dyn Sealer>, catalog: Option<Arc<dyn Catalog>>) -> Router {
     Router::new()
         .route("/quality/drivers", get(drivers))
         .route("/quality/sources", get(list))
@@ -59,7 +51,6 @@ pub fn routes(
             pool,
             sealer,
             catalog,
-            trino,
         })
 }
 
@@ -86,29 +77,6 @@ fn internal(what: &str) -> Response {
     StatusCode::INTERNAL_SERVER_ERROR.into_response()
 }
 
-/// Trino did not take the source's catalog statement.
-fn trino_failed(name: &str, why: &str) -> Response {
-    tracing::error!(source = name, "sources: trino catalog: {why}");
-    (StatusCode::BAD_GATEWAY, Json(json!({ "error": "trino" }))).into_response()
-}
-
-/// The source's catalog made again as it is saved, if it has one and there
-/// is a Trino.
-async fn sync_catalog(api: &SourceApi, name: &str, driver: &str) -> Result<(), Box<Response>> {
-    let Some(trino) = api.trino.as_deref() else {
-        return Ok(());
-    };
-    if !source_catalog::has_catalog(driver) {
-        return Ok(());
-    }
-    let saved = source_store::credentials(&api.pool, api.sealer.as_ref(), name)
-        .await
-        .map_err(|e| Box::new(internal(&format!("{e:?}"))))?;
-    source_catalog::replace(trino, &saved.source)
-        .await
-        .map_err(|e| Box::new(trino_failed(name, &e)))
-}
-
 /// A driver of the catalog, for its form.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DriverOut {
@@ -123,7 +91,6 @@ pub struct DriverOut {
 #[serde(rename_all = "lowercase")]
 pub enum EngineOut {
     Duckdb,
-    Trino,
 }
 
 /// One field of a driver's form; a `secret` one is never sent back.
@@ -146,7 +113,6 @@ pub enum FieldKindOut {
 fn driver_out(d: &Driver) -> DriverOut {
     let engine = match d.engine {
         Engine::DuckDb { .. } => EngineOut::Duckdb,
-        Engine::Trino { .. } => EngineOut::Trino,
     };
     let fields = d
         .fields
@@ -272,8 +238,6 @@ fn refusal(e: SourceError) -> Refusal {
         (status = 403, description = "May not manage this source"),
         (status = 422, description = "The source does not hold together: every reason",
             body = Refusals),
-        (status = 502, description = "Saved and audited, but Trino did not take its catalog: \
-            saving it again retries"),
     ),
     tag = "sources",
 )]
@@ -293,13 +257,6 @@ async fn put_source(
         fields: body.fields,
         secrets: body.secrets,
     };
-    if let Some(field) = source_catalog::refused_field(&source) {
-        let errors = vec![Refusal {
-            code: "value",
-            field: Some(field),
-        }];
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(Refusals { errors })).into_response();
-    }
     let change = match source_store::put(&api.pool, api.sealer.as_ref(), &source).await {
         Ok(Put::Created) => Change::Created,
         Ok(Put::Changed) => Change::Changed,
@@ -319,13 +276,10 @@ async fn put_source(
         resource,
         change,
     };
-    if let Err(e) = caller.audit(entry).await {
-        return internal(&format!("audit: {e}"));
-    }
-    match sync_catalog(&api, &name, &body.driver).await {
+    match caller.audit(entry).await {
         Ok(()) if change == Change::Created => StatusCode::CREATED.into_response(),
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(refused) => *refused,
+        Err(e) => internal(&format!("audit: {e}")),
     }
 }
 
@@ -367,7 +321,6 @@ fn unavailable() -> Response {
         (status = 404, description = "No source by that name"),
         (status = 409, description = "Datasets' mappings on the catalog's main read it",
             body = InUse),
-        (status = 502, description = "Trino did not drop its catalog: nothing deleted"),
         (status = 503, description = "No catalog to ask which mappings read it"),
     ),
     tag = "sources",
@@ -404,18 +357,6 @@ async fn delete_source(
         Ok(datasets) if datasets.is_empty() => {}
         Ok(datasets) => return (StatusCode::CONFLICT, Json(InUse { datasets })).into_response(),
         Err(e) => return internal(&e),
-    }
-    // Its catalog first: no catalog with its credentials outlives it.
-    if let Some(trino) = api.trino.as_deref() {
-        match source_store::driver_of(&api.pool, &name).await {
-            Ok(Some(driver)) if source_catalog::has_catalog(&driver) => {
-                if let Err(e) = source_catalog::drop(trino, &name).await {
-                    return trino_failed(&name, &e);
-                }
-            }
-            Ok(_) => {}
-            Err(e) => return internal(&e.to_string()),
-        }
     }
     match source_store::delete_held(held, &name).await {
         Ok(true) => {}

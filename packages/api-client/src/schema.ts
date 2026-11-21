@@ -1908,7 +1908,7 @@ export interface components {
          * @description The engine that reads a driver's sources.
          * @enum {string}
          */
-        EngineOut: "duckdb" | "trino";
+        EngineOut: "duckdb";
         /** @description The JSON body every error response carries. */
         ErrorResponse: {
             /**
@@ -6903,13 +6903,6 @@ export interface operations {
                     "application/json": components["schemas"]["Refusals"];
                 };
             };
-            /** @description Saved and audited, but Trino did not take its catalog: saving it again retries */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
         };
     };
     quality_delete_source: {
@@ -6960,13 +6953,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["InUse"];
                 };
-            };
-            /** @description Trino did not drop its catalog: nothing deleted */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description No catalog to ask which mappings read it */
             503: {

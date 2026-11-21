@@ -104,26 +104,6 @@ pub(crate) async fn extract_access(
         })
 }
 
-/// An extraction on Trino's namespace, made if missing (decision 0048):
-/// Trino writes the table with its own access, so no credential is given.
-pub(crate) async fn trino_namespace(
-    api: &WorkerApi,
-    tenant: Uuid,
-    mapping: &str,
-) -> Result<(), StatusCode> {
-    let (Some(tables), Ok(mapping)) = (&api.services.tables, Mapping::parse(mapping)) else {
-        return Ok(());
-    };
-    let (namespace, _) = bronze(&mapping);
-    tables
-        .ensure_namespace(&lake::warehouse(tenant), &namespace)
-        .await
-        .map_err(|e| {
-            tracing::error!("bronze namespace: {e}");
-            StatusCode::SERVICE_UNAVAILABLE
-        })
-}
-
 /// `GET /internal/jobs/{tenant}/{id}/lake`: an extraction asks again, once
 /// it has created its table.
 pub(crate) async fn lake_again(

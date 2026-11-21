@@ -26,7 +26,6 @@ use uuid::Uuid;
 use crate::catalog::Catalog;
 use crate::machine_certs::{MachineCertificates, TRINO_COORDINATOR};
 use crate::mapping::Mapping;
-use crate::source_catalog::has_catalog;
 use crate::source_store;
 use crate::trino_rules::{self, Extracted};
 
@@ -179,12 +178,18 @@ impl RulesApi {
             let driver = source_store::driver_of(&self.pool, &source)
                 .await
                 .map_err(|e| e.to_string())?;
-            if driver.as_deref().is_some_and(has_catalog) {
+            if driver.as_deref().is_some_and(read_by_trino) {
                 found.push(Extracted { dataset, source });
             }
         }
         Ok(found)
     }
+}
+
+/// Whether Trino reads a source of `driver`: never since decision 0077,
+/// every driver is DuckDB's. This route goes with the rest of Trino.
+fn read_by_trino(_driver: &str) -> bool {
+    false
 }
 
 #[cfg(test)]

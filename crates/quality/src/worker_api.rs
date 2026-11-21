@@ -315,8 +315,7 @@ async fn details(
         let lake = if evaluate {
             job_lake::read_access(&api, tenant, id, &job.kind, &client, &headers).await?
         } else {
-            let of = (&job, catalog.as_ref(), on_trino);
-            lake_of(&api, ids, of, &client, &headers).await?
+            lake_of(&api, ids, (&job, catalog.as_ref()), &client, &headers).await?
         };
         let entity_key = entity_key::for_job(&api, id, &job.kind, &client, &headers).await?;
         Ok(Json(JobDetails {
@@ -372,21 +371,16 @@ async fn source_given(
 }
 
 /// The lake of a job that is no evaluation: an extraction's, its bronze
-/// table (decision 0037), or with Trino, which writes with its own access,
-/// the namespace only (0048); a maintenance's, its dataset's tables (0039);
-/// a listing of the lake's tables, the lake's.
+/// table (decision 0037); a maintenance's, its dataset's tables (0039); a
+/// listing of the lake's tables, the lake's.
 async fn lake_of(
     api: &WorkerApi,
     (tenant, id): (Uuid, Uuid),
-    (job, catalog, on_trino): (&HeldJob, Option<&CatalogSnapshot>, bool),
+    (job, catalog): (&HeldJob, Option<&CatalogSnapshot>),
     client: &str,
     headers: &HeaderMap,
 ) -> Result<Option<LakeAccess>, StatusCode> {
     match (catalog, job.kind.as_str(), &job.dataset) {
-        (Some(snapshot), "extract", _) if on_trino => {
-            job_lake::trino_namespace(api, tenant, &snapshot.mapping).await?;
-            Ok(None)
-        }
         (Some(snapshot), "extract", _) => {
             job_lake::extract_access(api, tenant, id, client, headers, &snapshot.mapping).await
         }
