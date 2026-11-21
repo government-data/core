@@ -19,6 +19,7 @@ mod sign;
 mod signer;
 #[cfg(test)]
 mod tests;
+pub mod updater_files;
 
 use std::time::Duration;
 
@@ -36,6 +37,7 @@ pub use inspect::{
     X509CertificateReader,
 };
 pub use sign::{IssuedCertificate, Lifetime, MachineIdentity};
+pub use updater_files::UpdaterFiles;
 
 /// The variable of the CA's certificate file (PEM).
 pub const CA_CERT_VAR: &str = "CA_CERT";

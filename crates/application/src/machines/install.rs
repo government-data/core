@@ -4,6 +4,10 @@
 //! and no person, as PostgreSQL needs a certificate before the API starts.
 //! From then on its agent renews it as any machine's.
 //!
+//! The update agent's machine (decision 0003) is made the same way, with
+//! the role `updater`: its certificate is the one it calls `/updater/v1/`
+//! with on the internal entry point.
+//!
 //! An installer may run twice. A second run for the same name makes no
 //! second machine: when the certificate already in the agent's directory is
 //! the machine's (in use or next), nothing is done; otherwise one is signed
@@ -63,13 +67,40 @@ impl MachinesService {
         held: Option<&str>,
         origin: &Origin,
     ) -> Result<Installed, InstallError> {
+        self.install_on_the_spot(MachineRole::App, name, csr_pem, held, origin)
+            .await
+    }
+
+    /// The update agent's machine `name`, role `updater` (decision 0003),
+    /// made and signed as [`Self::install_app`] does, for `O=qd,
+    /// OU=updater, CN=<name>`.
+    pub async fn install_updater(
+        &self,
+        name: &str,
+        csr_pem: &str,
+        held: Option<&str>,
+        origin: &Origin,
+    ) -> Result<Installed, InstallError> {
+        self.install_on_the_spot(MachineRole::Updater, name, csr_pem, held, origin)
+            .await
+    }
+
+    /// A machine of a `role` that does not join, made `approved` with its
+    /// certificate signed now.
+    async fn install_on_the_spot(
+        &self,
+        role: MachineRole,
+        name: &str,
+        csr_pem: &str,
+        held: Option<&str>,
+        origin: &Origin,
+    ) -> Result<Installed, InstallError> {
         let Some(signer) = self.signer.clone() else {
             return Err(InstallError::Unavailable);
         };
         if !is_label(name) {
             return Err(InstallError::InvalidName);
         }
-        let role = MachineRole::App;
         let machine = match self.registry.find_live(name).await? {
             Some(m) if m.role != role => return Err(InstallError::NameTaken),
             Some(m) if holds(&m, held) => return Ok(Installed::Unchanged(m)),

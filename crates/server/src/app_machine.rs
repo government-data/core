@@ -28,22 +28,32 @@ const USAGE: &str = "usage: server app-machine --name NAME --dir PATH";
 pub(crate) async fn run() -> CommandResult {
     let args: Vec<String> = std::env::args().skip(2).collect();
     let (name, dir) = parse(&args)?;
-    let ca = Ca::from_env()?.ok_or("app-machine needs the CA: CA_CERT_FILE and CA_KEY_FILE")?;
+    let machines = signing_machines("app-machine").await?;
+    println!("{}", install(&machines, &name, Path::new(&dir)).await?);
+    Ok(())
+}
+
+/// The machines' use cases with the CA (`CA_CERT_FILE`, `CA_KEY_FILE`),
+/// over the database of `DATABASE_URL`, its migrations run: for a
+/// `command` that signs a certificate on the spot.
+pub(crate) async fn signing_machines(
+    command: &str,
+) -> Result<MachinesService, Box<dyn std::error::Error>> {
+    let ca = Ca::from_env()?
+        .ok_or_else(|| format!("{command} needs the CA: CA_CERT_FILE and CA_KEY_FILE"))?;
     let pool = infrastructure::connect(&PgConfig::from_env()?).await?;
     infrastructure::run_migrations(&pool).await?;
-    let machines = MachinesService::new(
+    Ok(MachinesService::new(
         Arc::new(PgMachines::new(pool.clone())),
         Arc::new(RingJoinTokenMint::new()),
         Arc::new(PgAuditRepository::new(pool)),
         Arc::new(SystemClock),
     )
-    .with_signer(Arc::new(ca));
-    println!("{}", install(&machines, &name, Path::new(&dir)).await?);
-    Ok(())
+    .with_signer(Arc::new(ca)))
 }
 
-/// `--name` and `--dir`, both required, nothing else.
-fn parse(args: &[String]) -> Result<(String, String), &'static str> {
+/// `--name` and `--dir`, both required, nothing else; `Err` for the usage.
+pub(crate) fn parse(args: &[String]) -> Result<(String, String), &'static str> {
     let (mut name, mut dir) = (None, None);
     let mut args = args.iter();
     while let Some(flag) = args.next() {
@@ -111,7 +121,7 @@ fn held_serial(store: &FileStore) -> Option<String> {
     certificate_info(&current.cert_pem).ok().map(|i| i.serial)
 }
 
-fn refusal(e: InstallError) -> String {
+pub(crate) fn refusal(e: InstallError) -> String {
     match e {
         InstallError::InvalidName => {
             "the name must be lowercase letters, digits and hyphens".into()

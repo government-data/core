@@ -12,6 +12,8 @@
 //!   * `ca-init` — make the installation's CA, once (decision 0066).
 //!   * `app-machine` — the application VM's machine and its first
 //!     certificate, signed on the spot (decision 0066, point 16).
+//!   * `updater-certificate` — the update agent's machine and its
+//!     certificate for the internal entry point (decision 0003).
 //!   * `oidc-keygen`, `oidc-client`, `oidc-client-update` — the gateway as an
 //!     OIDC provider: its keys and the applications that use it.
 //!   * `openapi` — print the OpenAPI spec.
@@ -39,6 +41,7 @@ mod settings_wiring;
 mod startup;
 mod tenants;
 mod trino_wiring;
+mod updater_certificate;
 mod updates_wiring;
 
 #[tokio::main]
@@ -64,6 +67,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some("audit") => audit::run().await,
         Some("ca-init") => commands::ca_init(),
         Some("app-machine") => app_machine::run().await,
+        Some("updater-certificate") => updater_certificate::run().await,
         Some("oidc-keygen") => commands::oidc_keygen(),
         Some("oidc-client") => commands::oidc_client().await,
         Some("oidc-client-update") => commands::oidc_client_update().await,
@@ -94,6 +98,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                  --cert PATH --key PATH (prints its SHA-256)\n  \
                  app-machine      The application VM's machine and its first \
                  certificate: --name NAME --dir PATH (the node agent's)\n  \
+                 updater-certificate  The update agent's certificate: --name NAME \
+                 --dir PATH (/etc/quality-data/internal)\n  \
                  oidc-keygen      Print a new OIDC_SIGNING_KEY \
                  (--es256: OIDC_SIGNING_KEY_ES256)\n  \
                  oidc-client      Register an application: ID NAME REDIRECT_URI... \

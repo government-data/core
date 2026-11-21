@@ -113,3 +113,49 @@ async fn no_ca_a_bad_name_or_a_bad_request_makes_no_machine() {
     assert!(w.kinds().is_empty());
     assert!(audit.0.lock().unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn the_update_agent_is_made_approved_with_the_role_updater() {
+    let w = world();
+    let installed = w
+        .service
+        .install_updater("updater", "csr", None, &origin())
+        .await
+        .unwrap();
+    let Installed::Signed {
+        machine,
+        certificate,
+        ..
+    } = installed
+    else {
+        panic!("signed");
+    };
+    assert_eq!(
+        (machine.role, machine.state),
+        (MachineRole::Updater, MachineState::Approved)
+    );
+    assert_eq!(certificate.pem, "cert updater updater");
+    let year = SystemTime::UNIX_EPOCH + DAY * 365;
+    assert_eq!(certificate.not_after, year, "until replaced");
+    let actions: Vec<_> = w
+        .audit
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|e| e.action.clone())
+        .collect();
+    assert_eq!(actions, ["install:updater", "install:updater"]);
+
+    // Not as the application VM: a name is one machine of one role.
+    let taken = w
+        .service
+        .install_app("updater", "csr", None, &origin())
+        .await;
+    assert_eq!(taken, Err(InstallError::NameTaken));
+    let again = w
+        .service
+        .install_updater("updater", "csr", Some(&certificate.serial), &origin())
+        .await;
+    assert_eq!(again, Ok(Installed::Unchanged(machine)));
+}
