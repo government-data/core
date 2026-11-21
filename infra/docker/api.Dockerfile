@@ -30,28 +30,16 @@ FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-# The public key the binary verifies licenses with (the production one is
-# passed when building the customers' images; without it, the development one).
-ARG ORQ_LICENSE_PUBKEY=""
 # The tag's version (domain::VERSION); without it, the crate's.
 ARG ORQ_VERSION=""
 ARG ORQ_COMMIT=""
-RUN if [ -n "$ORQ_LICENSE_PUBKEY" ]; then export ORQ_LICENSE_PUBKEY; else unset ORQ_LICENSE_PUBKEY; fi; \
-    if [ -n "$ORQ_VERSION" ]; then export ORQ_VERSION; else unset ORQ_VERSION; fi; \
+RUN if [ -n "$ORQ_VERSION" ]; then export ORQ_VERSION; else unset ORQ_VERSION; fi; \
     if [ -n "$ORQ_COMMIT" ]; then export ORQ_COMMIT; else unset ORQ_COMMIT; fi; \
-    cargo build --release --locked -p server -p licensing -p account
+    cargo build --release --locked -p server -p account
 # The folder of the key that encrypts the Settings secrets: the final image
 # has no shell to create it, and a new volume inherits its owner. The same
 # for the metrics file's folder (decision 0071), shared with Alloy.
 RUN mkdir -p /out/settings /out/qd-metrics
-
-# The licensing cloud (another image, same build):
-#   docker build -f infra/docker/api.Dockerfile --target licencias -t orquestador-licencias .
-FROM gcr.io/distroless/cc-debian12:nonroot AS licencias
-COPY --from=builder /app/target/release/licensing /usr/local/bin/licensing
-EXPOSE 8090
-USER nonroot
-ENTRYPOINT ["/usr/local/bin/licensing"]
 
 # The cloud's common account (cuenta.<domain>; another image, same build):
 #   docker build -f infra/docker/api.Dockerfile --target cuenta -t orquestador-cuenta .

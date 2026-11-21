@@ -88,8 +88,6 @@
     "app": {
       "gestion": "Management",
       "gestionDetail": "The platform panel",
-      "billing": "Billing",
-      "billingDetail": "Plan, payments and renewal",
       "trial": "Trial"
     },
     "language": "Language",

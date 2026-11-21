@@ -134,11 +134,6 @@ services:
       # APP_DOMAIN) and this API serves the companies of the cell ORQ_CELDA.
       ORQ_DOMINIO: ${ORQ_DOMINIO:-}
       ORQ_CELDA: ${ORQ_CELDA:-principal}
-      # The local installation's license (the installer writes them): the cloud
-      # that issues it, this installation's id and the key.
-      ORQ_NUBE: ${ORQ_NUBE:-}
-      ORQ_INSTALLATION_ID: ${ORQ_INSTALLATION_ID:-}
-      ORQ_LICENSE_KEY: ${ORQ_LICENSE_KEY:-}
     volumes:
       - settings-key:/var/lib/orquestador/settings
       - metrics:/run/qd-metrics

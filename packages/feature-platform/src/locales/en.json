@@ -66,7 +66,7 @@
     "reloadPage": "reload the page to use the new interface",
     "drainNotice": "It waits for running jobs to finish (up to {{maxDrainSecs}} min; anything started in the meantime stays queued), backs up the database and installs. If the new version does not start, it goes back to the previous one on its own. Quality Data does not respond for a few minutes.",
     "serviceSilent": "The update service has not responded since {{formatDate}}. Check it on the server with",
-    "licenseCloud": "The license cloud: {{w}}",
+    "updateSource": "The update source: {{w}}",
     "maintenanceSince": "Since {{formatDate}}: new jobs wait in the queue and run when it finishes.",
     "updateRequested": "«Update» clicked {{r}}on {{formatDate}} : the server's service picks it up in less than a minute.",
     "changedOn": "Changed on {{formatDate}} {{v}}.",

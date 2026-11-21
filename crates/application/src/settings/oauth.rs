@@ -18,8 +18,8 @@ impl SettingsService {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         // With the shared account, only it: the management panel controls the
-        // access and whoever signs in is tied to the account (so they see the
-        // billing). The company's own providers stay stored, unused.
+        // access and whoever signs in is tied to the account. The company's
+        // own providers stay stored, unused.
         let providers = match platform.as_ref() {
             Some(p) => vec![self.connectors.oauth_provider(p)?],
             None => s
@@ -50,8 +50,8 @@ impl SettingsService {
     }
 
     /// The shared account this instance signs in with (`https://cuenta.…`,
-    /// without a trailing `/`), to sign out through it, switch application or
-    /// see the billing. `None` without the account.
+    /// without a trailing `/`), to sign out through it or switch application.
+    /// `None` without the account.
     pub fn platform_account(&self) -> Option<String> {
         self.platform_oauth
             .read()
