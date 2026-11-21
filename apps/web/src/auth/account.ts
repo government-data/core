@@ -2,7 +2,7 @@
  * The cloud's common account (`cuenta.<domain>`, crates/account): there this
  * app only serves the access screens (sign in with its captcha, recover and
  * choose the password). After signing in it goes to the account's chooser
- * (`/home`: management, each company's app, the billing) or to the
+ * (`/home`: management, each company's app) or to the
  * application that sent it to sign in (`/oauth/authorize`), which are not
  * part of this app: they load whole.
  */

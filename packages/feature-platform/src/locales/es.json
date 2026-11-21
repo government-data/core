@@ -66,7 +66,7 @@
     "reloadPage": "recarga la página para usar la interfaz nueva",
     "drainNotice": "Se espera a que terminen las ejecuciones en curso (hasta {{maxDrainSecs}} min; lo que se ejecute mientras tanto queda en cola), se respalda la base y se instala. Si la versión nueva no arranca, se vuelve sola a la anterior. Quality Data no responde por unos minutos.",
     "serviceSilent": "El servicio de actualizaciones no responde desde el {{formatDate}}. Revísalo en el servidor con",
-    "licenseCloud": "La nube de licencias: {{w}}",
+    "updateSource": "La fuente de actualizaciones: {{w}}",
     "maintenanceSince": "Desde el {{formatDate}}: las ejecuciones nuevas esperan en cola y corren al terminar.",
     "updateRequested": "«Actualizar» pulsado {{r}}el {{formatDate}} : el servicio del servidor lo toma en menos de un minuto.",
     "changedOn": "Cambiada el {{formatDate}} {{v}}.",

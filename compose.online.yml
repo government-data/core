@@ -9,10 +9,6 @@
 #                       *.ORQ_DOMINIO comes through DNS-01 (with AWS_ACCESS_KEY_ID and
 #                       AWS_SECRET_ACCESS_KEY, or the instance's role)
 #   ORQ_ORIGEN_SECRETO  terraform output -json borde_secreto_origen
-#   ORQ_NUBE            the licensing cloud (https://licencias.orquestador.app)
-#   ORQ_LICENSE_KEY     the cell's key (online edition, from the gestión panel): with
-#                       it the cell receives the mail server configured in gestión
-#                       → Correo and sets it up in each company without its own
 #
 # Without the secret header no router answers: the cell cannot be reached
 # bypassing the edge.
@@ -34,9 +30,6 @@ services:
       ORQ_EDITION: online
       ORQ_DOMINIO: ${ORQ_DOMINIO:?ORQ_DOMINIO is missing}
       # The platform's mail is sent by gestión: each company's is optional.
-      ORQ_NUBE: ${ORQ_NUBE:?ORQ_NUBE is missing}
-      ORQ_LICENSE_KEY: ${ORQ_LICENSE_KEY:?ORQ_LICENSE_KEY is missing}
-      ORQ_INSTALLATION_ID: ${ORQ_INSTALLATION_ID:-${ORQ_DOMINIO}}
     labels:
       - "traefik.http.routers.api.rule=HostRegexp(`^[a-z0-9-]+\\.${ORQ_DOMINIO}$$`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && Header(`X-Origen-Secreto`, `${ORQ_ORIGEN_SECRETO:?ORQ_ORIGEN_SECRETO is missing}`)"
       - "traefik.http.routers.api.tls.domains[0].main=${ORQ_DOMINIO}"

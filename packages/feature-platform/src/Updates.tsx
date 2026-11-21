@@ -247,7 +247,7 @@ export const Updates: Component = () => {
             <Show when={v().report.warning}>
               {(w) => (
                 <div class="kn-notice kn-notice--warn">
-                  {tr("platform:updates.licenseCloud", { w: w() })}
+                  {tr("platform:updates.updateSource", { w: w() })}
                 </div>
               )}
             </Show>

@@ -88,8 +88,6 @@
     "app": {
       "gestion": "Gestión",
       "gestionDetail": "El panel de la plataforma",
-      "billing": "Facturación",
-      "billingDetail": "Plan, pagos y renovación",
       "trial": "Prueba"
     },
     "language": "Idioma",

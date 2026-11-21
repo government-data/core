@@ -75,7 +75,7 @@ pub fn routes(
 /// `GET /settings/account`: `{"url": …}`, the shared account this instance signs
 /// in with (`null` without one). The UI signs out through its `/signout` (which
 /// also closes that session and goes back to the site) and offers it in the
-/// menu: switching application and billing.
+/// menu: switching application.
 async fn account_url(State(settings): State<SettingsService>) -> Json<Value> {
     Json(json!({ "url": settings.platform_account() }))
 }
@@ -121,7 +121,7 @@ async fn local_apps(local: Option<&LocalApps>) -> Vec<Value> {
 
 /// `GET /settings/account/apps`: where else the session holder can go: this
 /// installation's applications (RustFS…) and, with the shared account, by
-/// their email, management, their company's instances and billing. If the
+/// their email, management and their company's instances. If the
 /// account does not answer, `502`.
 async fn account_apps(
     State((settings, admins)): State<(SettingsService, Arc<dyn AdminRepository>)>,

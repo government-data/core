@@ -59,7 +59,7 @@ export function logout(): Promise<unknown> {
 /**
  * The common account this installation signs in with (`https://cuenta.…`),
  * else `null`: «Sign out» goes through its /signout, and the menu offers
- * switching applications and the billing there.
+ * switching applications there.
  */
 export async function accountUrl(): Promise<string | null> {
   const r = await fetch("/api/settings/account", { credentials: "same-origin" });
@@ -71,11 +71,11 @@ export async function accountUrl(): Promise<string | null> {
 /**
  * A place the common account lets this person go (`current`: this one). The
  * names come in Spanish; `kind` lets the menu translate the platform panel,
- * the trials and the billing.
+ * and the trials.
  */
 export interface AccountApp {
   /** `app`: one that signs in with this installation (RustFS…). */
-  kind?: "management" | "instance" | "trial" | "billing" | "app";
+  kind?: "management" | "instance" | "trial" | "app";
   /** Of an `app`: its client id, for its page (`/apps/<id>`). */
   id?: string;
   name: string;
@@ -88,8 +88,8 @@ export interface AccountApp {
 
 /**
  * Where else this person can go: this installation's applications (RustFS…)
- * and, by the common account, the platform panel, their company's instances
- * and the billing.
+ * and, by the common account, the platform panel and their company's
+ * instances.
  */
 export async function accountApps(): Promise<AccountApp[]> {
   const r = await fetch("/api/settings/account/apps", { credentials: "same-origin" });

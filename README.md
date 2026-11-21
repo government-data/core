@@ -1,8 +1,8 @@
 # Quality Data
 
 Data quality for organisations: its own ETLs, rule catalogs and scheduled
-quality pipelines with their notices, on a platform with tenants, licenses by
-contract and single sign-on. The quality core is being built.
+quality pipelines with their notices, on a platform with tenants and single
+sign-on. The quality core is being built.
 
 The documentation lives in [`apps/docs`](apps/docs) (Astro + Starlight), in
 English and Spanish: the data quality guide (method, indicators, formulas,

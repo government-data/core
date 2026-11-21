@@ -6,8 +6,7 @@ import { MenuIcon } from "./MenuIcon";
 
 /**
  * An account application in the interface language: the account sends the
- * names in Spanish, with their `kind`. The billing also gets `?lang=`, so the
- * account's pages follow the language chosen here.
+ * names in Spanish, with their `kind`.
  */
 function inLang(app: AccountApp): AccountApp {
   switch (app.kind) {
@@ -17,16 +16,6 @@ function inLang(app: AccountApp): AccountApp {
         name: t("web:shell.app.gestion"),
         detail: t("web:shell.app.gestionDetail"),
       };
-    case "billing": {
-      const url = new URL(app.url, window.location.href);
-      url.searchParams.set("lang", lang());
-      return {
-        ...app,
-        name: t("web:shell.app.billing"),
-        detail: t("web:shell.app.billingDetail"),
-        url: url.toString(),
-      };
-    }
     case "trial":
       return { ...app, name: t("web:shell.app.trial") };
     default:
