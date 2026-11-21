@@ -15,12 +15,15 @@ DUCK=qs-verify-$SRC-duckdb
 PY_IMAGE=${PY_IMAGE:-python:3.12-slim}
 FAILED=0
 CONTAINERS=("$DUCK")
+# The extension directory of the offline checks (ext_install, ext_offline).
+EXTVOL=qs-verify-$SRC-ext
 
 ok() { printf '[OK  ] %s\n' "$*"; }
 ko() { printf '[FAIL] %s\n' "$*"; FAILED=1; }
 cleanup() {
   docker rm -fv "${CONTAINERS[@]}" >/dev/null 2>&1
   docker network rm "$NET" >/dev/null 2>&1
+  docker volume rm "$EXTVOL" >/dev/null 2>&1
   true
 }
 trap cleanup EXIT
@@ -136,6 +139,65 @@ duckdb_check() {
   docker run --rm --name "$DUCK" --network "$NET" -e ENGINE="$ENGINE" -e CHECK="$CHECK" "$@" "$PY_IMAGE" \
     sh -c 'eval "${PREP:-true}" && pip install --quiet --disable-pip-version-check --root-user-action=ignore "duckdb==${ENGINE#v}" >/dev/null 2>&1 &&
       python -I -c "$CHECK"' || FAILED=1
+}
+
+read -r -d '' INSTALL <<'PY'
+import sys; sys.path.insert(0, "/ext/py")
+import glob, hashlib, os, duckdb
+con = duckdb.connect()
+con.execute("SET enable_progress_bar = false")
+con.execute("SET extension_directory = '/ext/duckdb'")
+con.execute(f"INSTALL {os.environ['EXT']} FROM {os.environ['REPO']}")
+for f in sorted(glob.glob("/ext/duckdb/**/*.duckdb_extension", recursive=True)):
+    digest = hashlib.sha256(open(f, "rb").read()).hexdigest()
+    print(f"[OK  ] installed {f[len('/ext/duckdb/'):]}, sha256 {digest}", flush=True)
+PY
+
+# ext_install EXT REPO: what the worker's image does at build time (decision
+# 0077 point 8), into the volume EXTVOL: the engine's Python package under
+# /ext/py and the extension under /ext/duckdb, the extension directory;
+# prints the file's path and SHA-256.
+ext_install() {
+  docker run --rm --name "$DUCK" -v "$EXTVOL:/ext" -e ENGINE="$ENGINE" -e EXT="$1" -e REPO="$2" \
+    -e CHECK="$INSTALL" "$PY_IMAGE" sh -c 'pip install --quiet --disable-pip-version-check \
+      --root-user-action=ignore --target /ext/py "duckdb==${ENGINE#v}" >/dev/null 2>&1 && python -c "$CHECK"' ||
+    ko "install $1 into the extension directory"
+}
+
+# The start of a check run offline: the package and the extension from the
+# volume, nothing installed or loaded by itself.
+read -r -d '' OFFLINE <<'PY'
+import sys; sys.path.insert(0, "/ext/py")
+import os, duckdb
+def ok(m): print(f"[OK  ] {m}", flush=True)
+def ko(m): print(f"[FAIL] {m}", flush=True); sys.exit(1)
+con = duckdb.connect()
+con.execute("SET enable_progress_bar = false")
+for s in ("extension_directory = '/ext/duckdb'", "autoinstall_known_extensions = false", "autoload_known_extensions = false"):
+    con.execute(f"SET {s}")
+ext = os.environ["EXT"]
+try:
+    con.execute(f"LOAD {ext}")
+except Exception as e:
+    ko(f"LOAD {ext} from the extension directory: {e}")
+ok("LOAD %s from the extension directory: %s %s, installed from %s" % ((ext,) + con.execute(
+    "SELECT extension_version, install_mode, installed_from FROM duckdb_extensions() WHERE extension_name = ?",
+    [ext]).fetchone()))
+PY
+
+# ext_offline EXT: loads the extension from the volume with no network at
+# all, as the worker does at run time.
+ext_offline() {
+  docker run --rm --name "$DUCK" --network none -v "$EXTVOL:/ext:ro" -e EXT="$1" -e CHECK="$OFFLINE" "$PY_IMAGE" \
+    sh -c 'python -c "$CHECK"' || FAILED=1
+}
+
+# ext_check EXT: OFFLINE then the Python in CHECK2, on the script's network,
+# with the extension from the volume; extra `-e` flags as arguments.
+ext_check() {
+  local ext=$1; shift
+  docker run --rm --name "$DUCK" --network "$NET" -v "$EXTVOL:/ext:ro" -e EXT="$ext" -e CHECK="$OFFLINE
+$CHECK2" "$@" "$PY_IMAGE" sh -c 'python -c "$CHECK"' || FAILED=1
 }
 
 verdict() { # SOURCE

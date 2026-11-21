@@ -66,4 +66,8 @@ duckdb_check -e EXT=oracle_scanner -e REPO=community -e SRC_PASSWORD="$READER" \
   -e SCHEMA=main -e TABLE=src.main.clients \
   -e TYPES='{"id": ["INTEGER", "BIGINT", "DECIMAL(10,0)"], "code": ["VARCHAR"], "name": ["VARCHAR"], "opened": ["DATE", "TIMESTAMP"], "amount": ["DECIMAL(12,2)"], "updated": ["TIMESTAMP", "TIMESTAMP_NS"]}'
 
+echo "== The extension from a directory, offline (decision 0077 point 8)"
+ext_install oracle_scanner community
+ext_offline oracle_scanner
+
 verdict "Oracle"
