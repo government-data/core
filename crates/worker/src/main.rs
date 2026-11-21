@@ -42,11 +42,13 @@
 //! - `QD_WORKER_MIN_FREE_BYTES` (5 GB) and `QD_WORKER_MIN_FREE_MEMORY_PCT`
 //!   (10): below either no job is claimed (`guard.rs`, decision 0072);
 //! - `QD_METRICS_DIR`: where its metrics file goes (`/run/qd-metrics`, `off`
-//!   for none; decision 0071).
+//!   for none; decision 0071);
+//! - `QD_DUCKDB_EXTENSIONS`: DuckDB's extension directory, which sources
+//!   load from offline (`~/.duckdb/extensions`; decision 0077).
 //!
 //! `qd-worker --install-extensions` installs DuckDB's extensions, the
 //! lake's and the sources' drivers', and exits: the image runs it when it
-//! is built, so jobs fetch nothing.
+//! is built and checks their hashes, so jobs fetch nothing.
 
 mod api;
 mod config;

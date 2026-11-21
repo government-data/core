@@ -43,6 +43,18 @@ pub(crate) fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|v| !v.trim().is_empty())
 }
 
+/// DuckDB's extension directory, which the worker's image fills when it is
+/// built (decision 0077 point 8): `QD_DUCKDB_EXTENSIONS`, else DuckDB's own
+/// under `$HOME` (`~/.duckdb/extensions`, where `--install-extensions`
+/// puts them).
+pub(crate) fn extension_directory() -> Option<String> {
+    extension_directory_of(env("QD_DUCKDB_EXTENSIONS"), env("HOME"))
+}
+
+fn extension_directory_of(set: Option<String>, home: Option<String>) -> Option<String> {
+    set.or_else(|| home.map(|h| format!("{}/.duckdb/extensions", h.trim_end_matches('/'))))
+}
+
 /// How the worker proves who it is. The secret never shows in `Debug`.
 pub(crate) enum Mode {
     Secret(String),
@@ -140,7 +152,21 @@ pub(crate) async fn wait_for_lake(url: &str) -> Result<(), Failure> {
 
 #[cfg(test)]
 mod tests {
-    use super::Mode;
+    use super::{extension_directory_of, Mode};
+
+    #[test]
+    fn the_extension_directory_is_the_images_or_duckdbs_own() {
+        let some = |s: &str| Some(s.to_string());
+        assert_eq!(
+            extension_directory_of(some("/ext"), some("/home/nonroot")),
+            some("/ext")
+        );
+        assert_eq!(
+            extension_directory_of(None, some("/home/nonroot/")),
+            some("/home/nonroot/.duckdb/extensions")
+        );
+        assert_eq!(extension_directory_of(None, None), None);
+    }
 
     fn secret() -> Result<String, super::Failure> {
         Ok("s3cret".into())
