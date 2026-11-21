@@ -72,7 +72,7 @@ const RulesRead: Component<{ rules: RuleView[] }> = (props) => (
           </Show>
           <details>
             <summary>{t("quality:editor.sql")}</summary>
-            <pre class="qd-yaml">{`DuckDB\n${r.duckdb ?? "—"}\n\nTrino\n${r.trino ?? "—"}`}</pre>
+            <pre class="qd-yaml">{r.duckdb ?? "—"}</pre>
           </details>
         </section>
       )}

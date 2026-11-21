@@ -1,8 +1,8 @@
 /**
  * Quality Data's avatar over an application's top bar (AppFrame): centered
  * on it, whatever its height (RustFS's is 4rem, Grafana's lower), and with an
- * ink that reads over its background (Trino's bar is dark navy while Quality
- * Data is light). The page's CSS reads `--app-frame-bar` and `--app-frame-ink`.
+ * ink that reads over its background (a dark bar while Quality Data is
+ * light). The page's CSS reads `--app-frame-bar` and `--app-frame-ink`.
  */
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -53,48 +53,6 @@ header button[aria-label="Profile"],
 header button[aria-label="Perfil"] { visibility: hidden !important; }
 `;
 
-/**
- * In Trino's page (its web UI, in English only): with Quality Data's light
- * theme its navy top bar turns white, with dark ink; its theme button and its
- * own avatar go (both are Quality Data's), and the bar keeps room on the
- * right for Quality Data's avatar.
- */
-const TRINO_CSS = `
-html.qd-light .MuiAppBar-root {
-  background-color: #fff !important;
-  color: #1c1c22 !important;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08) !important;
-}
-.MuiAppBar-root button[aria-label="Themes"],
-.MuiAppBar-root button:has(.MuiAvatar-root) { display: none !important; }
-.MuiAppBar-root .MuiToolbar-root { padding-right: 10rem !important; }
-`;
-
-/** Where Trino's UI keeps its settings: its store, in this domain's storage. */
-const TRINO_STORE = "app-config";
-
-/**
- * Trino follows Quality Data's theme: its store's `theme` is set to it and
- * its page reloaded, only when it changed (its store is read on start).
- */
-function syncTrino(frame: HTMLIFrameElement) {
-  const root = frame.contentDocument?.documentElement;
-  root?.classList.remove("qd-light", "qd-dark");
-  root?.classList.add(`qd-${currentTheme()}`);
-  try {
-    const raw = localStorage.getItem(TRINO_STORE);
-    const store = (raw ? JSON.parse(raw) : { state: {}, version: 1 }) as {
-      state?: { theme?: string };
-    };
-    if (store.state?.theme === currentTheme()) return;
-    store.state = { ...store.state, theme: currentTheme() };
-    localStorage.setItem(TRINO_STORE, JSON.stringify(store));
-    frame.contentWindow?.location.reload();
-  } catch {
-    // Without storage Trino keeps its own.
-  }
-}
-
 /** How the application names each language in its own menu (RustFS). */
 const LANGUAGE_NAMES: Record<string, string> = { es: "Español", en: "English" };
 
@@ -176,8 +134,6 @@ interface Adapter {
   css: string;
   /** Its top bar, over which the avatar is centered. */
   bar: string;
-  /** Whether it speaks Quality Data's languages (else the menu hides them). */
-  translated: boolean;
   theme(frame: HTMLIFrameElement): void;
   language(frame: HTMLIFrameElement, next: string): Promise<void>;
 }
@@ -186,23 +142,14 @@ const ADAPTERS: Record<string, Adapter> = {
   grafana: {
     css: GRAFANA_CSS,
     bar: "header > :first-child",
-    translated: true,
     theme: (frame) => void syncGrafana(frame),
     language: (frame) => syncGrafana(frame),
-  },
-  trino: {
-    css: TRINO_CSS,
-    bar: ".MuiAppBar-root",
-    translated: false,
-    theme: syncTrino,
-    language: async () => {},
   },
 };
 
 const RUSTFS_LIKE: Adapter = {
   css: MERGE_CSS,
   bar: TOP_BAR,
-  translated: true,
   theme: applyTheme,
   language: switchLanguage,
 };
@@ -360,7 +307,6 @@ export const AppFrame: Component = () => {
     document.body.classList.add("app-frame-open");
     frame.hidden = false;
     showBar(frame);
-    document.body.classList.toggle("app-frame-no-lang", !adapterOf(frame).translated);
     // Another language since it loaded: the application follows.
     if (frame.dataset.lang && frame.dataset.lang !== lang()) {
       shareSettings();
@@ -370,7 +316,6 @@ export const AppFrame: Component = () => {
       frame.hidden = true;
       document.body.classList.remove("app-frame-open");
       showBar();
-      document.body.classList.remove("app-frame-no-lang");
     });
   });
 
