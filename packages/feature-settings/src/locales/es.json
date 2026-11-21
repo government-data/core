@@ -60,6 +60,10 @@
       "label": "Usuarios y acceso",
       "desc": "Cuentas, grupos, políticas y tokens.",
       "descOwn": "Tus tokens para integraciones."
+    },
+    "platform": {
+      "label": "Plataforma",
+      "desc": "La zona horaria de la instalación."
     }
   },
   "common": {
@@ -702,5 +706,17 @@
       "noKeys": "Faltan claves",
       "failed": "Falló en {{step}}: {{detail}}"
     }
+  },
+  "platform": {
+    "title": "Plataforma",
+    "intro": "Lo que comparte toda la instalación. Los cambios se aplican al guardar.",
+    "readError": "No se pudo leer la configuración de la plataforma.",
+    "timezone": "Zona horaria",
+    "timezoneHelp": "La hora de la instalación: en ella se lee la ventana de actualización automática, y las programaciones nuevas la toman cuando no indican otra. Las programaciones ya guardadas conservan la suya.",
+    "timezoneHint": "Un nombre IANA, como America/Bogota, Europe/Madrid o UTC.",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "saved": "Guardado.",
+    "reset": "De vuelta a UTC."
   }
 }

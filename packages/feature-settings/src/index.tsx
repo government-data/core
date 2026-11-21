@@ -99,6 +99,13 @@ export const settingsAdminFeature = defineFeature({
       ),
     },
     {
+      path: "/settings/platform",
+      component: view(
+        () => import("./PlatformPage"),
+        (m) => m.PlatformPage,
+      ),
+    },
+    {
       path: "/settings/execution",
       component: view(
         () => import("./ExecutionPage"),

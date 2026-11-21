@@ -32,6 +32,12 @@ const PATHS = {
       <path d="M18.5 3v4.5H14M5.5 21v-4.5H10" />
     </>
   ),
+  clock: () => (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
   directory: () => (
     <>
       <rect x="9" y="3" width="6" height="5" rx="1" />

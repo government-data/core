@@ -60,6 +60,10 @@
       "label": "Users and access",
       "desc": "Accounts, groups, policies and tokens.",
       "descOwn": "Your tokens for integrations."
+    },
+    "platform": {
+      "label": "Platform",
+      "desc": "The installation's time zone."
     }
   },
   "common": {
@@ -702,5 +706,17 @@
       "noKeys": "Keys missing",
       "failed": "Failed at {{step}}: {{detail}}"
     }
+  },
+  "platform": {
+    "title": "Platform",
+    "intro": "What the whole installation shares. Changes apply on save.",
+    "readError": "Could not read the platform settings.",
+    "timezone": "Time zone",
+    "timezoneHelp": "The installation's time: the automatic update window is read in it, and new schedules take it when they do not name another. Schedules already saved keep their own.",
+    "timezoneHint": "An IANA name, such as America/Bogota, Europe/Madrid or UTC.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved.",
+    "reset": "Back to UTC."
   }
 }
