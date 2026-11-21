@@ -35,10 +35,15 @@ fn machine_roles_and_states_round_trip() {
     assert_eq!(MachineRole::parse("admin"), None);
     assert_eq!(MachineRole::parse("app"), Some(MachineRole::App));
     let joining: Vec<_> = MachineRole::ALL.into_iter().filter(|r| r.joins()).collect();
-    assert_eq!(joining.len(), 5, "every role but app");
+    assert_eq!(joining.len(), 5, "every role but app and updater");
     assert!(!joining.contains(&MachineRole::App));
+    assert!(!joining.contains(&MachineRole::Updater));
+    assert_eq!(MachineRole::parse("updater"), Some(MachineRole::Updater));
     for role in MachineRole::ALL {
-        let until_replaced = matches!(role, MachineRole::TrinoCoordinator | MachineRole::App);
+        let until_replaced = matches!(
+            role,
+            MachineRole::TrinoCoordinator | MachineRole::App | MachineRole::Updater
+        );
         let term = role.certificate_term();
         assert_eq!(term == CertificateTerm::UntilReplaced, until_replaced);
     }

@@ -5935,7 +5935,7 @@
           },
           "role": {
             "type": "string",
-            "description": "`worker`, `trino-coordinator`, `trino-worker`, `lake`,\n`lake-replica` or `app` (the application VM): its certificate's `OU`."
+            "description": "`worker`, `trino-coordinator`, `trino-worker`, `lake`,\n`lake-replica`, `app` (the application VM) or `updater`: its certificate's `OU`."
           },
           "state": {
             "type": "string",

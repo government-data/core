@@ -2399,7 +2399,7 @@ export interface components {
             retired_at?: number | null;
             /**
              * @description `worker`, `trino-coordinator`, `trino-worker`, `lake`,
-             *     `lake-replica` or `app` (the application VM): its certificate's `OU`.
+             *     `lake-replica`, `app` (the application VM) or `updater`: its certificate's `OU`.
              */
             role: string;
             /** @description `pending`, `approved`, `draining` or `retired`. */

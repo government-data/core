@@ -102,7 +102,7 @@ pub struct MachineOut {
     /// Its certificate's `CN`.
     name: String,
     /// `worker`, `trino-coordinator`, `trino-worker`, `lake`,
-    /// `lake-replica` or `app` (the application VM): its certificate's `OU`.
+    /// `lake-replica`, `app` (the application VM) or `updater`: its certificate's `OU`.
     role: String,
     pool: Option<String>,
     /// `pending`, `approved`, `draining` or `retired`.

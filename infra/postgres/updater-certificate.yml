@@ -1,0 +1,32 @@
+# The update agent's certificate for the internal entry point (decision
+# 0003): an overlay of docker-compose.yml and tls.yml for the installer
+# alone, with the one-shot `updater-certificate`, `server
+# updater-certificate` from the API's image, as app-machine.yml:
+#
+#   docker compose -f infra/postgres/docker-compose.yml -f infra/postgres/tls.yml \
+#     -f infra/postgres/updater-certificate.yml run --rm updater-certificate \
+#     --name <machine> --dir /run/qd-updater
+#
+# It writes ca.pem, certificate.pem and private-key.pem (0600) into
+# QD_UPDATER_DIR, the agent's /etc/quality-data/internal, as the image's
+# user (uid 65532); the agent reads them as root. Run again it changes
+# nothing until less than 30 days of the certificate are left, then signs
+# a new one: the installer runs it at every installation and update.
+#
+# Required environment, besides tls.yml's:
+#   QD_CA_DIR       the installation's CA (`server ca-init`): ca.crt and ca.key
+#   QD_UPDATER_DIR  the agent's directory for the internal entry point
+# Optional: API_IMAGE (data-quality-api:local).
+services:
+  updater-certificate:
+    image: ${API_IMAGE:-data-quality-api:local}
+    profiles: ["updater-certificate"]
+    network_mode: "service:postgres"
+    entrypoint: ["/usr/local/bin/server", "updater-certificate"]
+    environment:
+      DATABASE_URL: postgres://${APP_DB_USER:-knime_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=prefer
+      CA_CERT_FILE: /run/qd-ca/ca.crt
+      CA_KEY_FILE: /run/qd-ca/ca.key
+    volumes:
+      - ${QD_UPDATER_DIR:?set QD_UPDATER_DIR to the update agent's internal directory}:/run/qd-updater
+      - ${QD_CA_DIR:?set QD_CA_DIR to the installation's CA directory}:/run/qd-ca:ro

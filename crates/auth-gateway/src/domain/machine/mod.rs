@@ -51,16 +51,22 @@ pub enum MachineRole {
     /// jobs and no OIDC client, and does not join: its first certificate is
     /// signed on the spot by the installer (point 16).
     App,
+    /// The installation's update agent (decision 0003): it calls
+    /// `/updater/v1/` on the internal entry point with this certificate.
+    /// Like `app`, it does not join and gets no OIDC client: the installer
+    /// signs its certificate on the spot (`server updater-certificate`).
+    Updater,
 }
 
 impl MachineRole {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Worker,
         Self::TrinoCoordinator,
         Self::TrinoWorker,
         Self::Lake,
         Self::LakeReplica,
         Self::App,
+        Self::Updater,
     ];
 
     /// The stored form, also the certificate's `OU`.
@@ -72,14 +78,16 @@ impl MachineRole {
             Self::Lake => "lake",
             Self::LakeReplica => "lake-replica",
             Self::App => "app",
+            Self::Updater => "updater",
         }
     }
 
     /// Whether a machine of this role joins with a token (0029). The
     /// application VM does not (0066, point 16), and gets no OIDC client
-    /// (point 15): a join token or a machine client for it is refused.
+    /// (point 15): a join token or a machine client for it is refused. Nor
+    /// does the update agent (decision 0003).
     pub fn joins(self) -> bool {
-        self != Self::App
+        !matches!(self, Self::App | Self::Updater)
     }
 
     pub fn parse(raw: &str) -> Option<Self> {
@@ -90,11 +98,12 @@ impl MachineRole {
     /// never by what the machine asks (0066, points 1, 9 and 11): Trino's
     /// coordinator, and Dolt on the application VM, read their certificate
     /// only when they start and restart only when free, so theirs is ended
-    /// by its replacement, not by a date; every other role renews its own
-    /// every 8 hours and lasts a day.
+    /// by its replacement, not by a date; so is the update agent's, which
+    /// the installer signs again before it ends; every other role renews its
+    /// own every 8 hours and lasts a day.
     pub fn certificate_term(self) -> CertificateTerm {
         match self {
-            Self::TrinoCoordinator | Self::App => CertificateTerm::UntilReplaced,
+            Self::TrinoCoordinator | Self::App | Self::Updater => CertificateTerm::UntilReplaced,
             _ => CertificateTerm::Day,
         }
     }
