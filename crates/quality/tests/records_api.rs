@@ -282,13 +282,15 @@ async fn a_page_is_queued_and_what_cannot_be_asked_is_refused() {
     let (status, out) = f.ask(last).await;
     assert_eq!(status, StatusCode::ACCEPTED);
     let job = Uuid::parse_str(out["job"].as_str().unwrap()).unwrap();
-    let (kind, parameters): (String, Value) =
-        sqlx::query_as("SELECT kind, parameters FROM quality.jobs WHERE id = $1")
+    let (kind, parameters, uses_trino): (String, Value, Option<bool>) =
+        sqlx::query_as("SELECT kind, parameters, uses_trino FROM quality.jobs WHERE id = $1")
             .bind(job)
             .fetch_one(&f.db.pool)
             .await
             .unwrap();
     assert_eq!(kind, "records");
+    // A SQL Server source is read through DuckDB: no job on Trino.
+    assert_eq!(uses_trino, Some(false));
     assert_eq!(
         (parameters["source"].as_str(), parameters["by"].as_str()),
         (Some("core"), Some(ANA))
@@ -512,9 +514,10 @@ async fn a_worker_gets_the_source_and_its_page_of_another_table_is_refused() {
     let source = details.source.unwrap();
     assert_eq!(source.table, "dbo.clients");
     assert!(
-        source.on_trino() && source.secrets.is_empty(),
-        "Trino reads it, with no credential"
+        !source.on_trino() && source.secrets.contains_key("password"),
+        "DuckDB reads it, with its credentials"
     );
+    assert!(details.trino.is_none());
 
     let report = format!("{uri}/report");
     let page = |table: &str| json!({ "source": "core", "table": table, "columns": ["id"], "rows": [["1"]], "more": false });

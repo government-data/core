@@ -250,7 +250,7 @@ async fn a_steward_creates_and_edits_a_source_audited_and_never_sees_its_secrets
         .as_array()
         .unwrap()
         .iter()
-        .any(|d| d["id"] == "sqlserver" && d["engine"] == "trino"));
+        .any(|d| d["id"] == "sqlserver" && d["engine"] == "duckdb"));
     let field = |driver: &str, key: &str| {
         drivers
             .as_array()
