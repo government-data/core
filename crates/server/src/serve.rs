@@ -307,7 +307,13 @@ pub(crate) async fn serve() -> Result<(), Box<dyn std::error::Error>> {
             auth.login_rate_limit,
         ))
         .merge(module_users)
-        .merge(machine_routes);
+        .merge(machine_routes)
+        // The update agent's protocol, with its certificate (decision 0003).
+        .merge(api::updater_v1::routes(
+            updates.clone(),
+            machines.clone(),
+            certificates.clone(),
+        ));
     let app = match central {
         Some(central) => app.merge(central),
         None => app,
