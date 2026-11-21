@@ -15,7 +15,7 @@ import {
 } from "./api";
 import { t } from "./i18n";
 
-/** What a mapping and a Trino catalog may call a source. */
+/** What a mapping may call a source. */
 const NAME = /^[a-z][a-z0-9_]{0,62}$/;
 
 export function validName(name: string): boolean {
@@ -92,13 +92,6 @@ export function deleteRefusal(err: unknown): string {
     return t("quality:sources.inUse", { datasets: datasets.join(", ") });
   }
   if (err.status === 403) return t("quality:common.forbidden");
-  if (err.status === 502) return t("quality:sources.trinoDelete");
   if (err.status === 503) return t("quality:common.catalogUnavailable");
-  return t("quality:common.saveError");
-}
-
-/** Why a source was not saved, when it is no refusal of its fields. */
-export function saveFailure(err: unknown): string {
-  if (err instanceof QualityError && err.status === 502) return t("quality:sources.trinoSave");
   return t("quality:common.saveError");
 }

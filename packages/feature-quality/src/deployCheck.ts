@@ -18,7 +18,7 @@ export interface DeployReview {
 type Rule = CheckOut["rules"][number];
 
 /** A rule as it reads, to tell whether it changed: its compiled SQL left out. */
-const reading = (r: Rule) => JSON.stringify({ ...r, duckdb: undefined, trino: undefined });
+const reading = (r: Rule) => JSON.stringify({ ...r, duckdb: undefined });
 
 /** `after` (the file to deploy) against `before` (`main`'s, if it has one). */
 export function review(before: CheckOut | undefined, after: CheckOut): DeployReview {

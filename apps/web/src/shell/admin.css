@@ -384,12 +384,6 @@ body {
   color: var(--app-frame-ink, inherit);
 }
 
-/* An application without translations (Trino's UI): its language cannot
-   follow, so the avatar's menu does not offer it. */
-.app-frame-no-lang .profile-menu__language {
-  display: none;
-}
-
 .app-frame-open .topbar__toggle,
 .app-frame-open .topbar__spacer {
   display: none;

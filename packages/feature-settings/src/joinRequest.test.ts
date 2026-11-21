@@ -71,13 +71,11 @@ describe("asking for a join token", () => {
   });
 
   it("sends no pool when it is left blank", async () => {
-    const { api, seen } = client(
-      json(answer({ role: "trino-worker", pool: null, install: null }), 201),
-    );
+    const { api, seen } = client(json(answer({ role: "worker", pool: null, install: null }), 201));
 
-    await requestJoin(api, "trino-worker", "  ");
+    await requestJoin(api, "worker", "  ");
 
-    expect(await seen[0].json()).toEqual({ role: "trino-worker" });
+    expect(await seen[0].json()).toEqual({ role: "worker" });
   });
 
   it("gives the command to show when the API built one, and not the bare token", async () => {
@@ -96,10 +94,10 @@ describe("asking for a join token", () => {
   });
 
   it("gives the token alone when there is no command", () => {
-    expect(joinOutcome(answer({ role: "trino-worker", pool: null, install: null }))).toEqual({
+    expect(joinOutcome(answer({ role: "worker", pool: null, install: null }))).toEqual({
       kind: "token",
       token: TOKEN,
-      role: "trino-worker",
+      role: "worker",
       pool: undefined,
       expiresAt: 1_700_003_600,
     });
