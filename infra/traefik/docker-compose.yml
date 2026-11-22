@@ -125,7 +125,7 @@ services:
       # encrypted with SETTINGS_ENCRYPTION_KEY or, empty, with the settings-key
       # volume's key. What is saved there wins over LDAP_* / OAUTH_*.
       SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
-      SETTINGS_KEY_FILE: /var/lib/orquestador/settings/settings.key
+      SETTINGS_KEY_FILE: /var/lib/quality-data/settings/settings.key
       # The API's public origin (Traefik strips "/api"): each OAuth provider's
       # redirect URL is <this>/auth/oauth/<id>/callback.
       OAUTH_REDIRECT_BASE: ${OAUTH_REDIRECT_BASE:-https://${APP_DOMAIN:-localhost}/api}
@@ -139,7 +139,7 @@ services:
       OIDC_SIGNING_KEY_ES256_PREVIOUS: ${OIDC_SIGNING_KEY_ES256_PREVIOUS:-}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
     volumes:
-      - settings-key:/var/lib/orquestador/settings
+      - settings-key:/var/lib/quality-data/settings
       - metrics:/run/qd-metrics
     networks:
       - edge

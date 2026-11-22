@@ -27,7 +27,7 @@ use crate::{settings_wiring, updates_wiring};
 
 /// Where the settings key lives when `SETTINGS_ENCRYPTION_KEY` is not set (a
 /// volume; it is generated the first time).
-const DEFAULT_SETTINGS_KEY_FILE: &str = "/var/lib/orquestador/settings/settings.key";
+const DEFAULT_SETTINGS_KEY_FILE: &str = "/var/lib/quality-data/settings/settings.key";
 
 type Failure = Box<dyn std::error::Error>;
 
