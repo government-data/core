@@ -234,6 +234,9 @@ jobs:
 
   # The images, built as a release builds them but not pushed: a Dockerfile
   # that no longer matches the workspace fails here, not at release time.
+  # Each is kept as a workflow artifact for a week (decision 0082), for the
+  # verifications and the test installation, until a release pushes them;
+  # a manual run (workflow_dispatch) builds all three from its ref.
   # On GitHub's runners (they have Docker), with no secrets: the token only
   # reads.
   #
@@ -244,7 +247,7 @@ jobs:
   # need more than the free space an ubuntu-latest runner starts with.
   image-api:
     needs: check
-    if: ${{ needs.check.outputs.image-api == 'true' }}
+    if: ${{ needs.check.outputs.image-api == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -262,6 +265,17 @@ jobs:
           context: .
           file: infra/docker/api.Dockerfile
           push: false
+          tags: qd-api:${{ github.sha }}
+          outputs: type=docker,dest=${{ runner.temp }}/qd-api.tar
+      # Kept for a week (decision 0082): `gh run download -n image-api`,
+      # then `docker load -i qd-api.tar`.
+      - name: Keep the API image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-api
+          path: ${{ runner.temp }}/qd-api.tar
+          retention-days: 7
+          if-no-files-found: error
 
   # The worker's image, as the API's: a release build with DuckDB, so no
   # Actions cache and the disk freed first. It also installs DuckDB's
@@ -269,7 +283,7 @@ jobs:
   # mismatch.
   image-worker:
     needs: check
-    if: ${{ needs.check.outputs.image-worker == 'true' }}
+    if: ${{ needs.check.outputs.image-worker == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -287,13 +301,24 @@ jobs:
           context: .
           file: infra/docker/worker.Dockerfile
           push: false
+          tags: qd-worker:${{ github.sha }}
+          outputs: type=docker,dest=${{ runner.temp }}/qd-worker.tar
+      # Kept for a week (decision 0082): `gh run download -n image-worker`,
+      # then `docker load -i qd-worker.tar`.
+      - name: Keep the worker image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-worker
+          path: ${{ runner.temp }}/qd-worker.tar
+          retention-days: 7
+          if-no-files-found: error
 
   # The web image keeps a small Actions cache (about 180 MB), deleted with the
   # PR's other caches when it closes (cache-cleanup.yml).
 
   image-web:
     needs: check
-    if: ${{ needs.check.outputs.image-web == 'true' }}
+    if: ${{ needs.check.outputs.image-web == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -306,8 +331,19 @@ jobs:
           context: .
           file: infra/docker/web.Dockerfile
           push: false
+          tags: qd-web:${{ github.sha }}
+          outputs: type=docker,dest=${{ runner.temp }}/qd-web.tar
           cache-from: type=gha,scope=image-web
           cache-to: type=gha,scope=image-web,mode=max
+      # Kept for a week (decision 0082): `gh run download -n image-web`,
+      # then `docker load -i qd-web.tar`.
+      - name: Keep the web image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-web
+          path: ${{ runner.temp }}/qd-web.tar
+          retention-days: 7
+          if-no-files-found: error
 
   # Single required status check for branch protection: green when every
   # affected job passed. Skipped stacks (unaffected) do not fail the gate.
