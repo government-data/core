@@ -52,6 +52,14 @@ include:
       - infra/postgres/tls.yml
   - infra/postgres/api.override.yml
 
+networks:
+  # The API's own network (decision 0083): Traefik and the API only, so the
+  # API can trust Traefik's client certificate header (0066). It leaves
+  # data-quality-edge, where other modules' services may be.
+  api:
+    name: data-quality-api
+    internal: true
+
 secrets:
   database_url:
     file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/database_url
@@ -60,6 +68,9 @@ secrets:
 
 services:
   traefik:
+    networks:
+      - edge
+      - api
     volumes:
       # Same targets as infra/traefik's files, so these replace theirs.
       - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/internal:/etc/traefik/dynamic"
@@ -76,7 +87,16 @@ services:
 
   api:
     image: ${IMAGE_API:-${API_IMAGE:?set IMAGE_API or API_IMAGE to a versioned image}}
+    # PostgreSQL's network and its own; never data-quality-edge (0083).
+    networks: !override
+      - backend
+      - api
+    labels:
+      - "traefik.docker.network=data-quality-api"
     environment:
+      # Only Traefik reaches the API (0083), so its client certificate
+      # header is believed: the machines' and the update agent's routes.
+      INTERNAL_CLIENT_CERT_HEADER: trusted
       DATABASE_URL: ""
       DATABASE_URL_FILE: /run/secrets/database_url
       CA_CERT_FILE: /run/qd-ca/ca.crt

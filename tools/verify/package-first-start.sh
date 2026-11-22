@@ -23,10 +23,10 @@
 # restart of Traefik: the internal entry point refuses a
 # client without a certificate and, with the agent's, reaches the API on
 # /api/updater/v1/version; and a renewed machine.pem is what it serves
-# within QD_TRAEFIK_CHECK_EVERY seconds. The API reads the certificate
-# header only with INTERNAL_CLIENT_CERT_HEADER=trusted, which the package
-# does not set: what it answers as the agent runs it is reported, then the
-# API is recreated with it (an overlay of this script's) for the 200.
+# within QD_TRAEFIK_CHECK_EVERY seconds. The API is on a network only
+# Traefik shares with it and trusts Traefik's certificate header (decision
+# 0083): a container on data-quality-edge does not reach it, by name or by
+# any of its addresses.
 #
 # The images are CI's (decision 0082, point 4), never built here:
 #
@@ -37,8 +37,8 @@
 #
 # PostgreSQL and Traefik are postgres:16-alpine and traefik:v3.6. It
 # publishes 80, 443, 9443-9445, 9009 and 5432 (the last three on
-# 127.0.0.1) and uses the fixed networks data-quality-edge and
-# data-quality-backend, so the dev stack must be down. Everything else is
+# 127.0.0.1) and uses the fixed networks data-quality-edge,
+# data-quality-backend and data-quality-api, so the dev stack must be down. Everything else is
 # named qs-verify-first… and removed on exit, also on failure. Run alone
 # (no build running), from the repository root. Needs docker, curl and
 # openssl.
@@ -47,6 +47,7 @@ export LC_ALL=C
 API=${QD_API_IMAGE:?set QD_API_IMAGE to the API image of a CI artifact}
 WEB=${QD_WEB_IMAGE:?set QD_WEB_IMAGE to the web image of a CI artifact}
 ALPINE=${ALPINE_IMAGE:-alpine:3}
+CURL=${CURL_IMAGE:-curlimages/curl:8.11.1}
 P=qs-verify-first
 NAME=qd-app
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -68,7 +69,7 @@ EXTRA=()
 cleanup() {
   EXTRA=()
   dc down --volumes --remove-orphans --timeout 5 >/dev/null 2>&1
-  docker rm -f "$P-ca" "$P-read" >/dev/null 2>&1
+  docker rm -f "$P-ca" "$P-read" "$P-edge" >/dev/null 2>&1
   # Files the containers' users wrote (uid 65532, 70).
   docker run --rm -v "$D:/d" "$ALPINE" sh -c 'rm -rf /d/* /d/.[!.]*' >/dev/null 2>&1
   rm -rf -- "${D:?}"
@@ -83,7 +84,7 @@ if ! docker run --rm --entrypoint /usr/local/bin/server "$API" updater-certifica
   ko "$API has no 'server updater-certificate'"
   exit 1
 fi
-for n in data-quality-edge data-quality-backend; do
+for n in data-quality-edge data-quality-backend data-quality-api; do
   if docker network inspect "$n" >/dev/null 2>&1; then ko "the network $n exists: stop the dev stack"; exit 1; fi
 done
 for port in 80 443 9443 9444 9445 9009 5432; do
@@ -210,7 +211,8 @@ internal() { # PATH [curl args]: the status
 agent() { internal "$1" --cert "$D/client/certificate.pem" --key "$D/client/private-key.pem"; }
 for _ in $(seq 20); do [ "$(agent /api/updater/v1/version)" != 000 ] && break; sleep 1; done
 expect "without a client certificate: no handshake" 000 "$(internal /api/updater/v1/version)"
-found "the agent's certificate on /api/updater/v1/version, as the package runs the API: $(agent /api/updater/v1/version)"
+for _ in $(seq 20); do [ "$(agent /api/updater/v1/version)" = 200 ] && break; sleep 1; done
+expect "the agent's certificate reaches /api/updater/v1/version" 200 "$(agent /api/updater/v1/version)"
 expect "Traefik was not restarted" "$STARTED" "$(docker inspect --format '{{.State.StartedAt}}' "$TRAEFIK")"
 
 # --- A renewed machine.pem, taken without a restart ------------------------------
@@ -232,15 +234,16 @@ for _ in $(seq 30); do [ "$(serial)" = "$want" ] && break; sleep 1; done
 expect "a renewed machine.pem is served on the internal entry point" "$want" "$(serial)"
 expect "Traefik was not restarted" "$STARTED" "$(docker inspect --format '{{.State.StartedAt}}' "$TRAEFIK")"
 
-# --- The API trusting the header (this script's overlay) -------------------------
-printf 'services:\n  api:\n    environment:\n      INTERNAL_CLIENT_CERT_HEADER: trusted\n' >"$D/trusted.yml"
-EXTRA=(--file "$D/trusted.yml")
-dc up --detach --no-build --wait --wait-timeout 120 api >/dev/null 2>&1 || ko "the API with the header trusted"
-EXTRA=()
-for _ in $(seq 20); do [ "$(agent /api/updater/v1/version)" = 200 ] && break; sleep 1; done
-expect "with INTERNAL_CLIENT_CERT_HEADER=trusted, the agent reaches /api/updater/v1/version" 200 \
-  "$(agent /api/updater/v1/version)"
-expect "Traefik was not restarted" "$STARTED" "$(docker inspect --format '{{.State.StartedAt}}' "$TRAEFIK")"
+# --- Only Traefik reaches the API (0083) ------------------------------------------
+edge() { docker run --rm --name "$P-edge" --network data-quality-edge "$CURL" \
+  -s -o /dev/null -w '%{http_code}' --max-time 3 "$1" 2>/dev/null; }
+expect "from data-quality-edge, the web (the probe works)" 200 "$(edge http://web:8080/)"
+expect "from data-quality-edge, the API by name" 000 "$(edge http://api:8080/)"
+for ip in $(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' "$(dc ps -q api)"); do
+  expect "from data-quality-edge, the API at $ip" 000 "$(edge "http://$ip:8080/")"
+done
+expect "the API's networks" "data-quality-api data-quality-backend" \
+  "$(docker inspect --format '{{range $n, $_ := .NetworkSettings.Networks}}{{$n}} {{end}}' "$(dc ps -q api)" | sed 's/ $//')"
 
 [ "$FAILED" = 0 ] && echo "All checks passed." || echo "Some checks failed."
 exit "$FAILED"
