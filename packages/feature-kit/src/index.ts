@@ -136,12 +136,7 @@ export function isRoleAllowed(userRole: string, allowedRoles?: string[]): boolea
  * is expected, never a reason to leave the page (a link from an activation or
  * reset email has to show its form).
  */
-export const PUBLIC_PATHS = [
-  "/login",
-  "/forgot-password",
-  "/reset-password",
-  "/activate",
-];
+export const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password", "/activate"];
 
 /** Whether `pathname` is one of the {@link PUBLIC_PATHS}. */
 export function isPublicPath(pathname: string): boolean {
