@@ -4,6 +4,7 @@ import { QualityError, schedulesApi, type ScheduleOut } from "./api";
 import { t } from "./i18n";
 import { scheduleBody, type ScheduleForm as Form } from "./schedules";
 import { describeWhen } from "./trigger";
+import { knownMe, who } from "./explorerCache";
 import { newWhen, problemOf, triggerOf, whenOf, type When } from "./triggerForm";
 import { WhenFields, type SetWhen } from "./WhenFields";
 
@@ -79,7 +80,8 @@ export const ScheduleForm: Component<{
   onSaved: () => void;
 }> = (props) => {
   const e = props.editing;
-  const [when, setWhen] = createSignal<When>(e ? whenOf(e) : newWhen());
+  const zone = knownMe()?.platform_timezone;
+  const [when, setWhen] = createSignal<When>(e ? whenOf(e) : newWhen(new Date(), zone));
   const [form, setForm] = createSignal<Form>({
     cron: "",
     timezone: "",
@@ -92,6 +94,16 @@ export const ScheduleForm: Component<{
   const [refusal, setRefusal] = createSignal<string>();
   const set: Set = (key, value) => setForm({ ...form(), [key]: value });
   const setW: SetWhen = (key, value) => setWhen({ ...when(), [key]: value });
+  // A new schedule takes the platform's zone once it is known, unless one
+  // was chosen meanwhile.
+  if (!e && !zone) {
+    const first = when().timezone;
+    void who()
+      .then((m) => {
+        if (m.platform_timezone && when().timezone === first) setW("timezone", m.platform_timezone);
+      })
+      .catch(() => undefined);
+  }
   const trigger = createMemo(() => triggerOf(when()));
   const problem = createMemo(() => problemOf(when()));
   const summary = () => problem() ?? describeWhen({ cron: when().cron.trim(), trigger: trigger() });

@@ -73,6 +73,8 @@ export const lakeApi = {
 export interface Me {
   is_admin: boolean;
   actions: string[];
+  /** The platform's time zone (decision 0079), UTC when never set. */
+  platform_timezone?: string;
 }
 
 /** The person's actions (`/access/me`, as Settings reads them). */

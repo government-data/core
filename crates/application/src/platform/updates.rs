@@ -50,6 +50,19 @@ impl PlatformService {
             .map_err(updates_error)
     }
 
+    /// The platform's time zone, for everyone signed in (decision 0079):
+    /// UTC when it was never saved, or without the updates' store or when
+    /// it cannot be read.
+    pub async fn platform_timezone(&self) -> String {
+        let Some(updates) = &self.updates else {
+            return schedule_core::timezone_or_utc(None);
+        };
+        updates.platform_timezone().await.unwrap_or_else(|e| {
+            tracing::warn!("the platform's time zone: {e}");
+            schedule_core::timezone_or_utc(None)
+        })
+    }
+
     /// The updates notice on top of every view: everyone sees the maintenance
     /// (what is run now runs when it ends); administrators, a new version, one
     /// that rolled back, or a critical state.

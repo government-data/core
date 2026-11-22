@@ -11,7 +11,8 @@ export type Kind = "once" | "daily" | "weekly" | "monthly" | "custom";
 
 export const KINDS: Kind[] = ["once", "daily", "weekly", "monthly", "custom"];
 
-export const DEFAULT_TIMEZONE = "America/Bogota";
+/** A new schedule's zone until the platform's is known (decision 0079). */
+export const DEFAULT_TIMEZONE = "UTC";
 
 /** The most used first; the rest is the browser's IANA list. */
 export const COMMON_TIMEZONES = [
@@ -60,13 +61,13 @@ export interface When {
 const dayOf = (d: Date) => d.toLocaleDateString("en-CA");
 const ALL_MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 
-/** A new schedule's: daily at 06:00 from today. */
-export function newWhen(now = new Date()): When {
+/** A new schedule's: daily at 06:00 from today, in `timezone` (the platform's). */
+export function newWhen(now = new Date(), timezone = DEFAULT_TIMEZONE): When {
   return {
     kind: "daily",
     startDate: dayOf(now),
     startTime: "06:00",
-    timezone: DEFAULT_TIMEZONE,
+    timezone,
     everyDays: 1,
     everyWeeks: 1,
     weekdays: [1],
