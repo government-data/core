@@ -181,6 +181,12 @@
       "alreadyInProgress": "an update is already in progress ({{phase}})",
       "maintenanceDuration": "maintenance lasts between 1 s and {{as_secs}} h",
       "maintenanceReasonMissing": "the maintenance reason is missing",
+      "modules": {
+        "badDrainPath": "module {{name}}: the drain path must start with «/» and stay under the module",
+        "badName": "a module's name is lower-case letters, digits and «-»",
+        "badVersion": "module {{name}}: the version is missing",
+        "repeated": "module {{name}} is named twice"
+      },
       "noUpdateService": "this installation does not have the update service: repeat the installation or run «orquestador actualizar» on the server",
       "objectExpected": "an object was expected",
       "policy": {

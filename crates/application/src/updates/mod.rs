@@ -20,6 +20,7 @@ use crate::admins::AdminContacts;
 use crate::settings::MailSlot;
 
 mod drain;
+mod modules;
 mod policy;
 mod report;
 mod store;
@@ -27,6 +28,7 @@ mod store;
 pub(crate) mod tests;
 
 pub use drain::{DrainStatus, ModuleWork, ModulesWork};
+pub use modules::InstalledModule;
 pub use policy::UpdatePolicy;
 pub use report::{DaemonReport, Outcome};
 pub use store::{

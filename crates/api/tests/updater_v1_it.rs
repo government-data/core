@@ -31,6 +31,7 @@ use updates_wiring::Store;
 struct World {
     app: axum::Router,
     machines: MachinesService,
+    updates: UpdatesService,
     _db: testkit::TestDb,
 }
 
@@ -53,8 +54,9 @@ async fn world(trusted: bool) -> World {
         ClientCertificates::not_trusted()
     };
     World {
-        app: api::updater_v1::routes(updates, machines.clone(), certificates),
+        app: api::updater_v1::routes(updates.clone(), machines.clone(), certificates),
         machines,
+        updates,
         _db: db,
     }
 }
@@ -220,7 +222,11 @@ async fn only_the_update_agents_certificate_in_use_is_accepted() {
         assert!(body["error"].is_string(), "{who}");
         let (status, _) = call(&w, "PUT", "/updater/v1/state", cert, Some(json!({}))).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{who}: nothing stored");
+        let modules = json!({ "modules": [{ "name": "trino", "version": "1.0.0" }] });
+        let (status, _) = call(&w, "PUT", "/updater/v1/modules", cert, Some(modules)).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{who}: no module stored");
     }
+    assert!(w.updates.installed_modules().await.unwrap().is_empty());
     let (status, _) = call(&w, "GET", version, Some(&current), None).await;
     assert_eq!(status, StatusCode::OK);
 }
@@ -232,4 +238,52 @@ async fn without_a_trusted_header_nothing_answers() {
     let (status, body) = call(&w, "GET", "/updater/v1/orders", Some(&cert), None).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert!(body["error"].is_string());
+}
+
+#[tokio::test]
+async fn the_agent_tells_the_installed_modules_whole() {
+    let w = world(true).await;
+    let cert = agent(&w.machines, "updater").await;
+    let agent = Some(cert.as_str());
+    let modules = json!({ "modules": [
+        { "name": "orchestrator", "version": "2.0.1", "drain_path": "/internal/drain" },
+        { "name": "quality-data", "version": "1.4.0", "drain_path": null },
+    ] });
+    for _ in 0..2 {
+        let (status, _) = call(
+            &w,
+            "PUT",
+            "/updater/v1/modules",
+            agent,
+            Some(modules.clone()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT, "the same list twice");
+    }
+    let stored = w.updates.installed_modules().await.unwrap();
+    let named: Vec<_> = stored
+        .iter()
+        .map(|m| (m.name.as_str(), m.version.as_str(), m.drain_path.as_deref()))
+        .collect();
+    assert_eq!(
+        named,
+        [
+            ("orchestrator", "2.0.1", Some("/internal/drain")),
+            ("quality-data", "1.4.0", None),
+        ]
+    );
+
+    let bad =
+        json!({ "modules": [{ "name": "trino", "version": "1.0.0", "drain_path": "/../api" }] });
+    let (status, body) = call(&w, "PUT", "/updater/v1/modules", agent, Some(bad)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"]
+        .as_str()
+        .is_some_and(|e| e.starts_with("modules")));
+    assert_eq!(w.updates.installed_modules().await.unwrap(), stored, "kept");
+
+    let none = json!({ "modules": [] });
+    let (status, _) = call(&w, "PUT", "/updater/v1/modules", agent, Some(none)).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert!(w.updates.installed_modules().await.unwrap().is_empty());
 }

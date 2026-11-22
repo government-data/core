@@ -106,6 +106,10 @@ pub trait UpdatesStore: Send + Sync {
     /// The platform's time zone as saved in Settings (decision 0079), `None`
     /// when it never was.
     async fn platform_timezone(&self) -> Result<Option<String>, String>;
+    /// Replace the installed modules (decision 0003).
+    async fn save_modules(&self, modules: &[super::InstalledModule]) -> Result<(), String>;
+    /// The installed modules as last saved; none when they never were.
+    async fn modules(&self) -> Result<Vec<super::InstalledModule>, String>;
 }
 
 /// What an administrator sees in Settings → Updates.

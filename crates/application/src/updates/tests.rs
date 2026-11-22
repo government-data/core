@@ -12,6 +12,7 @@ pub(crate) struct MemoryMaintenance {
     pub(crate) timezone: Mutex<Option<String>>,
     pub(crate) row: Mutex<UpdaterRow>,
     pub(crate) history: Mutex<Vec<HistoryEntry>>,
+    pub(crate) modules: Mutex<Vec<InstalledModule>>,
 }
 
 #[async_trait::async_trait]
@@ -52,6 +53,13 @@ impl UpdatesStore for MemoryMaintenance {
     }
     async fn platform_timezone(&self) -> Result<Option<String>, String> {
         Ok(self.timezone.lock().unwrap().clone())
+    }
+    async fn save_modules(&self, modules: &[InstalledModule]) -> Result<(), String> {
+        *self.modules.lock().unwrap() = modules.to_vec();
+        Ok(())
+    }
+    async fn modules(&self) -> Result<Vec<InstalledModule>, String> {
+        Ok(self.modules.lock().unwrap().clone())
     }
     async fn save_report(&self, report: &serde_json::Value) -> Result<(), String> {
         self.row.lock().unwrap().report = Some((report.clone(), Utc::now()));

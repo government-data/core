@@ -6,6 +6,7 @@
 //! | `PUT /updater/v1/state`                | the agent's state, kept for the page     |
 //! | `GET /updater/v1/orders`               | the policy and the pending request       |
 //! | `PUT /updater/v1/maintenance`          | maintenance begins (`active`) or ends    |
+//! | `PUT /updater/v1/modules`              | the installed modules, the whole list    |
 //! | `GET /updater/v1/drain?horizon_secs=N` | what still runs, and whether it drained  |
 //! | `GET /updater/v1/version`              | the version that answers                 |
 //!
@@ -19,7 +20,9 @@
 
 use std::time::Duration;
 
-use application::{MachinesService, MaintenanceError, UpdatesError, UpdatesService};
+use application::{
+    InstalledModule, MachinesService, MaintenanceError, UpdatesError, UpdatesService,
+};
 use auth_gateway::http::client_cert::{ClientCertificateError, ClientCertificates};
 use auth_gateway::MachineRole;
 use axum::extract::{Query, Request, State};
@@ -59,6 +62,7 @@ pub fn routes(
         .route("/updater/v1/state", put(state))
         .route("/updater/v1/orders", get(orders))
         .route("/updater/v1/maintenance", put(maintenance))
+        .route("/updater/v1/modules", put(modules))
         .route("/updater/v1/drain", get(drain))
         .route("/updater/v1/version", get(version))
         .with_state(updates)
@@ -135,6 +139,23 @@ async fn maintenance(
         Ok(m) => Json(json!({ "maintenance": m })).into_response(),
         Err(MaintenanceError::Invalid(why)) => refusal(StatusCode::BAD_REQUEST, why),
         Err(MaintenanceError::Unavailable(e)) => logged_unavailable("maintenance", &e),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ModulesBody {
+    modules: Vec<InstalledModule>,
+}
+
+/// `PUT /updater/v1/modules`: `{"modules": [{name, version, drain_path}]}`,
+/// every installed module; it replaces the list before it.
+async fn modules(State(updates): State<UpdatesService>, Json(body): Json<ModulesBody>) -> Response {
+    match updates.set_modules(body.modules).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(UpdatesError::Invalid(field, e)) => {
+            refusal(StatusCode::BAD_REQUEST, format!("{field}: {e}"))
+        }
+        Err(e) => logged_unavailable("modules", &e.to_string()),
     }
 }
 

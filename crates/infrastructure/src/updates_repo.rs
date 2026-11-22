@@ -139,6 +139,29 @@ impl PgMaintenanceStore {
         Ok(())
     }
 
+    /// Replace the installed modules (a JSON list, decision 0003).
+    pub async fn save_modules(&self, modules: &serde_json::Value) -> Result<(), String> {
+        sqlx::query(
+            "INSERT INTO orq_updater (modules, modules_at) VALUES ($1, now())
+             ON CONFLICT (id) DO UPDATE SET modules = EXCLUDED.modules, modules_at = now()",
+        )
+        .bind(modules)
+        .execute(&self.pool)
+        .await
+        .map_err(db)?;
+        Ok(())
+    }
+
+    /// The installed modules as last saved, `None` when they never were.
+    pub async fn modules(&self) -> Result<Option<serde_json::Value>, String> {
+        let modules: Option<Option<serde_json::Value>> =
+            sqlx::query_scalar("SELECT modules FROM orq_updater")
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(db)?;
+        Ok(modules.flatten())
+    }
+
     pub async fn save_policy(
         &self,
         policy: &serde_json::Value,

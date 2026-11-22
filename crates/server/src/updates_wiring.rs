@@ -3,7 +3,9 @@
 //!
 //! [`UpdatesService`]: application::UpdatesService
 
-use application::{HistoryEntry, Maintenance, UpdateRequest, UpdaterRow, UpdatesStore};
+use application::{
+    HistoryEntry, InstalledModule, Maintenance, UpdateRequest, UpdaterRow, UpdatesStore,
+};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use infrastructure::{HistoryRecord, MaintenanceRow, PgMaintenanceStore};
@@ -58,6 +60,18 @@ impl UpdatesStore for Store {
 
     async fn platform_timezone(&self) -> Result<Option<String>, String> {
         self.0.platform_timezone().await
+    }
+
+    async fn save_modules(&self, modules: &[InstalledModule]) -> Result<(), String> {
+        let modules = serde_json::to_value(modules).map_err(|e| e.to_string())?;
+        self.0.save_modules(&modules).await
+    }
+
+    async fn modules(&self) -> Result<Vec<InstalledModule>, String> {
+        match self.0.modules().await? {
+            Some(modules) => serde_json::from_value(modules).map_err(|e| e.to_string()),
+            None => Ok(Vec::new()),
+        }
     }
 
     async fn save_policy(&self, policy: &serde_json::Value, admin_id: &str) -> Result<(), String> {
