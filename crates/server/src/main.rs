@@ -16,6 +16,7 @@
 //!     certificate for the internal entry point (decision 0003).
 //!   * `oidc-keygen`, `oidc-client`, `oidc-client-update` — the gateway as an
 //!     OIDC provider: its keys and the applications that use it.
+//!   * `timezone [set NAME]` — the platform's time zone (decision 0079).
 //!   * `openapi` — print the OpenAPI spec.
 //!   * `quality rules lint | explain | test` — the rule language on local
 //!     files (see [`quality`]).
@@ -42,6 +43,7 @@ mod serve_services;
 mod settings_wiring;
 mod startup;
 mod tenants;
+mod timezone;
 mod trino_wiring;
 mod updater_certificate;
 mod updates_wiring;
@@ -73,6 +75,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some("oidc-keygen") => commands::oidc_keygen(),
         Some("oidc-client") => commands::oidc_client().await,
         Some("oidc-client-update") => commands::oidc_client_update().await,
+        Some("timezone") => timezone::run().await,
         // Print the OpenAPI spec to stdout and exit. Needs no database; the
         // monorepo's `gen:api` script pipes this into the TypeScript client
         // generator.
@@ -109,6 +112,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                  [--client-credentials --audience A [--service-account ID] \
                  [--machine-role ROLE: no secret, its machines' certificates]]\n  \
                  oidc-client-update  Change an application: ID [the same options]\n  \
+                 timezone         Print the platform's time zone; set NAME: set it \
+                 (an IANA name)\n  \
                  openapi          Print the OpenAPI spec (for client generation)\n  \
                  quality rules lint|explain|test FILE... --data DATASET=PARQUET... [--mapping FILE] \
                  [--cut DATE] [--type FIELD=email] [--lang es|en]\n  \

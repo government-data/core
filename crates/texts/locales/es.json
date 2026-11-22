@@ -203,7 +203,8 @@
         "installsInWindow": "Se instalará sola en la próxima ventana ({{start}}–{{end}}, {{timezone}}), cuando no haya flujos corriendo.",
         "pickADay": "elige al menos un día de la semana",
         "timeFormat": "las horas van como HH:MM (24 h)",
-        "updatedByHand": "Se actualiza a mano: corre «orquestador actualizar» en el servidor."
+        "updatedByHand": "Se actualiza a mano: corre «orquestador actualizar» en el servidor.",
+        "scheduleGuard": "la espera por una programación cercana va hasta 2 h"
       },
       "report": {
         "beforeInstalling": "Antes de instalarla se espera a que terminen los flujos que corren, se respalda la base, y si la versión nueva no arranca se vuelve sola a la anterior.",

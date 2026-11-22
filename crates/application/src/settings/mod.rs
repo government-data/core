@@ -24,11 +24,13 @@ mod ldap;
 mod mail;
 mod oauth;
 mod platform;
+mod platform_command;
 mod ports;
 mod sections;
 #[cfg(test)]
 mod tests;
 
+pub use platform_command::PlatformTimezone;
 pub use ports::{
     DirectoryMember, DirectoryProbe, DirectoryProbeUser, OidcDiscovery, SecretCipher,
     SettingsConnectors, SettingsStore, StoredSection,
@@ -79,10 +81,10 @@ pub enum SettingsError {
 impl std::fmt::Display for SettingsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Invalid(fields) => write!(f, "configuración inválida: {fields:?}"),
+            Self::Invalid(fields) => write!(f, "invalid settings: {fields:?}"),
             Self::Unreachable(e) => write!(f, "{e}"),
-            Self::Managed => write!(f, "lo administra gestión"),
-            Self::Internal(e) => write!(f, "error interno: {e}"),
+            Self::Managed => write!(f, "managed by the management panel"),
+            Self::Internal(e) => write!(f, "internal error: {e}"),
         }
     }
 }

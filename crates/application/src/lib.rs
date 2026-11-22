@@ -35,8 +35,8 @@ pub use platform::{
 pub use settings::{
     entra_own_tenant, DirectoryMember, DirectoryProbe, DirectoryProbeUser, EnvSettings,
     LdapSettings, MailSettings, MailSlot, MailTransport, Mailer, OAuthProviderSettings,
-    OAuthSettings, OidcDiscovery, OutgoingMail, PlatformSettings, SecretCipher, Section,
-    SettingsConnectors, SettingsError, SettingsService, SettingsSource, SettingsStore,
+    OAuthSettings, OidcDiscovery, OutgoingMail, PlatformSettings, PlatformTimezone, SecretCipher,
+    Section, SettingsConnectors, SettingsError, SettingsService, SettingsSource, SettingsStore,
     SettingsTargets, SmtpSecurity, StoredSection,
 };
 pub use updates::{

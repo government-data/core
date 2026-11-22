@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdateMode {
-    /// It only tells; it is updated with `orquestador actualizar` on the server.
+    /// It only tells; it is updated by hand on the server.
     Manual,
     /// It tells and waits for an administrator to press "Update".
     #[default]
@@ -18,7 +18,8 @@ pub enum UpdateMode {
     Automatic,
 }
 
-/// The automatic update's window, in the installation's time.
+/// The automatic update's window, in the platform's time zone (decision
+/// 0079): `timezone` is replaced by it wherever the window is read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UpdateWindow {
     /// 1 = Monday … 7 = Sunday.
@@ -35,7 +36,7 @@ impl Default for UpdateWindow {
             days: (1..=7).collect(),
             start: "02:00".into(),
             end: "05:00".into(),
-            timezone: schedule_core::DEFAULT_TIMEZONE.into(),
+            timezone: schedule_core::PLATFORM_DEFAULT_TIMEZONE.into(),
         }
     }
 }
@@ -81,16 +82,16 @@ impl UpdatePolicy {
             return Err(("window", texts::tr!("app.updates.policy.pickADay")));
         }
         if w.timezone.parse::<chrono_tz::Tz>().is_err() {
-            return Err((
-                "window",
-                format!("zona horaria desconocida: {}", w.timezone),
-            ));
+            return Err(("window", texts::tr!("app.settings.unknownTimezone")));
         }
         if !(5 * 60..=4 * 3600).contains(&self.max_drain_secs) {
             return Err(("max_drain_secs", texts::tr!("app.updates.policy.drainWait")));
         }
         if self.skip_if_scheduled_within_secs > 2 * 3600 {
-            return Err(("skip_if_scheduled_within_secs", "a lo sumo 2 h".into()));
+            return Err((
+                "skip_if_scheduled_within_secs",
+                texts::tr!("app.updates.policy.scheduleGuard"),
+            ));
         }
         Ok(())
     }

@@ -171,9 +171,7 @@ impl UpdatesService {
         let row = self.store.updater().await?;
         let report = Self::report_of(&row);
         let request = Self::pending(&row, &report).map(|r| serde_json::json!({ "id": r.id }));
-        let mut policy = Self::policy_of(&row);
-        let timezone = self.store.platform_timezone().await?;
-        policy.window.timezone = schedule_core::timezone_or_utc(timezone.as_deref());
+        let policy = self.in_platform_zone(Self::policy_of(&row)).await?;
         Ok(serde_json::json!({
             "policy": policy,
             "request": request,
@@ -185,6 +183,14 @@ impl UpdatesService {
     pub async fn platform_timezone(&self) -> Result<String, String> {
         let saved = self.store.platform_timezone().await?;
         Ok(schedule_core::timezone_or_utc(saved.as_deref()))
+    }
+
+    /// `policy` with its window in the platform's time zone: what the
+    /// daemon follows, the page shows and the emails say. The stored
+    /// window's own zone is not read (nor rewritten).
+    async fn in_platform_zone(&self, mut policy: UpdatePolicy) -> Result<UpdatePolicy, String> {
+        policy.window.timezone = self.platform_timezone().await?;
+        Ok(policy)
     }
 
     /// What the daemon reports: stored as is for the page, the outcome is
@@ -246,7 +252,12 @@ impl UpdatesService {
         let can_send = mail.configured() && !to.is_empty();
         if let Some(available) = new_available {
             let sent = if can_send {
-                let m = available.mail(&report.installed, &Self::policy_of(row), to.clone());
+                let policy = Self::policy_of(row);
+                let policy = self
+                    .in_platform_zone(policy.clone())
+                    .await
+                    .unwrap_or(policy);
+                let m = available.mail(&report.installed, &policy, to.clone());
                 mail.send(&m).await
             } else {
                 Ok(())
@@ -290,7 +301,7 @@ impl UpdatesService {
             stale,
             pending_request: Self::pending(&row, &report),
             report,
-            policy: Self::policy_of(&row),
+            policy: self.in_platform_zone(Self::policy_of(&row)).await?,
             policy_updated_at: row.policy.as_ref().map(|(_, at, _)| *at),
             policy_updated_by: row.policy.as_ref().and_then(|(_, _, by)| by.clone()),
             maintenance: self.active().await?,

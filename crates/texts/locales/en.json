@@ -203,7 +203,8 @@
         "installsInWindow": "It will install by itself in the next window ({{start}}–{{end}}, {{timezone}}), when no workflows are running.",
         "pickADay": "choose at least one day of the week",
         "timeFormat": "times go as HH:MM (24 h)",
-        "updatedByHand": "It is updated by hand: run «orquestador actualizar» on the server."
+        "updatedByHand": "It is updated by hand: run «orquestador actualizar» on the server.",
+        "scheduleGuard": "waiting for a schedule that fires soon goes up to 2 h"
       },
       "report": {
         "beforeInstalling": "Before installing it, running workflows are allowed to finish, the database is backed up, and if the new version does not start it goes back to the previous one on its own.",
