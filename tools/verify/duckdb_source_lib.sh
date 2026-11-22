@@ -17,6 +17,9 @@ FAILED=0
 CONTAINERS=("$DUCK")
 # The extension directory of the offline checks (ext_install, ext_offline).
 EXTVOL=qs-verify-$SRC-ext
+# The reviewed extensions the worker's image takes (decision 0077 point 8),
+# self-hosted for DuckDB v2.0.0 on linux_amd64.
+RELEASE=https://github.com/quality-data/core/releases/download/duckdb-extensions-v2.0.0
 
 ok() { printf '[OK  ] %s\n' "$*"; }
 ko() { printf '[FAIL] %s\n' "$*"; FAILED=1; }
@@ -48,19 +51,52 @@ pinned_engine() {
   ok "DuckDB pinned: crate duckdb $CRATE (Cargo.toml, Cargo.lock), bundled engine $ENGINE"
 }
 
+# ext_pins EXT: the release's files of a source extension and their SHA-256,
+# as "file sha256" pairs separated by ";" (the same as the worker image's);
+# a community extension takes the `.info` its repository writes, without
+# which DuckDB refuses its signature.
+ext_pins() {
+  case $1 in
+    mssql) echo "mssql.duckdb_extension 473b2980d494df2a0653ec9a8a82588ae102a9ab25d5a2b117a6e9fcd5fc20c5;mssql.duckdb_extension.info e319c9d709708142b7ed78490cb8cb90c83c2ced0ff9debb6fd5a61acf02c7a4" ;;
+    oracle_scanner) echo "oracle_scanner.duckdb_extension 20fe6e698f29be6d01435422c04115adb0dbdee073e003432a159d4665be3dc3;oracle_scanner.duckdb_extension.info 9a83aef31991a2462527f3f1e8a2d5f63de6012aa7bb8285b20244d041133621" ;;
+    postgres) echo "postgres_scanner.duckdb_extension 39e661c5cfb678c9472f5acd88235f84f3ef4126e7444c7c8a01214d9b291601" ;;
+    mysql) echo "mysql_scanner.duckdb_extension 6055f1a59dc527df795afccbf59279500d1ddc239608dd310c3eba0e98d1a11c" ;;
+    *) ko "no pinned files for the extension $1"; exit 1 ;;
+  esac
+}
+
+# Python that downloads PINS from RELEASE into <dir>/<ENGINE>/linux_amd64
+# with `fetch(dir)`, failing on a SHA-256 that differs.
+read -r -d '' FETCH <<'PY'
+import hashlib, os, urllib.request
+def fetch(top):
+    d = os.path.join(top, os.environ["ENGINE"], "linux_amd64")
+    os.makedirs(d, exist_ok=True)
+    for pin in os.environ["PINS"].split(";"):
+        name, want = pin.split()
+        data = urllib.request.urlopen(f"{os.environ['RELEASE']}/{name}").read()
+        got = hashlib.sha256(data).hexdigest()
+        if got != want:
+            raise SystemExit(f"[FAIL] {name}: sha256 {got}, pinned {want}")
+        open(os.path.join(d, name), "wb").write(data)
+        print(f"[OK  ] {name} from the release, sha256 {got}", flush=True)
+PY
+
 net_up() {
   cleanup
   docker network create "$NET" >/dev/null || { ko "network $NET"; exit 1; }
 }
 
 # The checks DuckDB runs, as Python on the duckdb package. Everything comes
-# from the environment: ENGINE, EXT, REPO, SECRET_SQL (with @PASSWORD@ for
+# from the environment: ENGINE, EXT, PINS (with RELEASE; else REPO, to
+# install from DuckDB's repository), SECRET_SQL (with @PASSWORD@ for
 # SRC_PASSWORD, never printed), ATTACH_SQL, SCHEMA, TABLE, TYPES (JSON:
 # column -> accepted DuckDB types).
 read -r -d '' CHECK <<'PY'
 import datetime as dt, json, os, sys
 from decimal import Decimal
 import duckdb
+@FETCH@
 failed = False
 def ok(m): print(f"[OK  ] {m}", flush=True)
 def ko(m):
@@ -75,10 +111,14 @@ expect("DuckDB engine in the container", env["ENGINE"], version)
 ok(f"source id {source_id}, platform {con.execute('PRAGMA platform').fetchone()[0]}")
 ext = env["EXT"]
 try:
-    con.execute(f"INSTALL {ext} FROM {env['REPO']}")
+    if env.get("PINS"):
+        fetch("/tmp/ext")
+        con.execute("SET extension_directory = '/tmp/ext'")
+    else:
+        con.execute(f"INSTALL {ext} FROM {env['REPO']}")
     con.execute(f"LOAD {ext}")
 except Exception as e:
-    ko(f"INSTALL {ext} FROM {env['REPO']}; LOAD {ext}: {e}"); sys.exit(1)
+    ko(f"install {ext}; LOAD {ext}: {e}"); sys.exit(1)
 ok("extension %s %s, installed from %s (%s)" % ((ext,) + con.execute(
     "SELECT extension_version, installed_from, install_mode FROM duckdb_extensions() WHERE extension_name = ?",
     [ext]).fetchone()))
@@ -130,36 +170,26 @@ except Exception as e:
     ok(f"a write is refused: {str(e).splitlines()[0][:120]}")
 sys.exit(1 if failed else 0)
 PY
+CHECK=${CHECK/@FETCH@/"$FETCH"}
 
 # duckdb_check: runs CHECK in the DuckDB container; extra `-e NAME` flags for
 # the variables above come as arguments (PREP: a command run first, ONLY_LOAD:
 # stop once the extension loads). The engine's Python package is the version
 # without its `v`.
 duckdb_check() {
-  docker run --rm --name "$DUCK" --network "$NET" -e ENGINE="$ENGINE" -e CHECK="$CHECK" "$@" "$PY_IMAGE" \
+  docker run --rm --name "$DUCK" --network "$NET" -e ENGINE="$ENGINE" -e RELEASE="$RELEASE" -e CHECK="$CHECK" "$@" "$PY_IMAGE" \
     sh -c 'eval "${PREP:-true}" && pip install --quiet --disable-pip-version-check --root-user-action=ignore "duckdb==${ENGINE#v}" >/dev/null 2>&1 &&
       python -I -c "$CHECK"' || FAILED=1
 }
 
-read -r -d '' INSTALL <<'PY'
-import sys; sys.path.insert(0, "/ext/py")
-import glob, hashlib, os, duckdb
-con = duckdb.connect()
-con.execute("SET enable_progress_bar = false")
-con.execute("SET extension_directory = '/ext/duckdb'")
-con.execute(f"INSTALL {os.environ['EXT']} FROM {os.environ['REPO']}")
-for f in sorted(glob.glob("/ext/duckdb/**/*.duckdb_extension", recursive=True)):
-    digest = hashlib.sha256(open(f, "rb").read()).hexdigest()
-    print(f"[OK  ] installed {f[len('/ext/duckdb/'):]}, sha256 {digest}", flush=True)
-PY
-
-# ext_install EXT REPO: what the worker's image does at build time (decision
+# ext_install EXT: what the worker's image does at build time (decision
 # 0077 point 8), into the volume EXTVOL: the engine's Python package under
-# /ext/py and the extension under /ext/duckdb, the extension directory;
-# prints the file's path and SHA-256.
+# /ext/py and the extension's pinned files from the release under
+# /ext/duckdb, the extension directory; prints each file and its SHA-256.
 ext_install() {
-  docker run --rm --name "$DUCK" -v "$EXTVOL:/ext" -e ENGINE="$ENGINE" -e EXT="$1" -e REPO="$2" \
-    -e CHECK="$INSTALL" "$PY_IMAGE" sh -c 'pip install --quiet --disable-pip-version-check \
+  docker run --rm --name "$DUCK" -v "$EXTVOL:/ext" -e ENGINE="$ENGINE" -e RELEASE="$RELEASE" \
+    -e PINS="$(ext_pins "$1")" -e CHECK="$FETCH
+fetch('/ext/duckdb')" "$PY_IMAGE" sh -c 'pip install --quiet --disable-pip-version-check \
       --root-user-action=ignore --target /ext/py "duckdb==${ENGINE#v}" >/dev/null 2>&1 && python -c "$CHECK"' ||
     ko "install $1 into the extension directory"
 }

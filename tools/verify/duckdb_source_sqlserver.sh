@@ -59,14 +59,14 @@ sqlserver "USE qs_verify;
 ok "invented rows: $(sqlserver 'SELECT count(*) FROM qs_verify.dbo.clients' | tr -d '\r')"
 
 echo "== DuckDB reads it through the extension mssql"
-duckdb_check -e EXT=mssql -e REPO=community -e SRC_PASSWORD="$READER" \
+duckdb_check -e EXT=mssql -e PINS="$(ext_pins mssql)" -e SRC_PASSWORD="$READER" \
   -e SECRET_SQL="CREATE SECRET src_secret (TYPE mssql, host '$MSSQL', port 1433, database 'qs_verify', user 'qs_reader', password '@PASSWORD@', trust_server_certificate true)" \
   -e ATTACH_SQL="ATTACH '' AS src (TYPE mssql, SECRET src_secret, READ_ONLY)" \
   -e SCHEMA=dbo -e TABLE=src.dbo.clients \
   -e TYPES='{"id": ["INTEGER"], "code": ["VARCHAR"], "name": ["VARCHAR"], "opened": ["DATE"], "amount": ["DECIMAL(12,2)"], "updated": ["TIMESTAMP", "TIMESTAMP_NS"]}'
 
 echo "== The extension from a directory, offline (decision 0077 point 8)"
-ext_install mssql community
+ext_install mssql
 ext_offline mssql
 
 echo "== Filters follow the server; aggregates, DISTINCT and joins DuckDB's with remote_pushdown false"
