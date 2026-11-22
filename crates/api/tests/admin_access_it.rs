@@ -1,5 +1,5 @@
 //! The administrator's entry through the internal routes (the installer and
-//! `orquestador acceso-admin`) with an ephemeral Postgres: with no account, it
+//! the host's admin access command) with an ephemeral Postgres: with no account, it
 //! creates the pending administrator and gives its activation link; with the
 //! link they choose their password, and from then on only `force` gives
 //! another one (the recovery one). Needs Docker.
@@ -21,7 +21,7 @@ use infrastructure::{
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-const INTERNAL: &str = "token-interno-de-prueba-de-al-menos-32";
+const INTERNAL: &str = "internal-test-token-of-at-least-32-chars";
 
 #[path = "../../server/src/updates_wiring.rs"]
 mod updates_wiring;
@@ -58,6 +58,7 @@ async fn access(app: &axum::Router, token: &str, body: Value) -> (StatusCode, Va
                 .method("POST")
                 .uri("/internal/admin-access")
                 .header("authorization", format!("Bearer {token}"))
+                .header("accept-language", "en")
                 .header("content-type", "application/json")
                 .body(Body::from(body.to_string()))
                 .unwrap(),
@@ -99,8 +100,12 @@ async fn the_installer_gets_an_activation_link_for_a_pending_first_admin() {
     assert_eq!(account.role, domain::Role::admin());
 
     // There is already an administrator: another email creates nothing.
-    let (status, _) = access(&app, INTERNAL, json!({ "email": "otro@cliente.co" })).await;
+    let (status, body) = access(&app, INTERNAL, json!({ "email": "otro@cliente.co" })).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        body["error"],
+        "There are already accounts and none has that email address."
+    );
     assert_eq!(admins.count().await.unwrap(), 1);
 
     // They choose their password with the link; repeating the install no longer
@@ -114,7 +119,7 @@ async fn the_installer_gets_an_activation_link_for_a_pending_first_admin() {
     assert_eq!(body["created"], false);
     assert_eq!(body["link"], Value::Null);
 
-    // `orquestador acceso-admin`: they lost it, a link to choose another.
+    // The admin access command: they lost it, a link to choose another.
     let (status, body) = access(
         &app,
         INTERNAL,

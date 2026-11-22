@@ -61,6 +61,12 @@
     "updater": {
       "notTheAgent": "Only the update agent's certificate calls updater/v1.",
       "unavailable": "The database does not answer."
+    },
+    "internal": {
+      "invalidEmail": "Invalid email address.",
+      "unknownAccount": "There are already accounts and none has that email address.",
+      "directoryAccount": "That account's password is in the directory (LDAP / AD).",
+      "unavailable": "The database does not answer."
     }
   },
   "app": {
