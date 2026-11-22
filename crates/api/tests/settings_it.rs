@@ -451,3 +451,45 @@ async fn the_platform_time_zone_is_saved_and_read_by_the_database() {
     assert_eq!(body["platform"]["value"]["timezone"], "UTC");
     assert_eq!(stored().await, None);
 }
+
+#[tokio::test]
+async fn the_timezone_command_sets_what_the_database_reads_and_audits_it() {
+    let db = testkit::spawn_test_db().await;
+    let audit = Arc::new(PgAuditRepository::new(db.pool.clone()));
+    let command = application::PlatformTimezone::new(
+        Arc::new(Store(PgSettingsStore::new(db.pool.clone()))),
+        audit.clone(),
+    );
+    assert_eq!(command.get().await.unwrap(), "UTC");
+    assert!(command
+        .set("Mars/Olympus", "server timezone set")
+        .await
+        .is_err());
+
+    let saved = command
+        .set("America/Bogota", "server timezone set")
+        .await
+        .unwrap();
+    assert_eq!(saved, "America/Bogota");
+    assert_eq!(command.get().await.unwrap(), "America/Bogota");
+    let stored: Option<String> = sqlx::query_scalar("SELECT public.platform_timezone()")
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(stored.as_deref(), Some("America/Bogota"));
+    let row = PgSettingsStore::new(db.pool.clone())
+        .load("platform")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.updated_by, None, "no person signed in");
+    let events = domain::AuditRepository::list_recent(audit.as_ref(), 10)
+        .await
+        .unwrap();
+    assert!(
+        events
+            .iter()
+            .any(|e| e.user_agent.as_deref() == Some("server timezone set")),
+        "{events:?}"
+    );
+}

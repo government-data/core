@@ -26,6 +26,7 @@
     "from": "Desde",
     "to": "Hasta",
     "timeZone": "Zona horaria",
+    "timeZoneFromPlatform": "La zona horaria de la plataforma (Configuración → Plataforma, o `server timezone set` en el servidor).",
     "drainHelp": "Si en ese tiempo no terminan, la actualización se posterga sin tocar nada.",
     "save": "Guardar",
     "history": "Historial",

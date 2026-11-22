@@ -479,10 +479,8 @@ export const Updates: Component = () => {
                         {tr("platform:updates.timeZone")}
                         <input
                           value={p().window.timezone}
-                          onInput={(ev) =>
-                            edit((x) => (x.window.timezone = ev.currentTarget.value.trim()))
-                          }
-                          required
+                          title={tr("platform:updates.timeZoneFromPlatform")}
+                          readOnly
                         />
                       </label>
                     </div>

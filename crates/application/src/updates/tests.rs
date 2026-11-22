@@ -308,13 +308,19 @@ async fn the_window_in_the_orders_is_in_the_platforms_time_zone() {
     *store.timezone.lock().unwrap() = Some("Europe/Madrid".into());
     assert_eq!(zone().await, "Europe/Madrid");
 
-    *store.timezone.lock().unwrap() = Some("Mars/Olympus".into());
-    assert_eq!(zone().await, "UTC", "one that does not parse: UTC");
     assert_eq!(
         updates.view().await.unwrap().policy.window.timezone,
-        "America/Bogota",
-        "the stored window is not rewritten"
+        "Europe/Madrid",
+        "the page shows the zone the daemon follows"
     );
+
+    *store.timezone.lock().unwrap() = Some("Mars/Olympus".into());
+    assert_eq!(zone().await, "UTC", "one that does not parse: UTC");
+}
+
+#[test]
+fn the_default_window_is_in_utc_not_bogota() {
+    assert_eq!(UpdatePolicy::default().window.timezone, "UTC");
 }
 
 #[tokio::test]

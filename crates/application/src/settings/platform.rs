@@ -16,16 +16,22 @@ impl SettingsService {
         mut s: PlatformSettings,
         actor: &str,
     ) -> Result<Section<PlatformSettings>, SettingsError> {
-        s.timezone = s.timezone.trim().to_string();
-        if chrono_tz::Tz::from_str(&s.timezone).is_err() {
-            return Err(invalid(
-                "timezone",
-                &texts::tr!("app.settings.unknownTimezone"),
-            ));
-        }
+        s.timezone = checked_timezone(&s.timezone)?;
         let source = self.persist(PLATFORM, &s, actor).await?;
         let saved = Section { value: s, source };
         self.current.update(|c| c.platform = saved.clone());
         Ok(saved)
     }
+}
+
+/// `name` trimmed, if it is an IANA time zone that `chrono-tz` knows.
+pub(super) fn checked_timezone(name: &str) -> Result<String, SettingsError> {
+    let name = name.trim();
+    if chrono_tz::Tz::from_str(name).is_err() {
+        return Err(invalid(
+            "timezone",
+            &texts::tr!("app.settings.unknownTimezone"),
+        ));
+    }
+    Ok(name.to_string())
 }

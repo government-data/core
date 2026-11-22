@@ -26,6 +26,7 @@
     "from": "From",
     "to": "To",
     "timeZone": "Time zone",
+    "timeZoneFromPlatform": "The platform's time zone (Settings → Platform, or `server timezone set` on the server).",
     "drainHelp": "If they do not finish in that time, the update is postponed without touching anything.",
     "save": "Save",
     "history": "History",
