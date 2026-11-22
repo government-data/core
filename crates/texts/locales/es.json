@@ -181,6 +181,12 @@
       "alreadyInProgress": "ya hay una actualización en curso ({{phase}})",
       "maintenanceDuration": "el mantenimiento dura entre 1 s y {{as_secs}} h",
       "maintenanceReasonMissing": "falta el motivo del mantenimiento",
+      "modules": {
+        "badDrainPath": "módulo {{name}}: la ruta de drenaje debe empezar por «/» y quedarse bajo el módulo",
+        "badName": "el nombre de un módulo lleva minúsculas, dígitos y «-»",
+        "badVersion": "módulo {{name}}: falta la versión",
+        "repeated": "el módulo {{name}} aparece dos veces"
+      },
       "noUpdateService": "esta instalación no tiene el servicio de actualizaciones: repite la instalación o corre «orquestador actualizar» en el servidor",
       "objectExpected": "se esperaba un objeto",
       "policy": {
