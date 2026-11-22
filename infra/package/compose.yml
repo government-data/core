@@ -1,0 +1,75 @@
+# The core's compose for installations (decision 0080, point 2): the
+# package's `compose.yml`, run by quality-sdk's update agent as
+#
+#   docker compose --project-name quality-data \
+#     --project-directory /opt/quality-data/quality-data/current \
+#     --file /opt/quality-data/quality-data/current/compose.yml \
+#     --env-file /opt/quality-data/quality-data/.env up -d --no-build --wait
+#
+# with no profile and no second file. Its paths are the package's (this file
+# at its root, beside infra/), not the repository's: tools/package.sh puts
+# it there. Development keeps compose.yml, compose.override.yml and
+# compose.prod.yml; a change of a service goes in infra/ once, and an
+# override of compose.prod.yml in both.
+#
+# It is the production stack (compose.yml with compose.prod.yml) in one
+# file, and Traefik's machine certificate (infra/traefik/certificate.yml,
+# decision 0081). What belongs to one installation is never in the version
+# folder but beside it, in QD_MODULE_DIR (/opt/quality-data/quality-data,
+# required), which the installer writes into the .env (env.example):
+#
+#   secrets/   database_url and postgres_superuser_password, as Docker
+#              secrets (readable by the containers' users: PostgreSQL's is
+#              uid 70)
+#   certs/     Traefik's default certificate (local.crt, local.key)
+#   internal/  Traefik's watched folder (decision 0081): internal.yml, the
+#              CA's machines-ca.crt, app-machine.pem (renewed in place);
+#              the package's dynamic files are read-only inside it, at
+#              package/
+#   ca/        the installation's CA, for the installer's one-shots
+#
+# The images are the agent's IMAGE_* (the signed index's digests).
+name: quality-data
+
+include:
+  - path:
+      - infra/traefik/docker-compose.yml
+      - infra/traefik/certificate.yml
+  - infra/postgres/docker-compose.yml
+  - infra/postgres/api.override.yml
+
+secrets:
+  database_url:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/database_url
+  postgres_superuser_password:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/postgres_superuser_password
+
+services:
+  traefik:
+    volumes:
+      # Same targets as infra/traefik's files, so these replace theirs.
+      - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/internal:/etc/traefik/dynamic"
+      - "./infra/traefik/dynamic:/etc/traefik/dynamic/package:ro"
+      - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/certs:/etc/traefik/certs:ro"
+
+  postgres:
+    environment:
+      # From the secret, not the environment (as compose.prod.yml).
+      POSTGRES_PASSWORD: ""
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+    secrets:
+      - postgres_superuser_password
+
+  api:
+    image: ${IMAGE_API:-${API_IMAGE:?set IMAGE_API or API_IMAGE to a versioned image}}
+    environment:
+      DATABASE_URL: ""
+      DATABASE_URL_FILE: /run/secrets/database_url
+    secrets:
+      - database_url
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  web:
+    image: ${IMAGE_WEB:-${WEB_IMAGE:?set IMAGE_WEB or WEB_IMAGE to a versioned image}}
