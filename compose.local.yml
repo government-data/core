@@ -1,6 +1,6 @@
 # The local (on-premise) edition's layer, over compose.yml and
 # compose.prod.yml: the API's internal routes for the host's update daemon
-# (orquestador-actualizador) and the documentation for the customers at /docs.
+# (quality-sdk's update agent) and the documentation for the customers at /docs.
 #
 # It is the only port the API publishes, and only on 127.0.0.1: it cannot be
 # reached from outside the machine. Each request brings the token of

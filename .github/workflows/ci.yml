@@ -1,6 +1,6 @@
 name: CI
 
-# Lint + test + build for the knime-orchestador monorepo. The pipeline is split into a
+# Lint + test + build for the quality-data core monorepo. The pipeline is split into a
 # Rust `backend` job and a pnpm `frontend` job, and the `check` job gates each
 # so a PR that only touches one stack never compiles the other. Dependency
 # caches (cargo + pnpm) keep repeat runs fast.

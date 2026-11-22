@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "KNIME Orquestador base config",
+  "display": "quality-data base config",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022"],
