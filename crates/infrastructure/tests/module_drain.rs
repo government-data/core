@@ -59,18 +59,15 @@ async fn each_module_answers_its_counts_or_is_an_error() {
         module: module.into(),
         url: format!("{base}{path}"),
     };
-    let drains = HttpModuleDrains::new(
-        vec![
-            endpoint("busy", "/busy"),
-            endpoint("idle", "/idle"),
-            endpoint("slow", "/slow"),
-            endpoint("broken", "/broken"),
-            endpoint("odd", "/odd"),
-        ],
-        Duration::from_millis(500),
-    )
-    .unwrap();
-    let answers = drains.work(Duration::from_secs(60)).await;
+    let endpoints = [
+        endpoint("busy", "/busy"),
+        endpoint("idle", "/idle"),
+        endpoint("slow", "/slow"),
+        endpoint("broken", "/broken"),
+        endpoint("odd", "/odd"),
+    ];
+    let drains = HttpModuleDrains::plain(Duration::from_millis(500));
+    let answers = drains.work(&endpoints, Duration::from_secs(60)).await;
     let names: Vec<_> = answers.iter().map(|(m, _)| m.as_str()).collect();
     assert_eq!(names, ["busy", "idle", "slow", "broken", "odd"]);
     assert_eq!(
@@ -93,6 +90,6 @@ async fn each_module_answers_its_counts_or_is_an_error() {
 
 #[tokio::test]
 async fn without_modules_nothing_is_asked() {
-    let drains = HttpModuleDrains::new(Vec::new(), Duration::from_secs(1)).unwrap();
-    assert!(drains.work(Duration::from_secs(60)).await.is_empty());
+    let drains = HttpModuleDrains::plain(Duration::from_secs(1));
+    assert!(drains.work(&[], Duration::from_secs(60)).await.is_empty());
 }
