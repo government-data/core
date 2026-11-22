@@ -54,7 +54,7 @@ services:
     # the foot of the menu: in dev the version does not tell which code runs.
     build:
       args:
-        ORQ_COMMIT: ${ORQ_COMMIT:-}
+        APP_COMMIT: ${APP_COMMIT:-}
     network_mode: host
     networks: !reset []
     expose: !reset []
@@ -79,7 +79,7 @@ services:
   web:
     build:
       args:
-        ORQ_COMMIT: ${ORQ_COMMIT:-}
+        APP_COMMIT: ${APP_COMMIT:-}
     # The documentation through its own router, as in compose.local.yml: only
     # with a session, and with docs-chain's CSP (Starlight's theme and
     # language selectors are inline scripts the web's CSP blocks).
@@ -100,7 +100,7 @@ services:
       context: .
       dockerfile: infra/docker/api.Dockerfile
       args:
-        ORQ_COMMIT: ${ORQ_COMMIT:-}
+        APP_COMMIT: ${APP_COMMIT:-}
     command: ["bootstrap-admin"]
     restart: "no"
     depends_on:

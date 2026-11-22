@@ -18,9 +18,9 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 # The release's version and commit (empty in development): the UI shows them
 # at the foot of the menu for debugging.
-ARG ORQ_VERSION=""
-ARG ORQ_COMMIT=""
-ENV ORQ_VERSION=$ORQ_VERSION ORQ_COMMIT=$ORQ_COMMIT
+ARG APP_VERSION=""
+ARG APP_COMMIT=""
+ENV APP_VERSION=$APP_VERSION APP_COMMIT=$APP_COMMIT
 RUN pnpm run build
 
 FROM nginxinc/nginx-unprivileged:1.28-alpine AS runtime

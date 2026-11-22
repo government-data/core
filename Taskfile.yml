@@ -23,7 +23,7 @@ tasks:
   dev:
     desc: Start the full dev stack (build + bootstrap)
     env:
-      ORQ_COMMIT:
+      APP_COMMIT:
         sh: git rev-parse HEAD
     cmds:
       - "{{.DC}} --profile dev up -d --build"
