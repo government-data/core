@@ -7,7 +7,7 @@ version: 0.0.0
 # Each must have a running container, besides their Compose healthchecks.
 # No `checks` until the API's image has a command that answers.
 health:
-  services: [traefik, postgres, api, web]
+  services: [traefik, postgres, api, node, web]
 
 # What a backup before every update covers (the critical pieces).
 data:

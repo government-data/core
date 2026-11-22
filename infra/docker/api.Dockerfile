@@ -25,7 +25,8 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Build: cook the dependencies from the recipe (cached across app-only edits),
-# then compile just the server binary.
+# then compile the server binary and the node agent's (`qd-node`, decision
+# 0084: the application VM's machine renews its certificate with it).
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
@@ -37,7 +38,7 @@ ARG APP_VERSION=""
 ARG APP_COMMIT=""
 RUN if [ -n "$APP_VERSION" ]; then export APP_VERSION; else unset APP_VERSION; fi; \
     if [ -n "$APP_COMMIT" ]; then export APP_COMMIT; else unset APP_COMMIT; fi; \
-    cargo build --release --locked -p server
+    cargo build --release --locked -p server -p node-agent
 # The folder of the key that encrypts the Settings secrets: the final image
 # has no shell to create it, and a new volume inherits its owner. The same
 # for the metrics file's folder (decision 0071), shared with Alloy.
@@ -46,6 +47,7 @@ RUN mkdir -p /out/settings /out/qd-metrics
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/release/server /usr/local/bin/server
+COPY --from=builder /app/target/release/qd-node /usr/local/bin/qd-node
 # The key that encrypts the Settings secrets (SETTINGS_KEY_FILE).
 COPY --from=builder --chown=nonroot:nonroot /out/settings /var/lib/orquestador/settings
 COPY --from=builder --chown=nonroot:nonroot /out/qd-metrics /run/qd-metrics

@@ -22,8 +22,9 @@
 # It also reports how long the first machine.pem lasts. Then, with no
 # restart of Traefik: the internal entry point refuses a
 # client without a certificate and, with the agent's, reaches the API on
-# /api/updater/v1/version; and a renewed machine.pem is what it serves
-# within QD_TRAEFIK_CHECK_EVERY seconds. The API is on a network only
+# /api/updater/v1/version; and the node agent (`node`, decision 0084)
+# renews machine.pem over the renew route (QD_NODE_RENEW_EVERY=60s), which
+# Traefik and PostgreSQL then serve without a restart. The API is on a network only
 # Traefik shares with it and trusts Traefik's certificate header (decision
 # 0083): a container on data-quality-edge does not reach it, by name or by
 # any of its addresses. The web entry point's certificate source (decision
@@ -88,6 +89,10 @@ if ! docker run --rm --entrypoint /usr/local/bin/server "$API" updater-certifica
   ko "$API has no 'server updater-certificate'"
   exit 1
 fi
+if ! docker run --rm --entrypoint /usr/local/bin/qd-node "$API" 2>&1 | grep -q QD_AGENT_DIR; then
+  ko "$API has no qd-node"
+  exit 1
+fi
 for n in data-quality-edge data-quality-backend data-quality-api; do
   if docker network inspect "$n" >/dev/null 2>&1; then ko "the network $n exists: stop the dev stack"; exit 1; fi
 done
@@ -128,6 +133,7 @@ cat >>"$MOD/.env" <<EOF
 QD_METRICS_VOLUME=$P-metrics
 QD_TRAEFIK_CHECK_EVERY=5
 QD_PG_TLS_CHECK_EVERY=5
+QD_NODE_RENEW_EVERY=60s
 POSTGRES_BIND=127.0.0.1
 TRAEFIK_METRICS_BIND=127.0.0.1
 TRAEFIK_INTERNAL_BIND=127.0.0.1
@@ -168,6 +174,7 @@ else
 fi
 for _ in $(seq 30); do [ "$(health postgres)" = healthy ] && break; sleep 2; done
 expect "3. PostgreSQL with TLS, by itself" healthy "$(health postgres)"
+FIRST=$(asroot "cat '$NODE/machine.pem'" | openssl x509 -noout -serial 2>/dev/null)
 
 # --- 4. The agent's up -------------------------------------------------------------
 if out=$(dc up --detach --no-build --remove-orphans --wait --wait-timeout 300 2>&1); then
@@ -176,7 +183,7 @@ else
   ko "4. up: $(printf '%s' "$out" | tail -n 3)"
   dc logs --no-log-prefix --tail 10 api 2>&1
 fi
-expect "4. running" "api postgres traefik web" \
+expect "4. running" "api node postgres traefik web" \
   "$(dc ps --services --status running 2>/dev/null | sort | tr '\n' ' ' | sed 's/ $//')"
 expect "4. PostgreSQL's first init made every role" "knime_app,qd_metrics,qd_queue" \
   "$(docker exec "$(dc ps -q postgres)" psql -U postgres -d knime -XAtc \
@@ -199,10 +206,9 @@ fi
 put() { asroot "cp '$1' '$MOD/internal/.$2.new' && chmod 644 '$MOD/internal/.$2.new' && mv -f '$MOD/internal/.$2.new' '$MOD/internal/$2'"; }
 put "$MOD/ca/ca.crt" machines-ca.crt
 put "$MOD/current/infra/traefik/internal.yml" internal.yml
-# The agent's files, as the agent (root) reads them, and the CA's key for
-# the renewal below.
+# The agent's files, as the agent (root) reads them.
 mkdir -p "$D/client"
-asroot "cp '$UPD/ca.pem' '$UPD/certificate.pem' '$UPD/private-key.pem' '$MOD/ca/ca.key' '$D/client/' &&
+asroot "cp '$UPD/ca.pem' '$UPD/certificate.pem' '$UPD/private-key.pem' '$D/client/' &&
   chown $(id -u) '$D'/client/* && chmod 600 '$D'/client/*"
 
 # --- The internal entry point, Traefik not restarted ----------------------------
@@ -219,24 +225,34 @@ for _ in $(seq 20); do [ "$(agent /api/updater/v1/version)" = 200 ] && break; sl
 expect "the agent's certificate reaches /api/updater/v1/version" 200 "$(agent /api/updater/v1/version)"
 expect "Traefik was not restarted" "$STARTED" "$(docker inspect --format '{{.State.StartedAt}}' "$TRAEFIK")"
 
-# --- A renewed machine.pem, taken without a restart ------------------------------
-serial() { openssl s_client -connect 127.0.0.1:9443 -servername "$NAME" </dev/null 2>/dev/null |
-  openssl x509 -noout -serial 2>/dev/null; }
-before=$(serial)
-openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj "/O=qd/OU=app/CN=$NAME" \
-  -keyout "$D/client/renewed.key" -out "$D/client/renewed.csr" 2>/dev/null
-printf 'basicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth,clientAuth\nsubjectAltName=DNS:%s\n' "$NAME" >"$D/client/ext"
-openssl x509 -req -in "$D/client/renewed.csr" -CA "$D/client/ca.pem" -CAkey "$D/client/ca.key" \
-  -set_serial "0x$(openssl rand -hex 8)" -extfile "$D/client/ext" -days 2 -out "$D/client/renewed.crt" 2>/dev/null
-# As the node agent would write it: aside then renamed, its user's, 0600.
-cat "$D/client/renewed.crt" "$D/client/renewed.key" >"$D/client/renewed.pem"
-asroot "cp '$D/client/renewed.pem' '$NODE/.machine.pem.new' && chown 65532:65532 '$NODE/.machine.pem.new' &&
-  chmod 600 '$NODE/.machine.pem.new' && mv -f '$NODE/.machine.pem.new' '$NODE/machine.pem'"
-want="serial=$(openssl x509 -in "$D/client/renewed.crt" -noout -serial | cut -d= -f2)"
-for _ in $(seq 30); do [ "$(serial)" = "$want" ] && break; sleep 1; done
-[ "$before" != "$want" ] || ko "the renewed serial is the old one"
-expect "a renewed machine.pem is served on the internal entry point" "$want" "$(serial)"
+# --- The node agent renews machine.pem, taken without a restart (0084) ------------
+# QD_NODE_RENEW_EVERY (60s here, 8h by default) is how often it renews.
+served() { # PORT [openssl args]: the serial the port serves
+  openssl s_client -connect "127.0.0.1:$1" -servername "$NAME" "${@:2}" </dev/null 2>/dev/null |
+    openssl x509 -noout -serial 2>/dev/null; }
+held() { asroot "cat '$NODE/machine.pem'" | openssl x509 -noout -serial 2>/dev/null; }
+POSTGRES=$(dc ps -q postgres)
+PG_STARTED=$(docker inspect --format '{{.State.StartedAt}}' "$POSTGRES")
+for _ in $(seq 150); do [ "$(held)" != "$FIRST" ] && break; sleep 1; done
+renewed=$(held)
+[ "$renewed" != "$FIRST" ] && ok "the node agent renewed machine.pem: $renewed" ||
+  ko "the node agent did not renew machine.pem in 150 s"
+dc logs --no-log-prefix --tail 5 node 2>&1 | sed 's/^/  node: /'
+traefik_ok=no pg_ok=no
+for _ in $(seq 40); do
+  now=$(held)
+  [ "$now" != "$FIRST" ] && [ "$(served 9443)" = "$now" ] && traefik_ok=yes
+  [ "$now" != "$FIRST" ] && [ "$(served 5432 -starttls postgres)" = "$now" ] && pg_ok=yes
+  [ "$traefik_ok$pg_ok" = yesyes ] && break
+  sleep 1
+done
+expect "the internal entry point serves the renewed certificate" yes "$traefik_ok"
+expect "PostgreSQL serves the renewed certificate" yes "$pg_ok"
 expect "Traefik was not restarted" "$STARTED" "$(docker inspect --format '{{.State.StartedAt}}' "$TRAEFIK")"
+expect "PostgreSQL was not restarted" "$PG_STARTED" "$(docker inspect --format '{{.State.StartedAt}}' "$POSTGRES")"
+expect "the node agent never restarted" 0 "$(docker inspect --format '{{.RestartCount}}' "$(dc ps -q node)")"
+expect "the node agent's networks" "${P}_default" \
+  "$(docker inspect --format '{{range $n, $_ := .NetworkSettings.Networks}}{{$n}} {{end}}' "$(dc ps -q node)" | sed 's/ $//')"
 
 # --- Only Traefik reaches the API (0083) ------------------------------------------
 edge() { docker run --rm --name "$P-edge" --network data-quality-edge "$CURL" \

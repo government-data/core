@@ -81,8 +81,13 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:-}
       TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL: ${ACME_EMAIL:-}
     networks:
-      - edge
-      - api
+      edge:
+      api:
+      # The node agent's network (decision 0084): it reaches the internal
+      # entry point by the VM's machine name, Traefik's alias here.
+      default:
+        aliases:
+          - ${INTERNAL_DOMAIN:?set INTERNAL_DOMAIN to the VM's machine name}
     volumes:
       # Same targets as infra/traefik's files, so these replace theirs.
       - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/internal:/etc/traefik/dynamic"
@@ -124,6 +129,32 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+
+  # The application VM's node agent (decision 0084): it keeps the machine
+  # certificate app-machine signed renewed over the renew route, as any
+  # machine's agent, writing it aside then renamed into QD_MACHINE_DIR,
+  # where PostgreSQL and Traefik take it without a restart. No join token:
+  # the machine is installed. It reaches Traefik's internal entry point by
+  # the VM's name (INTERNAL_DOMAIN), Traefik's alias on the project's
+  # default network, which it shares with Traefik alone; never
+  # data-quality-api (0083).
+  node:
+    image: ${IMAGE_API:-${API_IMAGE:?set IMAGE_API or API_IMAGE to a versioned image}}
+    entrypoint: ["/usr/local/bin/qd-node"]
+    # It exits non-zero only when a person must act (a refused renewal,
+    # another CA, a certificate that ended); anything else it retries.
+    restart: unless-stopped
+    read_only: true
+    environment:
+      QD_AGENT_DIR: /run/qd-node
+      QD_INTERNAL_URL: https://${INTERNAL_DOMAIN:?set INTERNAL_DOMAIN to the VM's machine name}:${TRAEFIK_INTERNAL_PORT:-9443}/api
+      # How often it renews (8h by default).
+      QD_RENEW_EVERY: ${QD_NODE_RENEW_EVERY:-8h}
+      OBS_VM: ${OBS_VM:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - "${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node"
+      - metrics:/run/qd-metrics
 
   web:
     image: ${IMAGE_WEB:-${WEB_IMAGE:?set IMAGE_WEB or WEB_IMAGE to a versioned image}}
