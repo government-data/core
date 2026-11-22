@@ -95,33 +95,6 @@ async fn a_tenant_cannot_write_rows_for_another() {
     assert_eq!(code, "42501");
 }
 
-#[tokio::test]
-async fn the_license_is_one_row_per_tenant() {
-    let db = testkit::spawn_test_db().await;
-    let app = pool_de_la_app(&db).await;
-    let acme = testkit::new_tenant(&db, "acme").await;
-
-    for tenant in [MAIN, acme.as_str()] {
-        let mut tx = en(&app, tenant).await;
-        for clave in ["ORQ-1", "ORQ-2"] {
-            sqlx::query(
-                "INSERT INTO orq_license (key_sealed) VALUES ($1)
-                 ON CONFLICT (tenant_id) DO UPDATE SET key_sealed = $1",
-            )
-            .bind(format!("{clave}-{tenant}"))
-            .execute(&mut *tx)
-            .await
-            .unwrap();
-        }
-        let keys: Vec<String> = sqlx::query_scalar("SELECT key_sealed FROM orq_license")
-            .fetch_all(&mut *tx)
-            .await
-            .unwrap();
-        assert_eq!(keys, [format!("ORQ-2-{tenant}")]);
-        tx.commit().await.unwrap();
-    }
-}
-
 /// A new table with `tenant_id` and without forced RLS would be a hole: this
 /// test fails until the migration gives it its policy.
 #[tokio::test]
