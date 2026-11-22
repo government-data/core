@@ -26,17 +26,6 @@
     "continueWith": "Continue with {{provider}}",
     "activated": "Done: your account is active. Sign in with your email and password."
   },
-  "signInPage": {
-    "intro": "Enter your email and password: we'll take you to your company.",
-    "orByAddress": "or by address",
-    "addressHelp": "Do you sign in with Google or Microsoft, or forgot your password? Go to your company's address.",
-    "address": "Your company's address",
-    "addressExample": "yourcompany",
-    "go": "Go",
-    "pick": "Which one?",
-    "pickHelp": "Your account is in several companies.",
-    "linkExpired": "This sign-in link no longer works. Please sign in again."
-  },
   "forgot": {
     "title": "Reset your password",
     "intro": "Enter the email of your account and we will send you a link to choose a new password.",

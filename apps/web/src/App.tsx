@@ -7,7 +7,6 @@ import { AppQueryProvider, redirectToLoginOnUnauthorized } from "@knime-orchesta
 import { AdminLayout } from "./shell/AdminLayout";
 import { FeatureRoutes } from "./shell/routes";
 import { ForgotPassword } from "./auth/ForgotPassword";
-import { CentralLogin, Handoff, isCentralHost } from "./auth/CentralLogin";
 import { Login } from "./auth/Login";
 import { ACCOUNT_HOME, isAccount } from "./auth/account";
 import { ActivateAccount, ResetPassword } from "./auth/ResetPassword";
@@ -39,7 +38,7 @@ const api = createApiClient();
 /**
  * The application shell. It provides the shared TanStack Query client (with the
  * global 401 → logout+redirect interceptor) and defines the two route groups:
- * the chrome-less `/login`, `/handoff`, `/forgot-password` and `/reset-password` screens,
+ * the chrome-less `/login`, `/forgot-password` and `/reset-password` screens,
  * and everything else nested under the admin layout. Feature routes are discovered through the shell registry — the shell
  * has no knowledge of any specific feature.
  */
@@ -60,12 +59,7 @@ export const App: Component = () => {
       <For each={[lang()]}>
         {() => (
           <>
-            {/* The common entrance (entrar.<domain>): only the sign-in. */}
-            {isCentralHost() ? (
-              <Router>
-                <Route path="*" component={CentralLogin} />
-              </Router>
-            ) : isAccount() ? (
+            {isAccount() ? (
               // The common account (cuenta.<domain>): only the access screens.
               <Router>
                 <Route path="/login" component={Login} />
@@ -77,7 +71,6 @@ export const App: Component = () => {
             ) : (
               <Router>
                 <Route path="/login" component={Login} />
-                <Route path="/handoff" component={Handoff} />
                 <Route path="/forgot-password" component={ForgotPassword} />
                 <Route path="/reset-password" component={ResetPassword} />
                 <Route path="/activate" component={ActivateAccount} />
