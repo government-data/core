@@ -111,6 +111,11 @@ services:
       # command (decision 0071, point 14): Mimir on the observability server,
       # by default the application VM's, named as its certificate names it.
       MACHINES_METRICS_PUSH_URL: ${MACHINES_METRICS_PUSH_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN:-localhost}}:${MIMIR_HTTP_PORT:-9009}/api/v1/push}
+      # Where the API asks each installed application module for its drain
+      # (decision 0003): /modules/<name><drain_path> on Traefik's internal
+      # entry point, with the VM's machine certificate (LAKE_CLIENT_CERT_FILE).
+      INTERNAL_DOMAIN: ${INTERNAL_DOMAIN:-internal.${APP_DOMAIN:-localhost}}
+      TRAEFIK_INTERNAL_PORT: ${TRAEFIK_INTERNAL_PORT:-9443}
       # Settings editable from the UI (LDAP, mail, OAuth): the secrets are
       # encrypted with SETTINGS_ENCRYPTION_KEY or, empty, with the settings-key
       # volume's key. What is saved there wins over LDAP_* / OAUTH_*.
