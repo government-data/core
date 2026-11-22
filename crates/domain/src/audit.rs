@@ -128,6 +128,9 @@ pub enum AuditEventType {
     /// Dolt's hold ended by the agent (`dolt:released`), or found already
     /// expired by itself (`dolt:expired`).
     DoltReleased,
+    /// The update agent's machine asked for an update now, for a person on
+    /// the server (decision 0086): the machine, on `platform/updates`.
+    UpdateRequested,
 }
 
 impl AuditEventType {
@@ -166,6 +169,7 @@ impl AuditEventType {
             Self::TrinoHeld => "trino_held",
             Self::DoltHeld => "dolt_held",
             Self::DoltReleased => "dolt_released",
+            Self::UpdateRequested => "update_requested",
             Self::TrinoReleased => "trino_released",
         }
     }
@@ -205,6 +209,7 @@ impl AuditEventType {
             "trino_held" => Self::TrinoHeld,
             "dolt_held" => Self::DoltHeld,
             "dolt_released" => Self::DoltReleased,
+            "update_requested" => Self::UpdateRequested,
             "trino_released" => Self::TrinoReleased,
             other => return Err(AuditEventTypeError::Unknown(other.to_string())),
         })
@@ -380,6 +385,7 @@ mod tests {
             AuditEventType::TrinoReleased,
             AuditEventType::DoltHeld,
             AuditEventType::DoltReleased,
+            AuditEventType::UpdateRequested,
         ] {
             assert_eq!(
                 AuditEventType::parse(event_type.as_str()).unwrap(),

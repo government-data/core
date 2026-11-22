@@ -32,8 +32,8 @@ pub use modules::InstalledModule;
 pub use policy::UpdatePolicy;
 pub use report::{DaemonReport, Outcome};
 pub use store::{
-    HistoryEntry, Maintenance, MaintenanceError, UpdateRequest, UpdaterRow, UpdatesError,
-    UpdatesStore, UpdatesView,
+    HistoryEntry, Maintenance, MaintenanceError, Requester, UpdateRequest, UpdaterRow,
+    UpdatesError, UpdatesStore, UpdatesView,
 };
 
 /// If the daemon reports nothing in this time, the page warns that it does
@@ -329,6 +329,16 @@ impl UpdatesService {
 
     /// "Update now": the daemon takes it on its next round.
     pub async fn request_now(&self, admin_id: &str) -> Result<UpdateRequest, UpdatesError> {
+        self.request(Requester::Admin(admin_id)).await
+    }
+
+    /// "Update now" from the server: the update agent's machine asked, for a
+    /// person there (decision 0086). As [`Self::request_now`].
+    pub async fn request_from_server(&self, machine: &str) -> Result<UpdateRequest, UpdatesError> {
+        self.request(Requester::Machine(machine)).await
+    }
+
+    async fn request(&self, by: Requester<'_>) -> Result<UpdateRequest, UpdatesError> {
         let row = self
             .store
             .updater()
@@ -348,7 +358,7 @@ impl UpdatesService {
         }
         let request = self
             .store
-            .new_request(admin_id)
+            .new_request(by)
             .await
             .map_err(UpdatesError::Unavailable)?;
         tracing::info!(request = %request.id, "update now");

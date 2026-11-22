@@ -181,6 +181,24 @@ pub(super) fn installed(
     )
 }
 
+/// The update agent's machine asked for an update now, for a person on the
+/// server (decision 0086): `request` on `platform/updates`, by no person.
+pub(super) fn update_requested(
+    machine: &Machine,
+    origin: &Origin,
+    at: SystemTime,
+) -> NewActionAudit {
+    event(
+        AuditEventType::UpdateRequested,
+        None,
+        Some(&machine.name),
+        "request".into(),
+        "platform/updates".into(),
+        origin,
+        at,
+    )
+}
+
 /// A lake's root keys given to a node of `role` that is installing, before
 /// it joins (0066 step 11): `install:<role>` on `lake/<lake>`, by no person
 /// and no machine yet. Never the keys.

@@ -95,7 +95,8 @@ impl PgMaintenanceStore {
         let Some(r) = sqlx::query(
             "SELECT u.report, u.reported_at, u.policy, u.policy_updated_at,
                     pa.email AS policy_by, u.request_id::text AS request_id, u.requested_at,
-                    ra.email AS request_by, u.notified_available, u.notified_result
+                    COALESCE(ra.email, u.requested_by_machine) AS request_by,
+                    u.notified_available, u.notified_result
                FROM orq_updater u
                LEFT JOIN admin_users pa ON pa.id = u.policy_updated_by
                LEFT JOIN admin_users ra ON ra.id = u.requested_by",
@@ -181,23 +182,29 @@ impl PgMaintenanceStore {
         Ok(())
     }
 
-    /// A new request: id, when and whose email.
+    /// A new request by an administrator or, from the server, the update
+    /// agent's machine: id, when and whose email (or the machine's name).
     pub async fn new_request(
         &self,
-        admin_id: &str,
+        admin_id: Option<&str>,
+        machine: Option<&str>,
     ) -> Result<(String, DateTime<Utc>, Option<String>), String> {
         let r = sqlx::query(
             "WITH request AS (
-                 INSERT INTO orq_updater (request_id, requested_at, requested_by)
-                 VALUES (gen_random_uuid(), now(), $1::uuid)
+                 INSERT INTO orq_updater
+                     (request_id, requested_at, requested_by, requested_by_machine)
+                 VALUES (gen_random_uuid(), now(), $1::uuid, $2)
                  ON CONFLICT (id) DO UPDATE SET request_id = EXCLUDED.request_id,
-                     requested_at = EXCLUDED.requested_at, requested_by = EXCLUDED.requested_by
-                 RETURNING request_id, requested_at, requested_by
+                     requested_at = EXCLUDED.requested_at, requested_by = EXCLUDED.requested_by,
+                     requested_by_machine = EXCLUDED.requested_by_machine
+                 RETURNING request_id, requested_at, requested_by, requested_by_machine
              )
-             SELECT p.request_id::text AS id, p.requested_at, a.email
+             SELECT p.request_id::text AS id, p.requested_at,
+                    COALESCE(a.email, p.requested_by_machine) AS email
                FROM request p LEFT JOIN admin_users a ON a.id = p.requested_by",
         )
         .bind(admin_id)
+        .bind(machine)
         .fetch_one(&self.pool)
         .await
         .map_err(db)?;

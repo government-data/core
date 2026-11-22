@@ -9,6 +9,7 @@
 //! | `PUT /updater/v1/modules`              | the installed modules, the whole list    |
 //! | `GET /updater/v1/drain?horizon_secs=N` | what still runs, and whether it drained  |
 //! | `GET /updater/v1/version`              | the version that answers                 |
+//! | `POST /updater/v1/request`             | "Update now", for a person on the server |
 //!
 //! They mean what the host daemon's `/internal/*` routes mean, and replace
 //! them; those stay, on their own port with their token, for the daemons
@@ -24,13 +25,15 @@ use application::{
     InstalledModule, MachinesService, MaintenanceError, UpdatesError, UpdatesService,
 };
 use auth_gateway::http::client_cert::{ClientCertificateError, ClientCertificates};
-use auth_gateway::MachineRole;
+use auth_gateway::{Machine, MachineRole};
 use axum::extract::{Query, Request, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, put};
-use axum::{Json, Router};
+use axum::routing::{get, post, put};
+use axum::{Extension, Json, Router};
+
+use crate::auth::ClientIp;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -45,6 +48,13 @@ const DEFAULT_HORIZON: Duration = Duration::from_secs(30 * 60);
 struct Gate {
     machines: MachinesService,
     certificates: ClientCertificates,
+}
+
+/// The agent's machine, as the gate found it, for the calls that record it.
+#[derive(Clone)]
+struct Caller {
+    machine: Machine,
+    machines: MachinesService,
 }
 
 /// Mount `updater/v1`; `certificates` says whether the client certificate
@@ -65,12 +75,13 @@ pub fn routes(
         .route("/updater/v1/modules", put(modules))
         .route("/updater/v1/drain", get(drain))
         .route("/updater/v1/version", get(version))
+        .route("/updater/v1/request", post(request))
         .with_state(updates)
         .layer(axum::middleware::from_fn_with_state(gate, require_updater))
 }
 
 /// Only the update agent's certificate passes.
-async fn require_updater(State(gate): State<Gate>, req: Request, next: Next) -> Response {
+async fn require_updater(State(gate): State<Gate>, mut req: Request, next: Next) -> Response {
     let presented = match gate.certificates.read(req.headers()) {
         Ok(presented) => presented,
         Err(ClientCertificateError::NotTrusted) => {
@@ -80,7 +91,11 @@ async fn require_updater(State(gate): State<Gate>, req: Request, next: Next) -> 
         Err(_) => return not_the_agent(),
     };
     match gate.machines.caller(&presented, MachineRole::Updater).await {
-        Ok(Some(_)) => next.run(req).await,
+        Ok(Some(machine)) => {
+            let machines = gate.machines.clone();
+            req.extensions_mut().insert(Caller { machine, machines });
+            next.run(req).await
+        }
         Ok(None) => not_the_agent(),
         Err(e) => {
             tracing::error!("updater/v1: the machine of a certificate: {e:?}");
@@ -185,6 +200,31 @@ async fn drain(State(updates): State<UpdatesService>, Query(q): Query<DrainQuery
         "maintenance": maintenance,
     }))
     .into_response()
+}
+
+/// `POST /updater/v1/request`: "Update now" from the server, for a person
+/// there (decision 0086), as the web's; `202 {id, at, by}`, `by` the
+/// machine's name. Audited as `update_requested`.
+async fn request(
+    State(updates): State<UpdatesService>,
+    Extension(caller): Extension<Caller>,
+    ClientIp(ip): ClientIp,
+    headers: HeaderMap,
+) -> Response {
+    let request = match updates.request_from_server(&caller.machine.name).await {
+        Ok(request) => request,
+        Err(UpdatesError::Conflict(why)) => return refusal(StatusCode::CONFLICT, why),
+        Err(e) => return logged_unavailable("request", &e.to_string()),
+    };
+    let origin = crate::machines::origin(ip, &headers);
+    if let Err(e) = caller
+        .machines
+        .update_requested(&caller.machine, &origin)
+        .await
+    {
+        tracing::warn!("updater/v1 request: the audit could not be recorded: {e:?}");
+    }
+    (StatusCode::ACCEPTED, Json(json!(request))).into_response()
 }
 
 /// `GET /updater/v1/version`: `{version}`.

@@ -1949,7 +1949,7 @@ export interface components {
              *     `join_token_refused`, `machine_approved`, `machine_draining`,
              *     `machine_retired`, `machine_sessions_ended`, `certificate_issued`,
              *     `certificate_refused`, `trino_held`, `trino_released`, `dolt_held`,
-             *     `dolt_released`).
+             *     `dolt_released`, `update_requested`).
              */
             event_type: string;
             /**

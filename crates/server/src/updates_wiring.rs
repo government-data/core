@@ -4,7 +4,7 @@
 //! [`UpdatesService`]: application::UpdatesService
 
 use application::{
-    HistoryEntry, InstalledModule, Maintenance, UpdateRequest, UpdaterRow, UpdatesStore,
+    HistoryEntry, InstalledModule, Maintenance, Requester, UpdateRequest, UpdaterRow, UpdatesStore,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -78,8 +78,12 @@ impl UpdatesStore for Store {
         self.0.save_policy(policy, admin_id).await
     }
 
-    async fn new_request(&self, admin_id: &str) -> Result<UpdateRequest, String> {
-        self.0.new_request(admin_id).await.map(request)
+    async fn new_request(&self, by: Requester<'_>) -> Result<UpdateRequest, String> {
+        let (admin, machine) = match by {
+            Requester::Admin(id) => (Some(id), None),
+            Requester::Machine(name) => (None, Some(name)),
+        };
+        self.0.new_request(admin, machine).await.map(request)
     }
 
     async fn mark_notified(

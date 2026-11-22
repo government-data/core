@@ -41,7 +41,7 @@ pub use settings::{
 };
 pub use updates::{
     DrainStatus, HistoryEntry, InstalledModule, Maintenance, MaintenanceError, ModuleWork,
-    ModulesWork, UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError, UpdatesService,
+    ModulesWork, Requester, UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError, UpdatesService,
     UpdatesStore, UpdatesView,
 };
 
