@@ -1,6 +1,8 @@
-//! The code modules' work in flight, for the update agent (decision 0003):
-//! every registered module that counts its own work ([`contracts::Drain`])
-//! is asked, each within [`ANSWER_WITHIN`]. The server names none of them.
+//! The modules' work in flight, for the update agent (decision 0003): every
+//! registered code module that counts its own work ([`contracts::Drain`]),
+//! and every application module that declares a drain path, asked over HTTP
+//! ([`AppModules`]); each within [`ANSWER_WITHIN`]. The server names none
+//! of them.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,6 +10,7 @@ use std::time::Duration;
 use application::{ModuleWork, ModulesWork};
 use async_trait::async_trait;
 use contracts::{Drain, ModuleRegistry};
+use infrastructure::module_drain::{DrainEndpoint, HttpModuleDrains};
 
 /// A module that takes longer counts as not drained.
 pub(crate) const ANSWER_WITHIN: Duration = Duration::from_secs(5);
@@ -45,6 +48,42 @@ impl ModulesWork for CodeModules {
             answers.push(((*name).to_string(), answer));
         }
         answers
+    }
+}
+
+/// The application modules' drain paths as the application's
+/// [`ModulesWork`].
+pub(crate) struct AppModules(HttpModuleDrains);
+
+impl AppModules {
+    /// The installed application modules' drain paths. None yet: the core
+    /// does not read the installed modules' manifests until decision 0002
+    /// says how, so no application module is asked.
+    pub(crate) fn installed(within: Duration) -> Result<Self, String> {
+        Self::of(Vec::new(), within)
+    }
+
+    fn of(endpoints: Vec<DrainEndpoint>, within: Duration) -> Result<Self, String> {
+        HttpModuleDrains::new(endpoints, within).map(Self)
+    }
+}
+
+#[async_trait]
+impl ModulesWork for AppModules {
+    async fn work(&self, horizon: Duration) -> Vec<(String, Result<ModuleWork, String>)> {
+        self.0
+            .work(horizon)
+            .await
+            .into_iter()
+            .map(|(module, answer)| {
+                let answer = answer.map(|w| ModuleWork {
+                    running: w.running,
+                    queued: w.queued,
+                    scheduled_soon: w.scheduled_soon,
+                });
+                (module, answer)
+            })
+            .collect()
     }
 }
 
@@ -99,5 +138,24 @@ mod tests {
         );
         assert_eq!(answers[1].0, "slow");
         assert!(answers[1].1.is_err());
+    }
+
+    #[tokio::test]
+    async fn without_installed_modules_no_application_module_is_asked() {
+        let modules = AppModules::installed(ANSWER_WITHIN).unwrap();
+        assert!(modules.work(Duration::from_secs(60)).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_application_module_that_does_not_answer_is_an_error() {
+        let unreachable = DrainEndpoint {
+            module: "reports".into(),
+            url: "http://127.0.0.1:9/drain".into(),
+        };
+        let modules = AppModules::of(vec![unreachable], Duration::from_millis(200)).unwrap();
+        let answers = modules.work(Duration::ZERO).await;
+        assert_eq!(answers.len(), 1);
+        assert_eq!(answers[0].0, "reports");
+        assert!(answers[0].1.is_err());
     }
 }
