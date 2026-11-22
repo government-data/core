@@ -1,5 +1,5 @@
 /**
- * Shared, framework-agnostic building blocks for the knime-orchestador frontend.
+ * Shared, framework-agnostic building blocks for the quality-data frontend.
  * Feature packages under `packages/` and apps under `apps/` consume these.
  */
 

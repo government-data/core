@@ -171,7 +171,7 @@ impl PasswordResetService {
     }
 
     /// Ask for a reset link for `email`. `link_base` is the public address of
-    /// the web app (`https://orquestador.example.com`).
+    /// the web app (`https://quality-data.example.com`).
     ///
     /// `Ok` whether or not the account exists; the returned id (for the audit
     /// trail only, never for the response) says which account it was.
@@ -255,7 +255,7 @@ impl PasswordResetService {
     }
 
     /// The administrator's entry from the server (the installer, or
-    /// `orquestador acceso-admin`), with no password anywhere: if there is no
+    /// the admin access command), with no password anywhere: if there is no
     /// account, it creates `email`'s as a pending administrator, and gives a
     /// link to choose the password. For an account that already chose it, only
     /// with `force` (it was lost and there is no outgoing mail). With outgoing

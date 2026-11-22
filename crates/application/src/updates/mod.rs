@@ -1,6 +1,6 @@
 //! The installation's updates.
 //!
-//! The host daemon (`orquestador-actualizador`) updates, never the API: the
+//! The update agent (quality-sdk) updates, never the API: the
 //! API only tells it whether it can (what still runs) and, meanwhile, goes
 //! into **maintenance**: no new work is handed out and what already runs
 //! finishes. What is queued meanwhile (a schedule, someone pressing "Run")

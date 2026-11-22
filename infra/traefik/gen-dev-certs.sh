@@ -5,12 +5,12 @@
 # they trust the installation's CA.
 #
 #   infra/traefik/gen-dev-certs.sh [extra-name ...]
-#   e.g.: infra/traefik/gen-dev-certs.sh orquestador.empresa.local 192.168.1.50
+#   e.g.: infra/traefik/gen-dev-certs.sh quality-data.example.local 192.168.1.50
 set -euo pipefail
 cd "$(dirname "$0")/certs"
 
 if [[ ! -f dev-ca.key ]]; then
-  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=knime-orchestador dev CA" \
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=quality-data dev CA" \
     -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
     -keyout dev-ca.key -out dev-ca.crt 2>/dev/null
 fi
