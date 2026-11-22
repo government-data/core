@@ -26,7 +26,17 @@
 #              CA's machines-ca.crt, app-machine.pem (renewed in place);
 #              the package's dynamic files are read-only inside it, at
 #              package/
-#   ca/        the installation's CA, for the installer's one-shots
+#   ca/        the installation's CA (`server ca-init`): the API's, to sign
+#              the machines' certificates and to check PostgreSQL's, and the
+#              installer's one-shots'
+#
+# database_url is verify-full by POSTGRES_SERVER_NAME (decision 0082):
+#   postgres://<APP_DB_USER>:<password>@<POSTGRES_SERVER_NAME>:5432/<POSTGRES_DB>?sslmode=verify-full&sslrootcert=/run/qd-ca/ca.crt
+#
+# The first start is not one `up` (decision 0082): ca-init, `up -d postgres`
+# without waiting, the app-machine one-shot, this `up`, then the
+# updater-certificate one-shot and internal/'s internal.yml and
+# machines-ca.crt.
 #
 # The images are the agent's IMAGE_* (the signed index's digests).
 name: quality-data
@@ -35,7 +45,11 @@ include:
   - path:
       - infra/traefik/docker-compose.yml
       - infra/traefik/certificate.yml
-  - infra/postgres/docker-compose.yml
+  # PostgreSQL with TLS and the machines' certificates (decisions 0066,
+  # 0082): healthy only once the node agent's machine.pem is there.
+  - path:
+      - infra/postgres/docker-compose.yml
+      - infra/postgres/tls.yml
   - infra/postgres/api.override.yml
 
 secrets:
@@ -65,8 +79,12 @@ services:
     environment:
       DATABASE_URL: ""
       DATABASE_URL_FILE: /run/secrets/database_url
+      CA_CERT_FILE: /run/qd-ca/ca.crt
+      CA_KEY_FILE: /run/qd-ca/ca.key
     secrets:
       - database_url
+    volumes:
+      - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/ca:/run/qd-ca:ro"
     read_only: true
     tmpfs:
       - /tmp

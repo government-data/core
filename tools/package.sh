@@ -11,7 +11,8 @@
 #   infra/        the files that compose includes and mounts (Traefik's
 #                 static and dynamic configuration, its machine
 #                 certificate's entrypoint, PostgreSQL's init and backup
-#                 scripts) and the installer's one-shot overlays
+#                 scripts and its TLS overlay) and the installer's one-shot
+#                 overlays
 #
 # The files are taken from the commit (HEAD), never the working tree, so
 # nothing per installation (internal.yml's copies, certificates, secrets,
@@ -45,6 +46,8 @@ files=(
   infra/traefik/dynamic
   infra/postgres/docker-compose.yml
   infra/postgres/api.override.yml
+  infra/postgres/tls.yml
+  infra/postgres/tls
   infra/postgres/initdb
   infra/postgres/scripts
   infra/postgres/app-machine.yml
