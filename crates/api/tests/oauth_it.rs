@@ -612,7 +612,10 @@ async fn a_signed_in_admin_links_an_account_with_another_email_then_unlinks_it()
     let list = json(list).await;
     assert_eq!(list["identities"][0]["provider"], "google");
     assert_eq!(list["identities"][0]["subject"], "google-subject-1");
-    assert_eq!(list["identities"][0]["email"], "someone.personal@example.org");
+    assert_eq!(
+        list["identities"][0]["email"],
+        "someone.personal@example.org"
+    );
 
     // 4. And now that account signs in, despite its unverified, foreign email.
     app.clone()
