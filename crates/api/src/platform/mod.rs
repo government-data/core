@@ -92,6 +92,9 @@ async fn me(
         "actions": actor.actions(),
         "version": domain::VERSION,
         "edition": platform.edition(),
+        // The platform's time zone (decision 0079), UTC when never set: the
+        // default of a new schedule's form.
+        "platform_timezone": platform.platform_timezone().await,
         // Maintenance (everyone) and new versions (administrators).
         "update_notice": platform.update_notice(&actor).await,
     })))

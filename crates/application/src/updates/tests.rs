@@ -318,6 +318,17 @@ async fn the_window_in_the_orders_is_in_the_platforms_time_zone() {
 }
 
 #[tokio::test]
+async fn everyone_reads_the_platforms_time_zone_or_utc() {
+    let (updates, store, _) = with_mail();
+    let zone = || async { updates.platform_timezone().await.unwrap() };
+    assert_eq!(zone().await, "UTC", "never saved");
+    *store.timezone.lock().unwrap() = Some("Europe/Madrid".into());
+    assert_eq!(zone().await, "Europe/Madrid");
+    *store.timezone.lock().unwrap() = Some("Mars/Olympus".into());
+    assert_eq!(zone().await, "UTC", "does not parse");
+}
+
+#[tokio::test]
 async fn the_page_says_when_the_daemon_stopped_reporting() {
     let (updates, store, _) = with_mail();
     assert!(!updates.view().await.unwrap().daemon);

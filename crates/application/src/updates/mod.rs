@@ -180,6 +180,13 @@ impl UpdatesService {
         }))
     }
 
+    /// The platform's time zone (decision 0079), UTC when it was never
+    /// saved or does not parse.
+    pub async fn platform_timezone(&self) -> Result<String, String> {
+        let saved = self.store.platform_timezone().await?;
+        Ok(schedule_core::timezone_or_utc(saved.as_deref()))
+    }
+
     /// What the daemon reports: stored as is for the page, the outcome is
     /// added to the history and what is new is announced.
     pub async fn report(&self, report: serde_json::Value) -> Result<(), UpdatesError> {

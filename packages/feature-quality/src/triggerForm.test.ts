@@ -63,3 +63,10 @@ describe("problemOf", () => {
     expect(problemOf({ ...w, expiresOn: true, expiresDate: "2026-11-01" })).not.toBeNull();
   });
 });
+
+describe("newWhen", () => {
+  it("is in the platform's time zone, UTC until it is known", () => {
+    expect(newWhen(now).timezone).toBe("UTC");
+    expect(newWhen(now, "Europe/Madrid").timezone).toBe("Europe/Madrid");
+  });
+});
