@@ -795,4 +795,3 @@ mod lake_replica;
 mod lake_replication;
 mod lake_warehouse;
 mod series;
-mod trino;

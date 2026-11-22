@@ -26,7 +26,6 @@ use crate::reveal::{self, Refusal, RevealIn, Shown};
 use crate::source_api::VIEW;
 use crate::source_records::{AskError, RecordsAsk, RecordsPage};
 use crate::source_tables;
-use crate::trino_hold;
 
 /// The job's kind.
 pub const KIND: &str = "records";
@@ -150,17 +149,14 @@ async fn ask(
 }
 
 /// Queues the page asked: waited for, before the scheduled work, and run
-/// once; marked with whether it uses Trino, by its source's driver
-/// (decision 0066, point 9).
+/// once.
 async fn queue(pool: &PgPool, parameters: &serde_json::Value) -> Result<Uuid, sqlx::Error> {
-    let uses_trino = trino_hold::known_use(pool, KIND, parameters, None).await?;
     sqlx::query_scalar(
-        "INSERT INTO quality.jobs (kind, parameters, priority, max_attempts, uses_trino)
-         VALUES ($1, $2, 10, 1, $3) RETURNING id",
+        "INSERT INTO quality.jobs (kind, parameters, priority, max_attempts)
+         VALUES ($1, $2, 10, 1) RETURNING id",
     )
     .bind(KIND)
     .bind(parameters)
-    .bind(uses_trino)
     .fetch_one(pool)
     .await
 }

@@ -1,6 +1,5 @@
 //! Dolt restarts to take a renewed certificate only when it is free (0066,
-//! point 11), checked twice, as Trino's coordinator does (point 9): the
-//! API, Dolt's only client, has no operation of the catalog in flight and
+//! point 11), checked twice: the API, Dolt's only client, has no operation of the catalog in flight and
 //! holds the next ones, and Dolt's own list shows no other connection
 //! running a statement. The application VM's agent asks with its
 //! certificate (role `app`, point 15) ([`MachinesService::hold_dolt`]);

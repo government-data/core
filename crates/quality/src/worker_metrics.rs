@@ -34,7 +34,7 @@ pub enum JobResult {
     Ok,
     /// Failed, or could not be finished.
     Failed,
-    /// Not this worker's to finish: put back (Trino held) or its lease lost.
+    /// Not this worker's to finish: put back or its lease lost.
     Cancelled,
 }
 

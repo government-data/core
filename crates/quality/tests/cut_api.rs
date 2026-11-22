@@ -242,8 +242,8 @@ async fn a_person_runs_todays_cut_audited_and_a_second_run_blocks_or_replaces() 
             .unwrap();
     assert_eq!(extract.0, "extract");
     assert_eq!(extract.1["cut"], out["cut"]);
-    // Its mapping read for the run: known not to use Trino (0066).
-    assert_eq!(extract.2, Some(false));
+    // No longer written (decision 0077): left NULL until it is dropped.
+    assert_eq!(extract.2, None);
 
     // Under a run, even asked to replace: blocked, not audited.
     for body in [None, Some(json!({ "rerun": "replace" }))] {

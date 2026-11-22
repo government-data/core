@@ -215,7 +215,7 @@ async fn a_listing_of_a_sql_server_source_gets_its_credentials_for_duckdb() {
         ("core", "sqlserver")
     );
     // DuckDB reads it (decision 0077): its credentials, no token for Trino.
-    assert!(!source.on_trino() && source.secrets.contains_key("password"));
+    assert!(source.secrets.contains_key("password"));
     assert_eq!(
         *f.issued.given.lock().unwrap(),
         vec![(job, "w1".into(), "source/core".into())]
@@ -262,7 +262,7 @@ async fn a_map_of_a_sql_server_source_gets_its_table_and_credentials() {
         (source.name.as_str(), source.table.as_str()),
         ("core", "dbo.clients")
     );
-    assert!(!source.on_trino() && source.secrets.contains_key("password"));
+    assert!(source.secrets.contains_key("password"));
     assert_eq!(
         *f.issued.given.lock().unwrap(),
         vec![(job, "w1".into(), "source/core".into())]

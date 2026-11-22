@@ -289,8 +289,8 @@ async fn a_page_is_queued_and_what_cannot_be_asked_is_refused() {
             .await
             .unwrap();
     assert_eq!(kind, "records");
-    // A SQL Server source is read through DuckDB: no job on Trino.
-    assert_eq!(uses_trino, Some(false));
+    // No longer written (decision 0077): left NULL until it is dropped.
+    assert_eq!(uses_trino, None);
     assert_eq!(
         (parameters["source"].as_str(), parameters["by"].as_str()),
         (Some("core"), Some(ANA))
@@ -514,7 +514,7 @@ async fn a_worker_gets_the_source_and_its_page_of_another_table_is_refused() {
     let source = details.source.unwrap();
     assert_eq!(source.table, "dbo.clients");
     assert!(
-        !source.on_trino() && source.secrets.contains_key("password"),
+        source.secrets.contains_key("password"),
         "DuckDB reads it, with its credentials"
     );
 

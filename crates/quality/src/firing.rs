@@ -9,7 +9,6 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::schedule::{self, Rerun, ScheduleTrigger, When};
-use crate::trino_hold;
 
 /// What a fire did, as `schedules.last_outcome` keeps it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,9 +157,6 @@ async fn fire_one(
                 schedule: Some(s.id),
                 requested_by: None,
                 due_at: fire,
-                // The scheduler has no catalog at hand: held while Trino
-                // is, until its details say.
-                from: None,
             };
             open_cut(tx, &request).await
         }
@@ -182,11 +178,6 @@ pub struct CutRequest<'a> {
     pub schedule: Option<Uuid>,
     pub requested_by: Option<Uuid>,
     pub due_at: DateTime<Utc>,
-    /// The source the dataset's mapping on `main` reads (its `from`), if
-    /// the opener has it at hand: its extraction is then known to use
-    /// Trino or not (decision 0066, point 9). `None` leaves it unknown,
-    /// held while Trino is.
-    pub from: Option<&'a str>,
 }
 
 /// Opens the dataset's cut of that date with its extraction; if it exists,
@@ -235,7 +226,7 @@ pub async fn open_cut(
     };
     // The cut's id and replacement number: the logs' run_id and run (0026).
     let parameters = serde_json::json!({ "cut": r.date.to_string(), "cut_id": cut, "run": run });
-    let job = queue_job_from(tx, "extract", Some(r.dataset), &parameters, r.from).await?;
+    let job = queue_job(tx, "extract", Some(r.dataset), &parameters).await?;
     sqlx::query("UPDATE quality.cuts SET extract_job = $2 WHERE id = $1")
         .bind(cut)
         .bind(job)
@@ -244,34 +235,21 @@ pub async fn open_cut(
     Ok((outcome, Some(cut), Some(job)))
 }
 
-/// Queues a `kind` job, marked with whether it uses Trino as far as its
-/// parameters say ([`trino_hold::known_use`]).
+/// Queues a `kind` job. `uses_trino` is no longer written (decision
+/// 0077): it stays NULL until a later version drops it.
 pub(crate) async fn queue_job(
     tx: &mut Transaction<'_, Postgres>,
     kind: &str,
     dataset: Option<&str>,
     parameters: &serde_json::Value,
 ) -> Result<Uuid, sqlx::Error> {
-    queue_job_from(tx, kind, dataset, parameters, None).await
-}
-
-/// [`queue_job`], for an extraction whose mapping reads `from`.
-async fn queue_job_from(
-    tx: &mut Transaction<'_, Postgres>,
-    kind: &str,
-    dataset: Option<&str>,
-    parameters: &serde_json::Value,
-    from: Option<&str>,
-) -> Result<Uuid, sqlx::Error> {
-    let uses_trino = trino_hold::known_use(&mut **tx, kind, parameters, from).await?;
     sqlx::query_scalar(
-        "INSERT INTO quality.jobs (kind, dataset, parameters, uses_trino)
-         VALUES ($1, $2, $3, $4) RETURNING id",
+        "INSERT INTO quality.jobs (kind, dataset, parameters)
+         VALUES ($1, $2, $3) RETURNING id",
     )
     .bind(kind)
     .bind(dataset)
     .bind(parameters)
-    .bind(uses_trino)
     .fetch_one(&mut **tx)
     .await
 }

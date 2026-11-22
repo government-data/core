@@ -40,7 +40,6 @@ pub use crate::report::{
 };
 use crate::source_store::Sealer;
 use crate::source_tables;
-use crate::trino_hold;
 use crate::worker_report;
 
 /// The largest report a worker may send.
@@ -289,17 +288,6 @@ async fn details(
         };
         let mapping = catalog.as_ref().map(|c| c.mapping.as_str());
         let source = api.job_source(&job.kind, mapping, &job.parameters).await?;
-        let on_trino = source.as_ref().is_some_and(SourceAccess::on_trino);
-        if reads_source(&job.kind)
-            && !trino_hold::at_details(&api.pool, id, &client, on_trino)
-                .await
-                .map_err(internal)?
-        {
-            // Trino is held for its restart: the job went back to the
-            // queue, its attempt not counted (decision 0066, point 9).
-            tracing::info!("a job on Trino while it is held: back to the queue");
-            return Err(StatusCode::SERVICE_UNAVAILABLE);
-        }
         let ids = (tenant, id);
         source_given(&api, id, &job.kind, &client, &headers, source.as_ref()).await?;
         let lake = if evaluate {

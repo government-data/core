@@ -16,10 +16,10 @@
 //!
 //! And, without a session, what a new machine is installed with
 //! ([`install`]), the route a machine joins with ([`join`]) and the one it
-//! renews its certificate with ([`renew`]), and Trino's
-//! coordinator's hold before it restarts ([`trino`]), Dolt's ([`dolt`]),
-//! the lake's gate ([`lake`]) and Grafana's alerts ([`alerts`]). The rules are
-//! [`MachinesService`]'s; here HTTP is only translated.
+//! renews its certificate with ([`renew`]), Dolt's hold before it
+//! restarts ([`dolt`]), the lake's gate ([`lake`]) and Grafana's alerts
+//! ([`alerts`]). The rules are [`MachinesService`]'s; here HTTP is only
+//! translated.
 
 pub mod alerts;
 pub mod dolt;
@@ -34,7 +34,6 @@ pub mod lake_replication;
 pub mod lifecycle;
 pub mod metrics;
 pub mod renew;
-pub mod trino;
 
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};

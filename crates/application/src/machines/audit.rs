@@ -255,10 +255,11 @@ pub(super) fn certificate_renewed(
     )
 }
 
-/// Trino's hold (0066, point 9): `trino_held` or `trino_released` with
-/// what happened, or `certificate_refused` with `trino:certificate`; and
-/// Dolt's (point 11), `dolt_held`, `dolt_released`, `dolt:certificate`. A
-/// name out of form is not written.
+/// Dolt's hold (0066, point 11): `dolt_held` or `dolt_released` with what
+/// happened, or `certificate_refused` with `dolt:certificate`; also the
+/// refusals at the lake's gate and the alerts route. A name out of form is
+/// not written. (Trino's hold, point 9, wrote `trino_held` and
+/// `trino_released`; decision 0077 retired them.)
 pub(super) fn hold(
     event_type: AuditEventType,
     machine: Option<&str>,
@@ -276,6 +277,23 @@ pub(super) fn hold(
         origin,
         at,
     )
+}
+
+impl super::MachinesService {
+    /// A hold audited (Dolt's), or a refusal at the lake's gate or the
+    /// alerts route, and answered whether or not it could be.
+    pub(super) async fn audit_hold(
+        &self,
+        event_type: AuditEventType,
+        machine: Option<&str>,
+        action: &str,
+        origin: &Origin,
+    ) {
+        let event = hold(event_type, machine, action, origin, self.clock.now());
+        if let Err(e) = self.record(event).await {
+            tracing::error!(error = %e, action, "a hold could not be audited");
+        }
+    }
 }
 
 /// `renew:<reason>`: `no-certificate`, `certificate` (unknown, replaced or

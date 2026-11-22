@@ -3729,7 +3729,6 @@ dependencies = [
  "texts",
  "tokio",
  "tracing",
- "trino-client",
  "uuid",
 ]
 
