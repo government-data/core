@@ -7,7 +7,9 @@
 use std::sync::Arc;
 
 use application::Edition;
+use async_trait::async_trait;
 use infrastructure::PgConfig;
+use quality::tenants::Tenants;
 
 use crate::config::env_value;
 
@@ -62,4 +64,36 @@ pub(crate) async fn connect(
         domain: Some(domain),
         resolver,
     })
+}
+
+/// The tenants of this API's cell, as the scheduler finds them: the main
+/// one on-premise, the directory's active ones online.
+#[derive(Clone)]
+pub(crate) struct CellTenants {
+    directory: Option<Arc<dyn tenancy::Directory>>,
+    cell: String,
+}
+
+impl From<&crate::tenants::Tenancy> for CellTenants {
+    fn from(tenancy: &crate::tenants::Tenancy) -> Self {
+        Self {
+            directory: tenancy.directory.clone(),
+            cell: tenancy.cell.clone(),
+        }
+    }
+}
+
+#[async_trait]
+impl Tenants for CellTenants {
+    async fn tenants(&self) -> Result<Vec<tenancy::Tenant>, String> {
+        let Some(directory) = &self.directory else {
+            return Ok(vec![tenancy::Tenant::main()]);
+        };
+        let records = directory.in_cell(&self.cell).await?;
+        Ok(records
+            .into_iter()
+            .filter(|r| r.status == tenancy::Status::Active)
+            .map(|r| r.tenant)
+            .collect())
+    }
 }

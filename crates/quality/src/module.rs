@@ -31,7 +31,6 @@ use crate::source_api;
 use crate::source_store::Sealer;
 use crate::split_api;
 use crate::tables_api;
-use crate::trino_rules_api::{self, RulesAccess};
 use crate::worker_api::{self, WorkerServices};
 
 /// The quality module. [`Default`] carries only its schema (migrations);
@@ -42,7 +41,6 @@ pub struct QualityModule {
     sources: Option<SourceServices>,
     patterns: Patterns,
     drafts: Option<Arc<dyn DraftCatalog>>,
-    trino_rules: Option<RulesAccess>,
 }
 
 /// What the sources' routes use: the store, its sealer, and the catalog.
@@ -69,7 +67,6 @@ impl QualityModule {
             sources: None,
             patterns: Patterns::default(),
             drafts: None,
-            trino_rules: None,
         }
     }
 
@@ -96,14 +93,6 @@ impl QualityModule {
     #[must_use]
     pub fn with_patterns(mut self, patterns: Patterns) -> Self {
         self.patterns = patterns;
-        self
-    }
-
-    /// With the route Trino reads its rules from (decision 0062); served
-    /// only with the sources and the catalog.
-    #[must_use]
-    pub fn with_trino_rules(mut self, access: RulesAccess) -> Self {
-        self.trino_rules = Some(access);
         self
     }
 
@@ -232,18 +221,9 @@ impl Module for QualityModule {
     }
 
     fn router(&self) -> Router {
-        let workers = match &self.workers {
+        match &self.workers {
             Some((pool, services)) => worker_api::routes(pool.clone(), services.clone()),
             None => Router::new(),
-        };
-        let catalog = self.sources.as_ref().and_then(|s| s.catalog.clone());
-        match (&self.trino_rules, &self.sources, catalog) {
-            (Some(access), Some(s), Some(catalog)) => workers.merge(trino_rules_api::routes(
-                s.pool.clone(),
-                catalog,
-                access.clone(),
-            )),
-            _ => workers,
         }
     }
 

@@ -28,7 +28,6 @@ use crate::job_maintain;
 use crate::job_map::Drafts;
 use crate::job_sources::{self, IssueLog, SourceAccess};
 use crate::job_span;
-use crate::job_trino::{self, TrinoAccess, TrinoJobTokens};
 use crate::lake::{LakeAccess, LakeIssuer, TableCatalog};
 use crate::lake_tables;
 use crate::manifest::ManifestStore;
@@ -102,9 +101,6 @@ pub struct WorkerServices {
     /// Where each credential given to a job is recorded first: without it,
     /// no credential is given (decision 0030, point 3).
     pub issues: Option<Arc<dyn IssueLog>>,
-    /// Signs a job's token for Trino: without it, a job on Trino gets
-    /// nothing (503, decision 0062).
-    pub trino_jobs: Option<Arc<dyn TrinoJobTokens>>,
 }
 
 impl std::fmt::Debug for WorkerServices {
@@ -117,7 +113,6 @@ impl std::fmt::Debug for WorkerServices {
             .field("tables", &self.tables.is_some())
             .field("drafts", &self.drafts.is_some())
             .field("issues", &self.issues.is_some())
-            .field("trino_jobs", &self.trino_jobs.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -142,9 +137,6 @@ pub struct JobDetails {
     /// An evaluation's key for its entities' hashes (decision 0057).
     #[serde(default)]
     pub entity_key: Option<EntityKey>,
-    /// A job on Trino's own token for it (decision 0062).
-    #[serde(default)]
-    pub trino: Option<TrinoAccess>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -170,7 +162,6 @@ pub fn routes(pool: PgPool, services: WorkerServices) -> Router {
             "/internal/jobs/{tenant}/{id}/lake",
             get(job_lake::lake_again),
         )
-        .route("/internal/jobs/{tenant}/{id}/trino", get(job_trino::again))
         // An evaluation's report carries a row per entity (0057): a
         // client base of a million is some 100 MiB.
         .route(
@@ -310,8 +301,7 @@ async fn details(
             return Err(StatusCode::SERVICE_UNAVAILABLE);
         }
         let ids = (tenant, id);
-        let given = source.as_ref();
-        let trino = source_given(&api, ids, &job.kind, &client, &headers, given, mapping).await?;
+        source_given(&api, id, &job.kind, &client, &headers, source.as_ref()).await?;
         let lake = if evaluate {
             job_lake::read_access(&api, tenant, id, &job.kind, &client, &headers).await?
         } else {
@@ -328,46 +318,27 @@ async fn details(
             catalog,
             source,
             entity_key,
-            trino,
         }))
     })
     .await
 }
 
-/// What a job is given for the source it reads, each recorded first: a
-/// source on Trino comes without credentials, its job's token for Trino
-/// instead (decision 0062); another with them.
+/// The source a job reads, with its credentials, recorded first as it is
+/// given (decision 0030, point 3).
 async fn source_given(
     api: &WorkerApi,
-    (tenant, id): (Uuid, Uuid),
+    id: Uuid,
     kind: &str,
     client: &str,
     headers: &HeaderMap,
     source: Option<&SourceAccess>,
-    mapping: Option<&str>,
-) -> Result<Option<TrinoAccess>, StatusCode> {
-    match source {
-        Some(s) if s.on_trino() => {
-            let dataset = job_trino::extracted(kind, mapping);
-            job_trino::access(
-                api,
-                (tenant, id),
-                kind,
-                client,
-                headers,
-                s,
-                dataset.as_deref(),
-            )
-            .await
-        }
-        Some(s) => {
-            let log = api.services.issues.as_deref();
-            let given = format!("source/{}", s.name);
-            job_sources::record(log, id, kind, client, headers, &given).await?;
-            Ok(None)
-        }
-        None => Ok(None),
-    }
+) -> Result<(), StatusCode> {
+    let Some(s) = source else {
+        return Ok(());
+    };
+    let log = api.services.issues.as_deref();
+    let given = format!("source/{}", s.name);
+    job_sources::record(log, id, kind, client, headers, &given).await
 }
 
 /// The lake of a job that is no evaluation: an extraction's, its bronze

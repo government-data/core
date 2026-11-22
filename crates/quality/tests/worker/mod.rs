@@ -14,7 +14,6 @@ use quality::catalog::{Catalog, CatalogSnapshot, DatasetMapping, RulesSource};
 use quality::firing::{open_cut, CutRequest};
 use quality::job_map::Drafts;
 use quality::job_sources::IssueLog;
-use quality::job_trino::{TrinoAccess, TrinoJobTokens};
 use quality::lake::{LakeAccess, LakeIssuer, TableCatalog};
 use quality::manifest::ManifestStore;
 use quality::module::QualityModule;
@@ -70,19 +69,6 @@ impl LakeIssuer for Issuer {
             secret_key: policy.into(),
             session_token: "token".into(),
             expires_at: "2026-10-30T12:15:00Z".into(),
-        })
-    }
-}
-
-/// Signs a job's token for Trino as `<subject>|<actor>`, for 15 minutes.
-#[derive(Debug)]
-pub struct JobTokens;
-#[async_trait::async_trait]
-impl TrinoJobTokens for JobTokens {
-    async fn issue(&self, subject: &str, actor: &str) -> Result<TrinoAccess, String> {
-        Ok(TrinoAccess {
-            token: format!("{subject}|{actor}"),
-            expires_in: 900,
         })
     }
 }
@@ -304,7 +290,6 @@ pub async fn fixture() -> Fixture {
         manifests: Some(bucket.clone()),
         sources: Some(Arc::new(Mirror)),
         issues: Some(issued.clone()),
-        trino_jobs: Some(Arc::new(JobTokens)),
         tables: Some(tables.clone()),
         drafts: Some(drafted.clone()),
         proposal_alerts: Some(Alerts {

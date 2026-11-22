@@ -180,7 +180,6 @@ async fn fixture() -> Fixture {
         manifests: None,
         sources: None,
         issues: None,
-        trino_jobs: None,
         tables: Some(tables.clone()),
         drafts: None,
         proposal_alerts: None,

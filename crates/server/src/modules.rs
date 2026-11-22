@@ -19,9 +19,7 @@ use quality::catalog::Catalog;
 use quality::draft_api::DraftCatalog;
 use quality::job_map::Drafts;
 use quality::job_sources::IssueLog;
-use quality::job_trino::TrinoJobTokens;
 use quality::lake::{LakeAccess, LakeIssuer, TableCatalog};
-use quality::machine_certs::MachineCertificates;
 use quality::manifest::ManifestStore;
 use quality::module::QualityModule;
 use quality::proposal::Patterns;
@@ -30,7 +28,6 @@ use quality::worker_api::WorkerServices;
 use texts::Language;
 
 use crate::catalog_wiring::{proposal_alerts, DoltSnapshots};
-use crate::trino_wiring::{ApiTrino, CellTenants};
 use uuid::Uuid;
 
 /// The modules as their schema: what `migrate` and `init` need. Adding a
@@ -48,16 +45,11 @@ pub(crate) fn registry() -> ModuleRegistry {
 /// and evaluations leave their manifests in the warehouse through the
 /// same issuer. The sources' routes for people seal their secrets with the
 /// installation's key, as the settings do, and ask the catalog which
-/// mappings read a source before deleting it. With Trino
-/// (`QUALITY_TRINO_URL`), its jobs' tokens are signed here; Trino reads
-/// its rules from here with its certificate (`machines`, 0066 point
-/// 9), or in development with `QUALITY_TRINO_RULES_KEY` (0062).
+/// mappings read a source before deleting it.
 pub(crate) fn serving(
     pool: &PgPool,
     provider: Option<AuthorizationServer>,
     secret_box: SecretBox,
-    tenants: CellTenants,
-    machines: Option<Arc<dyn MachineCertificates>>,
     dolt: Option<Arc<DoltSnapshots>>,
 ) -> Result<ModuleRegistry, Box<dyn std::error::Error>> {
     let issuer = StsIssuer::from_env()?;
@@ -71,7 +63,6 @@ pub(crate) fn serving(
     let catalog = dolt.clone().map(|d| d as Arc<dyn Catalog>);
     let drafts = dolt.clone().map(|d| d as Arc<dyn Drafts>);
     let review = dolt.map(|d| d as Arc<dyn DraftCatalog>);
-    let trino = ApiTrino::from_env(provider.clone())?;
     let quality = match provider {
         Some(p) => QualityModule::serving(
             pool.clone(),
@@ -87,9 +78,6 @@ pub(crate) fn serving(
                 issues: Some(Arc::new(Issues(Arc::new(PgAuditRepository::new(
                     pool.clone(),
                 ))))),
-                trino_jobs: trino
-                    .as_ref()
-                    .map(|t| Arc::new(t.job_tokens()) as Arc<dyn TrinoJobTokens>),
             },
         ),
         None => QualityModule::default(),
@@ -98,10 +86,6 @@ pub(crate) fn serving(
     .with_patterns(semantic_patterns()?);
     let quality = match review {
         Some(review) => quality.with_drafts(review),
-        None => quality,
-    };
-    let quality = match crate::trino_wiring::rules_from_env(tenants, machines)? {
-        Some(rules) => quality.with_trino_rules(rules),
         None => quality,
     };
     Ok(ModuleRegistry::new().register(quality))
