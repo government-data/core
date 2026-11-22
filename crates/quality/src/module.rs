@@ -214,6 +214,10 @@ impl Module for QualityModule {
                 "0026_jobs_uses_trino",
                 include_str!("../migrations/0026_jobs_uses_trino.sql"),
             ),
+            Migration::new(
+                "0027_claim_in_maintenance",
+                include_str!("../migrations/0027_claim_in_maintenance.sql"),
+            ),
         ]
     }
 

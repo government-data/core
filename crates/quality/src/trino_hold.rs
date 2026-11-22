@@ -1,6 +1,6 @@
 //! Holding the jobs on Trino while its coordinator restarts (decision 0066,
 //! point 9), in the current tenant: the queue hands out no queued one while
-//! the hold is in force (`claim_job`, migrations/0026_jobs_uses_trino.sql),
+//! the hold is in force (`claim_job`, migrations/0027_claim_in_maintenance.sql),
 //! and one already running goes on. Which jobs is per job (the user's ruling
 //! of 2026-11-11): `quality.jobs.uses_trino`, and when it is not known
 //! (NULL), every job of a kind that may read through Trino. The server

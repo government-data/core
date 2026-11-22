@@ -153,3 +153,26 @@ async fn a_job_whose_lease_ran_out_is_taken_again_until_its_attempts_end() {
         ("failed", "source timed out")
     );
 }
+
+#[tokio::test]
+async fn nothing_is_handed_out_during_maintenance_and_claiming_resumes_after() {
+    let (db, pool) = queue_db(1).await;
+    let queue = Queue::new(pool, "worker", Timing::default());
+    sqlx::query(
+        "INSERT INTO orq_maintenance (reason, until) VALUES ('update', now() + interval '1 hour')",
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    assert!(
+        queue.claim(&["evaluate"]).await.unwrap().is_none(),
+        "queued jobs wait while maintenance lasts"
+    );
+
+    sqlx::query("UPDATE orq_maintenance SET until = now()")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let job = queue.claim(&["evaluate"]).await.unwrap().unwrap();
+    assert!(queue.finish(&job, None).await.unwrap());
+}
