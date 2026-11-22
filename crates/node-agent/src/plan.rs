@@ -17,8 +17,8 @@ pub const LONGEST_WAIT: Duration = Duration::from_secs(3600);
 pub enum Mode {
     /// At once: the services reload it (the default).
     Rolling,
-    /// Only when the service may be restarted (Trino's coordinator, Dolt:
-    /// 0066, points 9 and 11): asked once the certificate in use is older
+    /// Only when the service may be restarted (0066, points 9 and 11):
+    /// asked once the certificate in use is older
     /// than `after`, every `ask_every`.
     Held {
         after: Duration,

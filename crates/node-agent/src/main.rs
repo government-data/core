@@ -19,7 +19,7 @@
 //! - `QD_RENEW_MODE`: `rolling` (the default: a renewed certificate is
 //!   taken at once) or `held` (taken only when `QD_HELD_READY` exits 0,
 //!   asked every `QD_HELD_ASK_EVERY`, `5m`, once the one in use is older
-//!   than `QD_HELD_AFTER`, `24h`: 0066, points 9 and 11).
+//!   than `QD_HELD_AFTER`, `24h`: 0066, point 11).
 //!
 //! And to join, only while there is no `machine.pem`:
 //!
@@ -31,19 +31,6 @@
 //! - `QD_CA_FILE`: a CA to trust for the join's TLS besides the public
 //!   roots (what `join.sh` checked against `--ca-sha256`). The renewal
 //!   trusts `ca.crt` alone.
-//!
-//! For Trino's coordinator (0066, point 9), in held mode, two commands of
-//! its own, so no script is needed on the machine:
-//!
-//! - `qd-node trino-ready` as `QD_HELD_READY`: asks the API, with the
-//!   certificate in use, to hold the jobs that use Trino if Trino is free
-//!   (none running, and Trino itself running no query); exits 0 only then;
-//! - `qd-node trino-restart` as `QD_AFTER_RENEW`: runs `QD_TRINO_RESTART`
-//!   (e.g. `docker restart trino-coordinator`), waits up to `QD_TRINO_WAIT`
-//!   (`3m`) until `QD_TRINO_INFO_URL` (the coordinator's `/v1/info`) says it
-//!   started since, then ends the hold with the new certificate. If Trino
-//!   is not back by then the hold is left to expire (15 minutes after it
-//!   was taken) and it exits non-zero, which the agent logs.
 //!
 //! On the application VM (role `app`, rolling for PostgreSQL and Traefik),
 //! a follower restarts Dolt when it is free to give it the certificate in
@@ -68,66 +55,24 @@
 //! up to 10 minutes. Nothing it logs holds a key, a token or a certificate.
 
 use node_agent::agent::Agent;
-use node_agent::config::{DoltSettings, Settings, TrinoSettings};
+use node_agent::config::{DoltSettings, Settings};
 use node_agent::dolt::{Followed, Follower, TcpProbe};
-use node_agent::http::{DoltApi, HttpApi, HttpTrinoInfo};
+use node_agent::http::{DoltApi, HttpApi};
 use node_agent::metrics::NodeMetrics;
 use node_agent::ports::{Processes, SystemClock};
 use node_agent::store::FileStore;
-use node_agent::trino;
 
 #[tokio::main]
 async fn main() {
     logging::init(node_agent::SERVICE);
     let done = match std::env::args().nth(1).as_deref() {
         None => run().await,
-        Some("trino-ready") => trino_ready().await,
-        Some("trino-restart") => trino_restart().await,
-        Some(other) => Err(format!("{other}: no such command (trino-ready, trino-restart)").into()),
+        Some(other) => Err(format!("{other}: no such command").into()),
     };
     if let Err(e) = done {
         eprintln!("qd-node: {e}");
         std::process::exit(1);
     }
-}
-
-/// `qd-node trino-ready`: exits 0 only when the API says Trino is free and
-/// holds its jobs.
-async fn trino_ready() -> Result<(), Box<dyn std::error::Error>> {
-    let (settings, store) = trino_settings()?;
-    let api = HttpApi::new("", &settings.internal_url, None);
-    if trino::ready(&store, &api).await? {
-        return Ok(());
-    }
-    std::process::exit(1);
-}
-
-/// `qd-node trino-restart`: restarts the coordinator, waits for it, and
-/// lets its jobs go.
-async fn trino_restart() -> Result<(), Box<dyn std::error::Error>> {
-    let (settings, store) = trino_settings()?;
-    let command = settings.restart.ok_or("QD_TRINO_RESTART is needed")?;
-    let info_url = settings.info_url.ok_or("QD_TRINO_INFO_URL is needed")?;
-    let ca = store.ca()?;
-    let info = HttpTrinoInfo::new(&info_url, ca.as_deref())
-        .map_err(|e| format!("QD_TRINO_INFO_URL {info_url}: {e}"))?;
-    let api = HttpApi::new("", &settings.internal_url, None);
-    let how = trino::Restart {
-        command,
-        wait: settings.wait,
-        poll: std::time::Duration::from_secs(2),
-    };
-    let processes = Processes::default();
-    let released = trino::restart(&store, &api, &info, &processes, &SystemClock, &how).await?;
-    tracing::info!(released, "Trino's jobs go again");
-    Ok(())
-}
-
-fn trino_settings() -> Result<(TrinoSettings, FileStore), String> {
-    let settings = TrinoSettings::from(|name| std::env::var(name).ok())?;
-    let store = FileStore::open(&settings.dir)
-        .map_err(|e| format!("QD_AGENT_DIR {}: {e}", settings.dir.display()))?;
-    Ok((settings, store))
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {

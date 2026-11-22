@@ -12,12 +12,10 @@
 //! - [`config`]: the settings;
 //! - [`ports`]: the clock and the commands (the hook, held mode's check);
 //! - [`agent`]: the loop that does what [`plan`] decides;
-//! - [`trino`]: held mode's two commands for Trino's coordinator, whether
-//!   Trino is free and its restart (0066, point 9);
 //! - [`dolt`]: on the application VM, the follower that restarts Dolt when
 //!   it is free to give it the certificate in use (point 11);
-//! - [`restart`]: what both restarts share: the command, the wait and the
-//!   release;
+//! - [`restart`]: what a restart through the API's hold does: the command,
+//!   the wait and the release;
 //! - [`metrics`]: its metrics file, renewals by result and the certificate's
 //!   end (decision 0071).
 
@@ -35,7 +33,6 @@ pub mod plan;
 pub mod ports;
 pub mod restart;
 pub mod store;
-pub mod trino;
 
 #[cfg(test)]
 pub(crate) mod testing {

@@ -1,16 +1,15 @@
 //! A service that reads its certificate only when it starts is restarted
 //! to take a new one only when it is free, through the API's hold (0066,
-//! points 9 and 11): Trino's coordinator ([`crate::trino`]) and Dolt
-//! ([`crate::dolt`]). What they share is here: the restart command, the
-//! wait until the service answers again (each says how in its [`Probe`]),
-//! and the release with the certificate now in use, tried again on what
-//! may pass.
+//! point 11): Dolt ([`crate::dolt`]). What such a restart does is here:
+//! the restart command, the wait until the service answers again (each
+//! says how in its [`Probe`]), and the release with the certificate now in
+//! use, tried again on what may pass.
 //!
 //! If the service does not come back within the wait the hold is not
 //! released: work let go against a service that does not answer would
-//! fail. The API ends the hold by itself (15 minutes after it was taken for
-//! Trino, 5 for Dolt), which is longer than the wait, and the failure is
-//! logged for a person.
+//! fail. The API ends the hold by itself (5 minutes after it was taken for
+//! Dolt), which is longer than the wait, and the failure is logged for a
+//! person.
 
 use std::time::Duration;
 
@@ -38,7 +37,7 @@ pub trait Probe: Send + Sync {
 /// How [`restart`] restarts the service and waits for it.
 #[derive(Debug, Clone)]
 pub struct Restart {
-    /// The command, without a shell (`docker restart trino-coordinator`).
+    /// The command, without a shell (`docker restart dolt`).
     pub command: Vec<String>,
     /// How long the service may take to answer again: within the 5 minutes
     /// a hook may run, and the API's hold.

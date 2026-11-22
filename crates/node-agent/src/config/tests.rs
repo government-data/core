@@ -47,7 +47,7 @@ fn held_needs_its_command_and_takes_its_times() {
     assert!(settings(&env).unwrap_err().contains("QD_HELD_READY"));
     env.push((
         "QD_HELD_READY",
-        r#"["/usr/local/bin/trino-idle", "--twice"]"#,
+        r#"["/usr/local/bin/service-idle", "--twice"]"#,
     ));
     let s = settings(&env).unwrap();
     let five_minutes = Duration::from_secs(300);
@@ -61,7 +61,7 @@ fn held_needs_its_command_and_takes_its_times() {
     );
     assert_eq!(
         s.held_ready.unwrap(),
-        ["/usr/local/bin/trino-idle", "--twice"]
+        ["/usr/local/bin/service-idle", "--twice"]
     );
     env.extend([("QD_HELD_AFTER", "2h"), ("QD_HELD_ASK_EVERY", "30s")]);
     let s = settings(&env).unwrap();
@@ -99,31 +99,6 @@ fn commands_are_words_or_a_json_array_never_a_shell() {
         settings(&env).unwrap().after_renew.unwrap(),
         ["pg_ctl", "reload"]
     );
-}
-
-#[test]
-fn trinos_commands_read_their_restart_and_wait() {
-    let mut env: HashMap<String, String> = BASE
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
-    env.insert("QD_TRINO_RESTART".into(), "docker restart trino-1".into());
-    env.insert(
-        "QD_TRINO_INFO_URL".into(),
-        "https://trino-1:8443/v1/info".into(),
-    );
-    let s = TrinoSettings::from(|name| env.get(name).cloned()).unwrap();
-    assert_eq!(s.restart.unwrap(), ["docker", "restart", "trino-1"]);
-    assert_eq!(s.info_url.as_deref(), Some("https://trino-1:8443/v1/info"));
-    assert_eq!(s.wait, Duration::from_secs(180));
-    let bad = |name: &str, value: &str| {
-        let mut env = env.clone();
-        env.insert(name.into(), value.into());
-        TrinoSettings::from(|n| env.get(n).cloned()).is_err()
-    };
-    assert!(bad("QD_TRINO_WAIT", "0"));
-    assert!(bad("QD_TRINO_RESTART", "[]"));
-    assert!(TrinoSettings::from(|_| None).is_err());
 }
 
 #[test]

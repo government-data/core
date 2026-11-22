@@ -8,7 +8,7 @@
 //! catalog ([`ready`]: free only when the API has no operation in flight and
 //! Dolt's own list shows nothing running), restarts Dolt (`QD_DOLT_RESTART`),
 //! waits until its port answers ([`TcpProbe`]) and releases the hold
-//! ([`crate::restart`], shared with Trino's coordinator). The 24 hours only
+//! ([`crate::restart`]). The 24 hours only
 //! turn the question on; Dolt says when.
 //!
 //! What Dolt was started with is the agent's own record, `dolt.followed`
