@@ -244,7 +244,7 @@ mod tests {
             welcome_mail(&email(), None),
             password_changed_mail(&email(), Some("Ana")),
             locked_mail(&email(), None, 5, minutes),
-            linked_mail(&email(), None, &google, Some("ana@gmail.com")),
+            linked_mail(&email(), None, &google, Some("ana@example.org")),
             unlinked_mail(&email(), None, &google),
             deleted_mail(&email(), None),
         ] {

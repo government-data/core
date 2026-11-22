@@ -84,7 +84,7 @@ certificatesResolvers:
     acme:
       # Placeholder; overridden at runtime by
       # TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL (see compose).
-      email: "codecsrayo@gmail.com"
+      email: "admin@example.com"
       storage: /letsencrypt/acme.json
       # Online the certificate is a wildcard (*.domain): CloudFront forwards the
       # visitor's Host and validates against it. It only comes through DNS-01,

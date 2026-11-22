@@ -164,7 +164,7 @@ async fn list_and_unlink_are_per_admin() {
     let google = ProviderId::parse("google").unwrap();
     let entra = ProviderId::parse("microsoft").unwrap();
 
-    repo.link(&google, "g-1", Some("ana@gmail.com"), &ana)
+    repo.link(&google, "g-1", Some("ana@example.org"), &ana)
         .await
         .unwrap();
     repo.link(&entra, "m-1", None, &ana).await.unwrap();
@@ -174,7 +174,7 @@ async fn list_and_unlink_are_per_admin() {
     assert_eq!(mine.len(), 2);
     assert!(mine
         .iter()
-        .any(|i| i.provider == google && i.email.as_deref() == Some("ana@gmail.com")));
+        .any(|i| i.provider == google && i.email.as_deref() == Some("ana@example.org")));
     assert!(mine
         .iter()
         .any(|i| i.provider == entra && i.email.is_none()));
