@@ -16,10 +16,10 @@
 # Required environment, besides tls.yml's:
 #   QD_CA_DIR       the installation's CA (`server ca-init`): ca.crt and ca.key
 #   QD_UPDATER_DIR  the agent's directory for the internal entry point
-# Optional: API_IMAGE (data-quality-api:local).
+# Optional: IMAGE_API, else API_IMAGE (data-quality-api:local).
 services:
   updater-certificate:
-    image: ${API_IMAGE:-data-quality-api:local}
+    image: ${IMAGE_API:-${API_IMAGE:-data-quality-api:local}}
     profiles: ["updater-certificate"]
     network_mode: "service:postgres"
     entrypoint: ["/usr/local/bin/server", "updater-certificate"]

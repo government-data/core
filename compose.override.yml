@@ -95,7 +95,7 @@ services:
   # database is healthy; `restart: no` so it does not loop after completing.
   bootstrap:
     profiles: ["dev"]
-    image: ${API_IMAGE:-data-quality-api:local}
+    image: ${IMAGE_API:-${API_IMAGE:-data-quality-api:local}}
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile

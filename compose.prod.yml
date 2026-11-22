@@ -33,7 +33,7 @@ services:
 
   api:
     # A versioned, immutable image — never a local build in production.
-    image: ${API_IMAGE:?set API_IMAGE to a versioned image tag for prod}
+    image: ${IMAGE_API:-${API_IMAGE:?set IMAGE_API or API_IMAGE to a versioned image for prod}}
     environment:
       # Blank the plain-text URL the dev wiring set and read it from the secret
       # instead (an empty value falls through to DATABASE_URL_FILE).
@@ -48,4 +48,4 @@ services:
       - /tmp
 
   web:
-    image: ${WEB_IMAGE:?set WEB_IMAGE to a versioned image tag for prod}
+    image: ${IMAGE_WEB:-${WEB_IMAGE:?set IMAGE_WEB or WEB_IMAGE to a versioned image for prod}}
