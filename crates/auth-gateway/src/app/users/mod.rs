@@ -216,7 +216,7 @@ impl UsersService {
         let activation_sent = match self.resets.send_activation(&account, link_base).await {
             Ok(()) => true,
             Err(e) => {
-                tracing::warn!("users: activation email for {} failed: {e}", account.email);
+                tracing::warn!(admin = %account.id, "users: activation email failed: {e}");
                 false
             }
         };

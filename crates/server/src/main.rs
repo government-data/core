@@ -7,6 +7,8 @@
 //!   * `bootstrap-admin` — create the first administrator from environment
 //!     secrets, so no password is ever committed to the repository.
 //!   * `recover-admin` — after restoring a backup on a new server.
+//!   * `admin-access` — the administrator's link to choose a password, from
+//!     the server (see [`admin_access`], decision 0086).
 //!   * `audit verify` — every tenant's audit chain recomputed; exits 1 on a
 //!     break (see [`audit`], decision 0070).
 //!   * `ca-init` — make the installation's CA, once (decision 0066).
@@ -23,6 +25,7 @@
 //!   * `quality catalog import` — a dataset's mapping and rules into the
 //!     tenant's catalog (see [`quality_catalog`]).
 
+mod admin_access;
 mod app_machine;
 mod audit;
 mod background;
@@ -68,6 +71,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         Some("serve") | None => serve::serve().await,
         Some("bootstrap-admin") => commands::bootstrap_admin().await,
         Some("recover-admin") => commands::recover_admin().await,
+        Some("admin-access") => admin_access::run().await,
         Some("audit") => audit::run().await,
         Some("ca-init") => commands::ca_init(),
         Some("app-machine") => app_machine::run().await,
@@ -97,6 +101,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                  bootstrap-admin  Create the first admin from \
                  ADMIN_BOOTSTRAP_EMAIL / ADMIN_BOOTSTRAP_PASSWORD\n  \
                  recover-admin    Recover the admin after restoring a backup\n  \
+                 admin-access     The administrator's link to choose a password: \
+                 --email ADDRESS [--force]\n  \
                  audit verify     Verify the audit chain: [--tenant ID] [--lang es|en] \
                  (exits 1 on a break)\n  \
                  ca-init          Make the installation's CA: --name INSTALLATION \
