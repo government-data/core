@@ -3,7 +3,7 @@
 //! administrator it creates `ADDRESS`'s account pending activation; it
 //! prints a one-time link to choose the password (mailed too when outgoing
 //! mail is set). For an account that already chose its password, a link
-//! only with `--force` (it was lost). On-premise only.
+//! only with `--force` (it was lost).
 //!
 //! The link goes to standard output and nowhere else; nothing logs the
 //! address. Audited as the internal route is.
@@ -12,7 +12,6 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use api::internal::AdminAccessRoute;
-use application::Edition;
 use auth_gateway::{AccessError, AdminAccess, LoginService};
 use domain::{AuditEventType, NewAuditEvent};
 use infrastructure::auth_config::AuthConfig;
@@ -57,9 +56,7 @@ pub(crate) async fn run() -> Result<(), Failure> {
     let args: Vec<String> = std::env::args().skip(2).collect();
     let args = parse(&args)?;
     crate::init_tracing();
-    let edition = Edition::parse(&std::env::var("ORQ_EDITION").unwrap_or_default())
-        .map_err(|e| format!("ORQ_EDITION {e}"))?;
-    let route = route(edition).await?;
+    let route = route().await?;
     let granted = route
         .service
         .admin_access(&args.email, &route.link_base, args.force)
@@ -71,7 +68,7 @@ pub(crate) async fn run() -> Result<(), Failure> {
 }
 
 /// The service and the audit, built as `serve` builds them.
-async fn route(edition: Edition) -> Result<AdminAccessRoute, Failure> {
+async fn route() -> Result<AdminAccessRoute, Failure> {
     let auth = AuthConfig::from_env()?;
     let pool = infrastructure::connect(&PgConfig::from_env()?).await?;
     infrastructure::run_migrations(&pool).await?;
@@ -88,8 +85,8 @@ async fn route(edition: Edition) -> Result<AdminAccessRoute, Failure> {
     let secret_box = SecretBox::from_env_or_file(settings_key_file())?;
     let (_, _, settings) = settings(&pool, &auth, &secret_box, &login).await?;
     let audit = auth_gateway::AuditService::new(Arc::new(PgAuditRepository::new(pool.clone())));
-    let (_, _, route) = password_reset(&pool, &admins, &auth, &settings, &audit, edition)?;
-    route.ok_or_else(|| "admin-access is for an on-premise installation".into())
+    let (_, _, route) = password_reset(&pool, &admins, &auth, &settings, &audit)?;
+    route.ok_or_else(|| "the administrator's entry is not available".into())
 }
 
 fn refusal(e: AccessError) -> Failure {

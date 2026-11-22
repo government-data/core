@@ -12,7 +12,6 @@ export interface Me {
   is_admin: boolean;
   /** The application's version. */
   version?: string;
-  edition?: "onpremise" | "online";
   /** The service account the request comes with, if any. */
   service_account?: string | null;
   /** The actions it may do on some resource (ADR 0016); `admin`, everything. */

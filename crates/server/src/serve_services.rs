@@ -8,8 +8,7 @@ use api::internal::AdminAccessRoute;
 use api::oauth::OAuthRedirects;
 use api::password_reset::ResetLinkBase;
 use application::{
-    Edition, EnvSettings, HealthService, PlatformService, SettingsService, SettingsTargets,
-    UpdatesService,
+    EnvSettings, HealthService, PlatformService, SettingsService, SettingsTargets, UpdatesService,
 };
 use auth_gateway::{AuditService, OAuthLoginService, SessionService};
 use auth_gateway::{LoginService, PasswordResetService};
@@ -57,11 +56,7 @@ pub(crate) fn settings_key_file() -> String {
 /// The services. The health probe reflects live database connectivity;
 /// the login service verifies admin credentials with argon2id,
 /// constant-time equalization, and progressive account/IP lockout.
-pub(crate) async fn services(
-    tenancy: &Tenancy,
-    auth: &AuthConfig,
-    edition: Edition,
-) -> Result<Services, Failure> {
+pub(crate) async fn services(tenancy: &Tenancy, auth: &AuthConfig) -> Result<Services, Failure> {
     let pool = tenancy.pool.clone();
     let health = HealthService::new(Arc::new(PgHealthCheck::new(pool.clone())));
     let admins: Arc<dyn auth_gateway::AdminRepository> =
@@ -80,7 +75,7 @@ pub(crate) async fn services(
     // `SETTINGS_KEY_FILE`.
     let secret_box = SecretBox::from_env_or_file(settings_key_file())?;
 
-    let platform = platform(&pool, platform_repo.clone(), edition, &secret_box);
+    let platform = platform(&pool, platform_repo.clone(), &secret_box);
     // Update maintenance: while it lasts, no new work starts.
     let updates = UpdatesService::new(Arc::new(updates_wiring::Store(
         infrastructure::PgMaintenanceStore::new(pool.clone()),
@@ -118,7 +113,7 @@ pub(crate) async fn services(
     let oauth_service = oauth_service.with_mail(settings.mailer());
 
     let (password_reset, reset_links, admin_access) =
-        password_reset(&pool, &admins, auth, &settings, &audit, edition)?;
+        password_reset(&pool, &admins, auth, &settings, &audit)?;
     Ok(Services {
         health,
         admins,
@@ -136,32 +131,20 @@ pub(crate) async fn services(
     })
 }
 
-/// The background round of every tenant (the platform mail), once the
-/// settings are loaded, and the schedules (decision 0035): only the VM
-/// holding the lock fires.
+/// The background round (the platform mail), once the settings are loaded,
+/// and the schedules (decision 0035): only the VM holding the lock fires.
 fn spawn_rounds(settings: &SettingsService, tenancy: &Tenancy) {
-    spawn_background(
-        settings.clone(),
-        tenancy.directory.clone(),
-        tenancy.cell.clone(),
-    );
-    spawn_scheduler(
-        tenancy.pool.clone(),
-        tenancy.directory.clone(),
-        tenancy.cell.clone(),
-    );
+    spawn_background(settings.clone());
+    spawn_scheduler(tenancy.pool.clone());
 }
 
 /// The platform: the actor and IAM, secrets and updates.
 fn platform(
     pool: &PgPool,
     platform_repo: Arc<dyn platform::PlatformRepository>,
-    edition: Edition,
     secret_box: &SecretBox,
 ) -> PlatformService {
-    tracing::info!(?edition, "edition");
     let platform = PlatformService::new(platform_repo)
-        .with_edition(edition)
         .with_cipher(Arc::new(settings_wiring::Cipher(secret_box.clone())))
         .with_tokens(Arc::new(infrastructure::ServiceTokenMint));
     // When what someone can do changes (here, in another replica or directly
@@ -226,18 +209,15 @@ pub(crate) async fn settings(
 }
 
 /// Password recovery: a link by email (the settings' mail) that expires
-/// after `PASSWORD_RESET_TTL_MINUTES`. On-premise the link points to the
-/// configured public address; online, to the subdomain of the company
-/// that asked for it (the tenant middleware already rejected any other).
-/// With it, the administrator's entry from the server (internal routes):
-/// on-premise only, where there is one company and a fixed public address.
+/// after `PASSWORD_RESET_TTL_MINUTES`, pointing to the configured public
+/// address. With it, the administrator's entry from the server (internal
+/// routes).
 pub(crate) fn password_reset(
     pool: &PgPool,
     admins: &Arc<dyn auth_gateway::AdminRepository>,
     auth: &AuthConfig,
     settings: &SettingsService,
     audit: &AuditService,
-    edition: Edition,
 ) -> Result<
     (
         PasswordResetService,
@@ -256,11 +236,8 @@ pub(crate) fn password_reset(
         auth.password_policy,
         auth.password_reset_ttl,
     );
-    let reset_links = match edition {
-        Edition::OnPremise => ResetLinkBase::Fixed(public_url_from_env()),
-        Edition::Online => ResetLinkBase::FromHost,
-    };
-    let admin_access = (edition == Edition::OnPremise).then(|| AdminAccessRoute {
+    let reset_links = ResetLinkBase::Fixed(public_url_from_env());
+    let admin_access = Some(AdminAccessRoute {
         service: password_reset.clone(),
         audit: audit.clone(),
         link_base: public_url_from_env(),

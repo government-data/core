@@ -1,17 +1,11 @@
-//! The work that runs in the background while the server serves: each
-//! tenant's periodic round and the scheduler.
-
-use std::sync::Arc;
+//! The work that runs in the background while the server serves: the
+//! periodic round and the scheduler.
 
 use application::SettingsService;
 
-/// The background work of every tenant in this cell, every
-/// `BACKGROUND_INTERVAL_SECS` (15 by default): keep the platform mail set.
-pub(crate) fn spawn_background(
-    settings: SettingsService,
-    directory: Option<Arc<dyn tenancy::Directory>>,
-    cell: String,
-) {
+/// The background work, every `BACKGROUND_INTERVAL_SECS` (15 by default):
+/// keep the platform mail set.
+pub(crate) fn spawn_background(settings: SettingsService) {
     let tick = std::time::Duration::from_secs(
         std::env::var("BACKGROUND_INTERVAL_SECS")
             .ok()
@@ -24,45 +18,24 @@ pub(crate) fn spawn_background(
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             interval.tick().await;
-            let tenants = match &directory {
-                None => vec![(tenancy::Tenant::main(), true)],
-                Some(directory) => match directory.in_cell(&cell).await {
-                    Ok(records) => records
-                        .into_iter()
-                        .map(|r| (r.tenant, r.status == tenancy::Status::Active))
-                        .collect(),
-                    Err(e) => {
-                        tracing::error!("tenant registry: {e}");
-                        continue;
-                    }
-                },
-            };
-            for (tenant, _active) in tenants {
-                let slug = tenant.slug.clone();
-                tenancy::within(tenant, async {
-                    // The platform mail, if there is one, stays set on the
-                    // company (and up to date).
-                    match settings.seed_platform_mail().await {
-                        Ok(true) => tracing::info!(%slug, "platform mail set for the company"),
-                        Ok(false) => {}
-                        Err(e) => tracing::error!(%slug, "settings: {e}"),
-                    }
-                })
-                .await;
-            }
+            tenancy::within(tenancy::Tenant::main(), async {
+                // The platform mail, if there is one, stays set (and up to
+                // date).
+                match settings.seed_platform_mail().await {
+                    Ok(true) => tracing::info!("platform mail set"),
+                    Ok(false) => {}
+                    Err(e) => tracing::error!("settings: {e}"),
+                }
+            })
+            .await;
         }
     });
 }
 
 /// The scheduler (decision 0035): every `SCHEDULER_INTERVAL_SECS` (30 by
-/// default), if this VM holds its lock, fires the due schedules of every
-/// active tenant of this cell. Fires missed for longer than
+/// default), if this VM holds its lock, fires the due schedules. Fires missed for longer than
 /// `SCHEDULER_MISSED_MAX_HOURS` (24) are skipped.
-pub(crate) fn spawn_scheduler(
-    pool: infrastructure::PgPool,
-    directory: Option<Arc<dyn tenancy::Directory>>,
-    cell: String,
-) {
+pub(crate) fn spawn_scheduler(pool: infrastructure::PgPool) {
     let number = |name: &str, default: u64| {
         std::env::var(name)
             .ok()
@@ -78,15 +51,8 @@ pub(crate) fn spawn_scheduler(
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             interval.tick().await;
-            let tenants = match active_tenants(directory.as_ref(), &cell).await {
-                Ok(tenants) => tenants,
-                Err(e) => {
-                    tracing::error!("tenant registry: {e}");
-                    continue;
-                }
-            };
             for fired in scheduler
-                .round(tenants, chrono::Utc::now())
+                .round(vec![tenancy::Tenant::main()], chrono::Utc::now())
                 .await
                 .unwrap_or_default()
             {
@@ -99,21 +65,4 @@ pub(crate) fn spawn_scheduler(
             }
         }
     });
-}
-
-/// The active tenants of this cell: on-premise, the main one.
-pub(crate) async fn active_tenants(
-    directory: Option<&Arc<dyn tenancy::Directory>>,
-    cell: &str,
-) -> Result<Vec<tenancy::Tenant>, String> {
-    let Some(directory) = directory else {
-        return Ok(vec![tenancy::Tenant::main()]);
-    };
-    Ok(directory
-        .in_cell(cell)
-        .await?
-        .into_iter()
-        .filter(|r| r.status == tenancy::Status::Active)
-        .map(|r| r.tenant)
-        .collect())
 }

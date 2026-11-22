@@ -138,12 +138,6 @@ services:
       OIDC_SIGNING_KEY_ES256: ${OIDC_SIGNING_KEY_ES256:-}
       OIDC_SIGNING_KEY_ES256_PREVIOUS: ${OIDC_SIGNING_KEY_ES256_PREVIOUS:-}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
-      # Edition: onpremise or online.
-      ORQ_EDITION: ${ORQ_EDITION:-onpremise}
-      # Online: each company signs in at <company>.ORQ_DOMINIO (by default,
-      # APP_DOMAIN) and this API serves the companies of the cell ORQ_CELDA.
-      ORQ_DOMINIO: ${ORQ_DOMINIO:-}
-      ORQ_CELDA: ${ORQ_CELDA:-principal}
     volumes:
       - settings-key:/var/lib/orquestador/settings
       - metrics:/run/qd-metrics

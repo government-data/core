@@ -3,7 +3,7 @@
 use iam::catalog::MANAGE_UPDATES;
 use iam::Actor;
 
-use super::{Edition, PlatformError, PlatformService, R};
+use super::{PlatformError, PlatformService, R};
 
 fn updates_error(e: crate::UpdatesError) -> PlatformError {
     match e {
@@ -15,15 +15,12 @@ fn updates_error(e: crate::UpdatesError) -> PlatformError {
 
 impl PlatformService {
     /// The installation's updates (administrators only). `None` without the
-    /// service (we update the online edition ourselves).
+    /// service (development).
     pub async fn updates(&self, actor: &Actor) -> R<Option<crate::UpdatesView>> {
         Self::require(actor, MANAGE_UPDATES)?;
         let Some(updates) = &self.updates else {
             return Ok(None);
         };
-        if self.edition != Edition::OnPremise {
-            return Ok(None);
-        }
         updates
             .view()
             .await
@@ -71,7 +68,7 @@ impl PlatformService {
         if let Ok(Some(m)) = updates.active().await {
             return Some(serde_json::json!({ "kind": "maintenance", "reason": m.reason }));
         }
-        if !actor.may(MANAGE_UPDATES) || self.edition != Edition::OnPremise {
+        if !actor.may(MANAGE_UPDATES) {
             return None;
         }
         let view = updates.view().await.ok()?;
@@ -100,11 +97,8 @@ impl PlatformService {
     }
 
     fn updates_on_premise(&self) -> R<&crate::UpdatesService> {
-        match &self.updates {
-            Some(u) if self.edition == Edition::OnPremise => Ok(u),
-            _ => Err(PlatformError::Conflict(texts::tr!(
-                "app.platform.notUpdatedHere"
-            ))),
-        }
+        self.updates
+            .as_ref()
+            .ok_or_else(|| PlatformError::Conflict(texts::tr!("app.platform.notUpdatedHere")))
     }
 }

@@ -8,7 +8,7 @@
     "intro": "The installed version, new ones and when they install. Before installing, it waits for running jobs to finish, backs up the database and, if the new version does not start, goes back to the previous one on its own.",
     "update": "Update",
     "settings": "Settings",
-    "notUpdatedHere": "This installation is not updated from here (online edition or development environment).",
+    "notUpdatedHere": "This installation is not updated from here (development environment).",
     "updateCommand": "orquestador actualizar",
     "onTheServer": "on the server.",
     "statusCommand": "systemctl status orquestador-actualizador",

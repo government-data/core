@@ -8,7 +8,7 @@
 //! use case or domain type sees any of it: the counting is in the
 //! middleware, the queue's adapter and here.
 
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 use api::machines::alerts::UnknownAlerts;
 use application::MachinesService;
@@ -40,12 +40,7 @@ pub(crate) fn unknown_alerts() -> UnknownAlerts {
 /// machines', its file written from now on (unless `QD_METRICS_DIR` is
 /// `off`), and the gauges read from the queue and the machines every 15
 /// seconds. Returns what the router's middleware counts with.
-pub(crate) fn start(
-    pool: infrastructure::PgPool,
-    directory: Option<Arc<dyn tenancy::Directory>>,
-    cell: String,
-    machines: MachinesService,
-) -> HttpMetrics {
+pub(crate) fn start(pool: infrastructure::PgPool, machines: MachinesService) -> HttpMetrics {
     let mut registry = Registry::default();
     registry.register(
         "qd_machine_alerts_unknown",
@@ -80,7 +75,7 @@ pub(crate) fn start(
                     machines_failing = true;
                 }
             }
-            match read_queue(&pool, directory.as_ref(), &cell).await {
+            match read_queue(&pool).await {
                 Ok(rows) => {
                     queue.set(&rows);
                     failing = false;
@@ -99,15 +94,9 @@ pub(crate) fn start(
     http
 }
 
-/// The ready jobs of every active tenant of this cell, each read inside it.
+/// The ready jobs, read inside the main tenant.
 async fn read_queue(
     pool: &infrastructure::PgPool,
-    directory: Option<&Arc<dyn tenancy::Directory>>,
-    cell: &str,
 ) -> Result<Vec<queue_ready::Ready>, Box<dyn std::error::Error + Send + Sync>> {
-    let mut rows = Vec::new();
-    for tenant in crate::background::active_tenants(directory, cell).await? {
-        rows.extend(tenancy::within(tenant, queue_ready::ready(pool)).await?);
-    }
-    Ok(rows)
+    Ok(tenancy::within(tenancy::Tenant::main(), queue_ready::ready(pool)).await?)
 }
