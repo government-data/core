@@ -1,0 +1,119 @@
+name: Release
+
+# A `v*` tag pushes the module's images to ECR (quality-sdk decision 0002
+# step 15), replacing the interim artifacts of ci.yml (decision 0082). The
+# tag must be `v` + version.txt at the tagged commit; each image is tagged
+# with that version, without the `v`. The tags are immutable and builds are
+# not reproducible, so an image whose tag is already in ECR is not built
+# again: its digest is printed and nothing is pushed. A broken version is
+# fixed by a new version.
+#
+# GitHub's OIDC token is exchanged for the module's role
+# (`quality-data-publish-quality-data`), which may push only to this module's
+# api and web repositories. A person sets the repository variables
+# AWS_PUBLISH_ROLE and AWS_REGION from quality-sdk's Terraform output. The
+# worker image is not pushed: it has no ECR repository.
+
+on:
+  push:
+    tags: ["v*"]
+
+# A tag is released once at a time; a second run waits instead of racing.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The tag matches version.txt
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(tr -d '[:space:]' < version.txt)
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::tag $TAG is not v + version.txt ($version)"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  push:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [api, web]
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      REPOSITORY: quality-data/quality-data/${{ matrix.image }}
+    steps:
+      - name: AWS credentials from the module's role
+        id: aws
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PUBLISH_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: release-${{ matrix.image }}-${{ github.run_id }}
+      - name: Is the version already in ECR
+        id: existing
+        run: |
+          if digest=$(aws ecr describe-images --repository-name "$REPOSITORY" \
+            --image-ids imageTag="$VERSION" --query 'imageDetails[0].imageDigest' \
+            --output text 2>"$RUNNER_TEMP/err.txt"); then
+            :
+          elif grep -q ImageNotFoundException "$RUNNER_TEMP/err.txt"; then
+            digest=""
+          else
+            cat "$RUNNER_TEMP/err.txt" >&2; exit 1
+          fi
+          if [ -n "$digest" ] && [ "$digest" != "None" ]; then
+            echo "$REPOSITORY:$VERSION already exists: $digest (not pushed again)"
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          fi
+      # A release build with DuckDB can need more than the free space an
+      # ubuntu-latest runner starts with.
+      - name: Free disk space
+        if: steps.existing.outputs.digest == ''
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc "$RUNNER_TOOL_CACHE"
+      - if: steps.existing.outputs.digest == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: steps.existing.outputs.digest == ''
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Sign in to ECR
+        if: steps.existing.outputs.digest == ''
+        env:
+          REGISTRY: ${{ steps.aws.outputs.aws-account-id }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+        run: aws ecr get-login-password | docker login --username AWS --password-stdin "$REGISTRY"
+      # One image manifest, no attestations: the digest the index pins is the
+      # image's, as the images pushed by hand so far.
+      - name: Build and push
+        id: build
+        if: steps.existing.outputs.digest == ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/${{ matrix.image }}.Dockerfile
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.aws.outputs.aws-account-id }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY }}:${{ env.VERSION }}
+          build-args: |
+            APP_VERSION=${{ env.VERSION }}
+            APP_COMMIT=${{ github.sha }}
+      - name: The digest
+        env:
+          DIGEST: ${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
+        run: |
+          echo "$REPOSITORY:$VERSION $DIGEST"
+          echo "- \`$REPOSITORY:$VERSION\` \`$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
