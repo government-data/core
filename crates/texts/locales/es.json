@@ -174,7 +174,8 @@
       "testLabel": "Prueba",
       "testMailBody": "Si recibes este mensaje, el correo saliente de Quality Data está bien configurado.",
       "testMailSubject": "Prueba de correo de Quality Data",
-      "unknownSection": "sección desconocida"
+      "unknownSection": "sección desconocida",
+      "unknownTimezone": "No es una zona horaria conocida (un nombre IANA como America/Bogota o UTC)"
     },
     "updates": {
       "alreadyInProgress": "ya hay una actualización en curso ({{phase}})",

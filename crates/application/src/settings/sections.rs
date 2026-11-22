@@ -157,6 +157,23 @@ pub struct OAuthSettings {
     pub providers: Vec<OAuthProviderSettings>,
 }
 
+/// The platform's own settings (decision 0079).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PlatformSettings {
+    /// The installation's time zone, an IANA name: the update window's and
+    /// new schedules' when they name none.
+    pub timezone: String,
+}
+
+impl Default for PlatformSettings {
+    fn default() -> Self {
+        Self {
+            timezone: schedule_core::PLATFORM_DEFAULT_TIMEZONE.into(),
+        }
+    }
+}
+
 // Secrets are hidden in the logs too.
 macro_rules! redacted_debug {
     ($ty:ty, [$($field:ident),*]) => {
@@ -192,6 +209,12 @@ impl Secrets for LdapSettings {
 impl Secrets for MailSettings {
     fn secrets_mut(&mut self) -> Vec<&mut String> {
         vec![&mut self.smtp_password, &mut self.graph_client_secret]
+    }
+}
+
+impl Secrets for PlatformSettings {
+    fn secrets_mut(&mut self) -> Vec<&mut String> {
+        Vec::new()
     }
 }
 

@@ -1,5 +1,6 @@
-//! HTTP for the system settings: LDAP, outgoing mail and OAuth2/OIDC
-//! providers. Only for the global `admin` role.
+//! HTTP for the system settings: LDAP, outgoing mail, OAuth2/OIDC
+//! providers and the platform's own (decision 0079). Only for the global
+//! `admin` role.
 //!
 //! Secrets never leave: in every response the field is empty and next to it a
 //! `has_<field>` says whether one is stored. On save, an empty secret keeps
@@ -7,8 +8,8 @@
 //! HTTP is only translated.
 
 use application::{
-    LdapSettings, MailSettings, OAuthSettings, Section, SettingsError, SettingsService,
-    SettingsSource,
+    LdapSettings, MailSettings, OAuthSettings, PlatformSettings, Section, SettingsError,
+    SettingsService, SettingsSource,
 };
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -16,7 +17,6 @@ use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
 use std::sync::Arc;
 
-use domain::AdminId;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -25,6 +25,11 @@ use auth_gateway::{AdminRepository, SessionService};
 use crate::error::ApiError;
 use crate::rbac::require_action;
 use crate::session::{require_session, CurrentSession};
+
+mod account;
+
+pub use account::LocalApps;
+use account::{account_apps, account_url};
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -58,6 +63,10 @@ pub fn routes(
         .route("/settings/mail/test", post(test_mail))
         .route("/settings/oauth", put(put_oauth).delete(reset_oauth))
         .route("/settings/oauth/discover", post(discover_oidc))
+        .route(
+            "/settings/platform",
+            put(put_platform).delete(reset_platform),
+        )
         .with_state(settings.clone())
         // The current tenant's settings, loaded before using them.
         .layer(axum::middleware::from_fn_with_state(settings, loaded))
@@ -70,85 +79,6 @@ pub fn routes(
             require_session,
         ))
         .merge(public)
-}
-
-/// `GET /settings/account`: `{"url": …}`, the shared account this instance signs
-/// in with (`null` without one). The UI signs out through its `/signout` (which
-/// also closes that session and goes back to the site) and offers it in the
-/// menu: switching application.
-async fn account_url(State(settings): State<SettingsService>) -> Json<Value> {
-    Json(json!({ "url": settings.platform_account() }))
-}
-
-/// This installation's applications (those registered with
-/// `server oidc-client … --home URL`), in the request extensions.
-#[derive(Clone)]
-pub struct LocalApps(pub Arc<dyn auth_gateway::OidcClientRegistry>);
-
-impl std::fmt::Debug for LocalApps {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("LocalApps")
-    }
-}
-
-/// The ones that sign in with this installation, as entries of the list
-/// (`kind: app`).
-async fn local_apps(local: Option<&LocalApps>) -> Vec<Value> {
-    let Some(LocalApps(registry)) = local else {
-        return Vec::new();
-    };
-    match registry.listed().await {
-        Ok(apps) => apps
-            .into_iter()
-            .filter(|a| a.url.starts_with("https://"))
-            .map(|a| {
-                json!({
-                    "kind": "app",
-                    "id": a.id,
-                    "name": a.name,
-                    "detail": a.detail,
-                    "url": a.url,
-                    "icon": a.icon.filter(|i| i.starts_with("https://")),
-                })
-            })
-            .collect(),
-        Err(e) => {
-            tracing::warn!("local apps: {e}");
-            Vec::new()
-        }
-    }
-}
-
-/// `GET /settings/account/apps`: where else the session holder can go: this
-/// installation's applications (RustFS…) and, with the shared account, by
-/// their email, management and their company's instances. If the
-/// account does not answer, `502`.
-async fn account_apps(
-    State((settings, admins)): State<(SettingsService, Arc<dyn AdminRepository>)>,
-    Extension(session): Extension<CurrentSession>,
-    local: Option<Extension<LocalApps>>,
-) -> ApiResult<Json<Value>> {
-    let mut apps = local_apps(local.as_ref().map(|e| &e.0)).await;
-    let email = match admins.find_by_id(&AdminId::new(&session.admin_id)).await {
-        Ok(Some(a)) => a.email.to_string(),
-        _ => return Ok(Json(json!({ "apps": apps }))),
-    };
-    match settings.platform_apps(&email).await {
-        None => Ok(Json(json!({ "apps": apps }))),
-        Some(Ok(v)) => {
-            let mut all = v["apps"].as_array().cloned().unwrap_or_default();
-            all.append(&mut apps);
-            Ok(Json(json!({ "apps": all })))
-        }
-        Some(Err(e)) => {
-            tracing::warn!("account apps: {e}");
-            Err(ApiError::new(
-                StatusCode::BAD_GATEWAY,
-                "account_unreachable",
-                "The common account did not answer.",
-            ))
-        }
-    }
 }
 
 async fn loaded(
@@ -257,12 +187,17 @@ fn oauth_out(settings: &SettingsService, s: &Section<OAuthSettings>) -> Value {
     })
 }
 
-/// `GET /settings`: the three sections, without secrets.
+fn platform_out(s: &Section<PlatformSettings>) -> Value {
+    section_out(s, &[], |_| {})
+}
+
+/// `GET /settings`: the sections, without secrets.
 async fn get_all(State(settings): State<SettingsService>) -> Json<Value> {
     Json(json!({
         "ldap": ldap_out(&settings.ldap()),
         "mail": mail_out(&settings.mail()),
         "oauth": oauth_out(&settings, &settings.oauth()),
+        "platform": platform_out(&settings.platform()),
         // The redirect URL of a provider whose id is not written yet.
         "oauth_redirect_template": settings.oauth_redirect_uri("{id}"),
         // How long recovery links last when the mail settings set none.
@@ -380,7 +315,7 @@ async fn discover_oidc(
     })))
 }
 
-/// `DELETE /settings/{ldap,mail,oauth}`: forget what is stored and go back to
+/// `DELETE /settings/{ldap,mail,oauth,platform}`: forget what is stored and go back to
 /// the environment. Answers all the sections, like `GET /settings`.
 async fn reset(
     settings: SettingsService,
@@ -413,6 +348,27 @@ async fn reset_oauth(
     Extension(session): Extension<CurrentSession>,
 ) -> ApiResult<Json<Value>> {
     reset(settings, &session, "oauth").await
+}
+
+/// `PUT /settings/platform`: `{"timezone": "<IANA name>"}`.
+async fn put_platform(
+    State(settings): State<SettingsService>,
+    Extension(session): Extension<CurrentSession>,
+    Json(body): Json<PlatformSettings>,
+) -> ApiResult<Json<Value>> {
+    let saved = settings
+        .save_platform(body, &session.admin_id)
+        .await
+        .map_err(to_api)?;
+    Ok(Json(platform_out(&saved)))
+}
+
+/// `DELETE /settings/platform`: back to UTC.
+async fn reset_platform(
+    State(settings): State<SettingsService>,
+    Extension(session): Extension<CurrentSession>,
+) -> ApiResult<Json<Value>> {
+    reset(settings, &session, "platform").await
 }
 
 #[cfg(test)]
