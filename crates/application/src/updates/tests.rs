@@ -70,13 +70,16 @@ impl UpdatesStore for MemoryMaintenance {
             Some((policy.clone(), Utc::now(), Some("admin@coop.co".into())));
         Ok(())
     }
-    async fn new_request(&self, _admin: &str) -> Result<UpdateRequest, String> {
+    async fn new_request(&self, by: Requester<'_>) -> Result<UpdateRequest, String> {
         let mut row = self.row.lock().unwrap();
         let n = row.request.as_ref().map_or(0, |r| r.id.len());
         let request = UpdateRequest {
             id: format!("request-{n}"),
             at: Utc::now(),
-            by: Some("admin@coop.co".into()),
+            by: Some(match by {
+                Requester::Admin(_) => "admin@coop.co".into(),
+                Requester::Machine(name) => name.into(),
+            }),
         };
         row.request = Some(request.clone());
         Ok(request)
@@ -265,6 +268,27 @@ async fn a_request_is_handed_to_the_daemon_until_it_handles_it() {
     // And with one in progress another is not asked for.
     assert!(matches!(
         updates.request_now("a").await,
+        Err(UpdatesError::Conflict(_))
+    ));
+}
+
+#[tokio::test]
+async fn a_request_from_the_server_is_the_machines_and_handed_out_alike() {
+    let (updates, _, _) = with_mail();
+    assert!(matches!(
+        updates.request_from_server("updater").await,
+        Err(UpdatesError::Conflict(_))
+    ));
+    updates.report(report("idle", None, None)).await.unwrap();
+    let request = updates.request_from_server("updater").await.unwrap();
+    assert_eq!(request.by.as_deref(), Some("updater"));
+    assert_eq!(updates.orders().await.unwrap()["request"]["id"], request.id);
+    updates
+        .report(report("applying", Some("1.3.0"), None))
+        .await
+        .unwrap();
+    assert!(matches!(
+        updates.request_from_server("updater").await,
         Err(UpdatesError::Conflict(_))
     ));
 }

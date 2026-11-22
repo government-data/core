@@ -287,3 +287,50 @@ async fn the_agent_tells_the_installed_modules_whole() {
     assert_eq!(status, StatusCode::NO_CONTENT);
     assert!(w.updates.installed_modules().await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn the_agent_asks_for_an_update_for_a_person_on_the_server() {
+    let w = world(true).await;
+    let cert = agent(&w.machines, "updater").await;
+    let agent = Some(cert.as_str());
+    let request = "/updater/v1/request";
+    // Before the agent has told its state there is nobody to hand it to.
+    let (status, body) = call(&w, "POST", request, agent, None).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert!(body["error"].is_string());
+
+    let idle = json!({ "phase": "idle", "installed_version": "1.2.0", "failed": [] });
+    let (status, _) = call(&w, "PUT", "/updater/v1/state", agent, Some(idle)).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, filed) = call(&w, "POST", request, agent, None).await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    assert_eq!(filed["by"], "updater", "the machine asked");
+    let (_, orders) = call(&w, "GET", "/updater/v1/orders", agent, None).await;
+    assert_eq!(orders["request"]["id"], filed["id"]);
+    let pending = w.updates.view().await.unwrap().pending_request.unwrap();
+    assert_eq!(pending.by.as_deref(), Some("updater"));
+
+    let events: Vec<(String, String, Option<String>)> = sqlx::query_as(
+        "SELECT event_type, action, service_account FROM admin_audit_events \
+         WHERE resource = 'platform/updates'",
+    )
+    .fetch_all(&w._db.pool)
+    .await
+    .unwrap();
+    let recorded = (
+        "update_requested".into(),
+        "request".into(),
+        Some("updater".into()),
+    );
+    assert_eq!(events, [recorded]);
+
+    let applying = json!({ "phase": "applying", "installed_version": "1.2.0", "failed": [] });
+    let (status, _) = call(&w, "PUT", "/updater/v1/state", agent, Some(applying)).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _) = call(&w, "POST", request, agent, None).await;
+    assert_eq!(status, StatusCode::CONFLICT, "an update is under way");
+
+    let worker = joined(&w.machines, MachineRole::Worker, "worker-1").await;
+    let (status, _) = call(&w, "POST", request, Some(&worker.cert), None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "only the agent");
+}

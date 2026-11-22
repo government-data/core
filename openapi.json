@@ -4921,7 +4921,7 @@
           },
           "event_type": {
             "type": "string",
-            "description": "The event type (`login_succeeded`, `login_failed`, `locked_out`,\n`logged_out`, `password_reset_requested`, `password_reset_completed`,\n`oauth_linked`, `oauth_unlinked`, `user_created`, `activation_sent`,\n`user_deleted`, `user_updated`, `resource_created`, `resource_changed`,\n`secrets_changed`, `resource_deleted`, `run_started`, `draft_approved`, `credentials_issued`,\n`records_viewed`, `join_token_issued`, `join_token_used`,\n`join_token_refused`, `machine_approved`, `machine_draining`,\n`machine_retired`, `machine_sessions_ended`, `certificate_issued`,\n`certificate_refused`, `trino_held`, `trino_released`, `dolt_held`,\n`dolt_released`)."
+            "description": "The event type (`login_succeeded`, `login_failed`, `locked_out`,\n`logged_out`, `password_reset_requested`, `password_reset_completed`,\n`oauth_linked`, `oauth_unlinked`, `user_created`, `activation_sent`,\n`user_deleted`, `user_updated`, `resource_created`, `resource_changed`,\n`secrets_changed`, `resource_deleted`, `run_started`, `draft_approved`, `credentials_issued`,\n`records_viewed`, `join_token_issued`, `join_token_used`,\n`join_token_refused`, `machine_approved`, `machine_draining`,\n`machine_retired`, `machine_sessions_ended`, `certificate_issued`,\n`certificate_refused`, `trino_held`, `trino_released`, `dolt_held`,\n`dolt_released`, `update_requested`)."
           },
           "fields_shown": {
             "type": [

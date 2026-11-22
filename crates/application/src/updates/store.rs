@@ -45,8 +45,18 @@ impl std::error::Error for MaintenanceError {}
 pub struct UpdateRequest {
     pub id: String,
     pub at: DateTime<Utc>,
-    /// The email of whoever asked, if the account still exists.
+    /// The email of whoever asked, if the account still exists, or the name
+    /// of the update agent's machine for a request from the server.
     pub by: Option<String>,
+}
+
+/// Who asks for an update now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Requester<'a> {
+    /// An administrator, from the web: their id.
+    Admin(&'a str),
+    /// The update agent's machine, for a person on the server: its name.
+    Machine(&'a str),
 }
 
 /// How an attempt ended, for the history.
@@ -92,7 +102,7 @@ pub trait UpdatesStore: Send + Sync {
     async fn save_report(&self, report: &serde_json::Value) -> Result<(), String>;
     async fn save_policy(&self, policy: &serde_json::Value, admin_id: &str) -> Result<(), String>;
     /// A new "Update now" (it replaces the previous one).
-    async fn new_request(&self, admin_id: &str) -> Result<UpdateRequest, String>;
+    async fn new_request(&self, by: Requester<'_>) -> Result<UpdateRequest, String>;
     /// Write down what was announced (what comes as `None` does not change).
     async fn mark_notified(
         &self,

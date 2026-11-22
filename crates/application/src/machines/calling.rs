@@ -6,7 +6,7 @@
 use auth_gateway::app::machines::accept_certificate;
 use auth_gateway::{Machine, MachineCertificate, MachineRole, MACHINE_ORGANIZATION};
 
-use super::{MachinesError, MachinesService};
+use super::{audit, MachinesError, MachinesService, Origin};
 
 /// Whether a machine's certificate is the one it uses.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +43,17 @@ impl MachinesService {
             }
             _ => None,
         })
+    }
+
+    /// Record that `machine`, the update agent, asked for an update now for
+    /// a person on the server (decision 0086).
+    pub async fn update_requested(
+        &self,
+        machine: &Machine,
+        origin: &Origin,
+    ) -> Result<(), MachinesError> {
+        let event = audit::update_requested(machine, origin, self.clock.now());
+        Ok(self.record(event).await?)
     }
 
     /// Whether the certificate `serial` of `machine_name` is accepted: only

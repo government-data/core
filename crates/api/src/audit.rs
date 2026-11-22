@@ -66,7 +66,7 @@ pub struct EventOut {
     /// `join_token_refused`, `machine_approved`, `machine_draining`,
     /// `machine_retired`, `machine_sessions_ended`, `certificate_issued`,
     /// `certificate_refused`, `trino_held`, `trino_released`, `dolt_held`,
-    /// `dolt_released`).
+    /// `dolt_released`, `update_requested`).
     event_type: String,
     /// The resolved admin id, when the event maps to a known account.
     admin_id: Option<String>,
