@@ -18,13 +18,15 @@
 # and this router writes no access log, which would keep it. Above the
 # API's own routers; the same chain.
 {{ $domain := env "APP_DOMAIN" | default "localhost" }}
+{{- /* The certificate source (decision 0087): none with QD_TLS_MODE=file. */}}
+{{ $resolver := "letsencrypt" }}{{ if eq (env "QD_TLS_MODE") "file" }}{{ $resolver = "" }}{{ end }}
 http:
   routers:
     trino-ui:
       rule: "Host(`{{ $domain }}`) && (Path(`/ui`) || PathPrefix(`/ui/`) || PathPrefix(`/oauth2/`))"
       entryPoints: [websecure]
       tls:
-        certResolver: letsencrypt
+        certResolver: "{{ $resolver }}"
       priority: 10
       service: trino
       middlewares: [app-frame-headers]
@@ -32,7 +34,7 @@ http:
       rule: "Host(`{{ $domain }}`) && Path(`/api/internal/trino/rules`)"
       entryPoints: [websecure]
       tls:
-        certResolver: letsencrypt
+        certResolver: "{{ $resolver }}"
       priority: 300
       service: "{{ env "TRINO_RULES_SERVICE" | default "api@docker" }}"
       middlewares: [api-chain]

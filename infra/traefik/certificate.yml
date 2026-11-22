@@ -51,4 +51,5 @@ services:
     volumes:
       - "./dynamic:/etc/traefik/dynamic"
       - "./machine/entrypoint.sh:/etc/qd/traefik/entrypoint.sh:ro"
+      - "./machine/tls-source.sh:/etc/qd/traefik/tls-source.sh:ro"
       - "${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro"

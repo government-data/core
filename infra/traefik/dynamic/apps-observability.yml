@@ -4,6 +4,8 @@
 # priority above the web's catch-all. Loki and Alloy are not routed: nothing
 # outside their stack talks to them.
 {{ $domain := env "APP_DOMAIN" | default "localhost" }}
+{{- /* The certificate source (decision 0087): none with QD_TLS_MODE=file. */}}
+{{ $resolver := "letsencrypt" }}{{ if eq (env "QD_TLS_MODE") "file" }}{{ $resolver = "" }}{{ end }}
 http:
   routers:
     # Grafana serves from its subpath (serve_from_sub_path): no prefix strip.
@@ -11,7 +13,7 @@ http:
       rule: "Host(`{{ $domain }}`) && PathPrefix(`/grafana`)"
       entryPoints: [websecure]
       tls:
-        certResolver: letsencrypt
+        certResolver: "{{ $resolver }}"
       priority: 10
       service: grafana
       middlewares: [app-frame-headers]

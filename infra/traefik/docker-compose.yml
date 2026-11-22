@@ -31,8 +31,11 @@ services:
       - "--configFile=/etc/traefik/traefik.yml"
     environment:
       # ACME registration address. Required — the stack refuses to start without
-      # it, so a real contact rides on every issued certificate.
-      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in your environment}
+      # it, so a real contact rides on every issued certificate. Not with
+      # QD_TLS_MODE, the package's certificate source (decision 0087), where
+      # only `acme` needs it; Traefik with --configFile does not read this
+      # variable, so the package writes the address into its static file.
+      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL: ${ACME_EMAIL:-${QD_TLS_MODE:?set ACME_EMAIL in your environment}}
       # The name machines reach the internal entry point by: its server
       # certificate's, and the Host of its routers (internal.yml).
       INTERNAL_DOMAIN: ${INTERNAL_DOMAIN:-internal.${APP_DOMAIN:-localhost}}
@@ -41,11 +44,13 @@ services:
       - "443:443"
       # The machines' entry point (decision 0066): only machines with a
       # certificate of the installation's CA get past its handshake. On the
-      # private network between VMs only (0023's table).
-      - "${TRAEFIK_INTERNAL_PORT:-9443}:9443"
+      # private network between VMs only (0023's table). With
+      # TRAEFIK_INTERNAL_BIND, on that address only (decision 0087); unset,
+      # on every address.
+      - "${TRAEFIK_INTERNAL_BIND:+${TRAEFIK_INTERNAL_BIND}:}${TRAEFIK_INTERNAL_PORT:-9443}:9443"
       # The lake's gates' entry point (0066, point 10): the API's lake check
       # alone, asked by the Traefik in front of RustFS on each lake node.
-      - "${TRAEFIK_LAKEGATE_PORT:-9444}:9444"
+      - "${TRAEFIK_INTERNAL_BIND:+${TRAEFIK_INTERNAL_BIND}:}${TRAEFIK_LAKEGATE_PORT:-9444}:9444"
     networks:
       - edge
     volumes:
@@ -146,6 +151,9 @@ services:
       - edge
     expose:
       - "8080"
+    # Its routers' certificate resolver, by the certificate source (decision
+    # 0087): without QD_TLS_MODE, Let's Encrypt as always.
+    label_file: ./tls-source/${QD_TLS_MODE:-acme}-api.labels
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=data-quality-edge"
@@ -157,7 +165,6 @@ services:
       # certificate (infra/traefik/internal.yml).
       - "traefik.http.routers.api.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`)"
       - "traefik.http.routers.api.entrypoints=websecure"
-      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api.priority=100"
       - "traefik.http.routers.api.middlewares=api-chain@file"
       - "traefik.http.services.api.loadbalancer.server.port=8080"
@@ -166,7 +173,6 @@ services:
       # api-events-chain).
       - "traefik.http.routers.api-events.rule=Host(`${APP_DOMAIN:-localhost}`) && Path(`/api/events`)"
       - "traefik.http.routers.api-events.entrypoints=websecure"
-      - "traefik.http.routers.api-events.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api-events.priority=200"
       - "traefik.http.routers.api-events.service=api"
       - "traefik.http.routers.api-events.middlewares=api-events-chain@file"
@@ -178,13 +184,14 @@ services:
     restart: unless-stopped
     networks:
       - edge
+    # As the API's (decision 0087).
+    label_file: ./tls-source/${QD_TLS_MODE:-acme}-web.labels
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=data-quality-edge"
       # Web router: catch-all for the host, lowest priority so "/api" wins.
       - "traefik.http.routers.web.rule=Host(`${APP_DOMAIN:-localhost}`)"
       - "traefik.http.routers.web.entrypoints=websecure"
-      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
       - "traefik.http.routers.web.priority=1"
       - "traefik.http.routers.web.middlewares=web-chain@file"
       # The web image runs nginx unprivileged (non-root), listening on 8080.
