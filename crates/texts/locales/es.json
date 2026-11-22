@@ -61,6 +61,12 @@
     "updater": {
       "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
       "unavailable": "La base de datos no responde."
+    },
+    "internal": {
+      "invalidEmail": "Correo inválido.",
+      "unknownAccount": "Ya hay cuentas y ninguna tiene ese correo.",
+      "directoryAccount": "La contraseña de esa cuenta está en el directorio (LDAP / AD).",
+      "unavailable": "La base de datos no responde."
     }
   },
   "app": {

@@ -1,8 +1,8 @@
 //! The internal routes, for the host's update daemon
-//! (`orquestador-actualizador`): the running version, what is left before it
+//! (the host's updater): the running version, what is left before it
 //! can update, maintenance, what the administrator decided (`orders`) and the
 //! daemon's state (`report`). And the administrator's entry (`admin-access`),
-//! for the installer and `orquestador acceso-admin`.
+//! for the installer and the host's admin access command.
 //!
 //! They do not go through Traefik: they are served on their own port
 //! (`ORQ_INTERNAL_ADDR`), which Compose publishes only on the host's
@@ -17,9 +17,11 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
+pub use admin_access::AdminAccessRoute;
+
+mod admin_access;
+
 use application::{MaintenanceError, UpdatesError, UpdatesService};
-use auth_gateway::AuditService;
-use auth_gateway::{AccessError, PasswordResetService};
 use axum::{
     extract::{Query, Request, State},
     http::{header::AUTHORIZATION, StatusCode},
@@ -28,7 +30,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use domain::{AuditEventType, NewAuditEvent};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -39,15 +40,6 @@ const DEFAULT_HORIZON: Duration = Duration::from_secs(30 * 60);
 struct Internal {
     updates: UpdatesService,
     access: Option<AdminAccessRoute>,
-}
-
-/// What `admin-access` needs.
-#[derive(Debug, Clone)]
-pub struct AdminAccessRoute {
-    pub service: PasswordResetService,
-    pub audit: AuditService,
-    /// The web's public address, the one links use.
-    pub link_base: String,
 }
 
 /// How long the previous token stays valid when the file changes: as long as
@@ -128,7 +120,7 @@ impl InternalToken {
                         state.modified = modified;
                     }
                     // Half written or deleted: the one there was stays.
-                    Err(e) => tracing::warn!("rutas internas: {e}"),
+                    Err(e) => tracing::warn!("internal routes: {e}"),
                 }
             }
         }
@@ -148,7 +140,7 @@ fn read_token(path: &std::path::Path) -> Result<(Option<SystemTime>, String), St
         .to_string();
     if token.len() < InternalToken::MIN_LEN {
         return Err(format!(
-            "ORQ_INTERNAL_TOKEN_FILE {}: el token es muy corto",
+            "ORQ_INTERNAL_TOKEN_FILE {}: the token is too short",
             path.display()
         ));
     }
@@ -168,8 +160,9 @@ pub fn router(
         .route("/internal/maintenance", post(maintenance))
         .route("/internal/orders", get(orders))
         .route("/internal/report", post(report))
-        .route("/internal/admin-access", post(admin_access))
+        .route("/internal/admin-access", post(admin_access::admin_access))
         .with_state(Internal { updates, access })
+        .layer(axum::middleware::from_fn(crate::language::per_request))
         .layer(axum::middleware::from_fn(move |req, next| {
             authorize(token.clone(), req, next)
         }))
@@ -276,77 +269,11 @@ async fn report(State(s): State<Internal>, Json(body): Json<serde_json::Value>) 
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct AdminAccessBody {
-    email: String,
-    /// Also for an account that already chose its password (it lost it).
-    #[serde(default)]
-    force: bool,
-}
-
-/// The link for the administrator to choose their password: the installer asks
-/// for it when it finishes (it creates the account if there is none) and
-/// `orquestador acceso-admin` when it was lost. Whoever gets here is root on the
-/// server.
-async fn admin_access(State(s): State<Internal>, Json(body): Json<AdminAccessBody>) -> Response {
-    let Some(access) = s.access else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    let result = access
-        .service
-        .admin_access(&body.email, &access.link_base, body.force)
-        .await;
-    let (status, error) = match &result {
-        Ok(_) => (StatusCode::OK, ""),
-        Err(AccessError::InvalidEmail(_)) => (StatusCode::UNPROCESSABLE_ENTITY, "correo inválido"),
-        Err(AccessError::UnknownAccount) => (
-            StatusCode::NOT_FOUND,
-            "ya hay cuentas y ninguna tiene ese correo",
-        ),
-        Err(AccessError::DirectoryAccount) => (
-            StatusCode::CONFLICT,
-            "la contraseña de esa cuenta está en el directorio (LDAP / AD)",
-        ),
-        Err(AccessError::Internal(e)) => return unavailable(e),
-    };
-    let Ok(granted) = result else {
-        return (status, Json(json!({ "error": error }))).into_response();
-    };
-    if granted.created || granted.link.is_some() {
-        let event = NewAuditEvent {
-            event_type: if granted.created {
-                AuditEventType::UserCreated
-            } else {
-                AuditEventType::ActivationSent
-            },
-            admin_id: Some(granted.admin.clone()),
-            email_attempted: Some(body.email.trim().to_ascii_lowercase()),
-            ip: "127.0.0.1".into(),
-            user_agent: Some("orquestador (servidor)".into()),
-            occurred_at: SystemTime::now(),
-        };
-        if let Err(e) = access.audit.record(event).await {
-            tracing::warn!("admin access: failed to record audit event: {e}");
-        }
-        tracing::warn!(
-            created = granted.created,
-            emailed = granted.emailed,
-            "admin access link issued from the host"
-        );
-    }
-    Json(json!({
-        "created": granted.created,
-        "link": granted.link,
-        "emailed": granted.emailed,
-    }))
-    .into_response()
-}
-
 fn unavailable(e: &str) -> Response {
-    tracing::error!("rutas internas: {e}");
+    tracing::error!("internal routes: {e}");
     (
         StatusCode::SERVICE_UNAVAILABLE,
-        Json(json!({ "error": "la base de datos no responde" })),
+        Json(json!({ "error": texts::tr!("api.internal.unavailable") })),
     )
         .into_response()
 }
@@ -384,10 +311,13 @@ mod tests {
             .set_modified(later)
             .unwrap();
         assert!(token.accepts(&new));
-        assert!(token.accepts(&old), "el anterior sirve unos minutos");
+        assert!(
+            token.accepts(&old),
+            "the previous one is valid for a few minutes"
+        );
 
         // A short one (half written) does not replace the current one.
-        std::fs::write(&path, "corto").unwrap();
+        std::fs::write(&path, "short").unwrap();
         std::fs::File::options()
             .write(true)
             .open(&path)
