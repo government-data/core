@@ -26,7 +26,11 @@
 # within QD_TRAEFIK_CHECK_EVERY seconds. The API is on a network only
 # Traefik shares with it and trusts Traefik's certificate header (decision
 # 0083): a container on data-quality-edge does not reach it, by name or by
-# any of its addresses.
+# any of its addresses. The web entry point's certificate source (decision
+# 0087): with the package's default, `file`, Traefik serves certs/local.crt,
+# has no resolver and logs no ACME line; the `acme` rendering carries
+# ACME_EMAIL and starts Traefik (offline); a wrong mode, or `acme` without an
+# address, does not; TRAEFIK_INTERNAL_BIND publishes 9443 and 9444 there only.
 #
 # The images are CI's (decision 0082, point 4), never built here:
 #
@@ -117,7 +121,6 @@ sed -e "s|^QD_MODULE_DIR=.*|QD_MODULE_DIR=$MOD|" -e "s|^QD_MACHINE_DIR=.*|QD_MAC
   -e "s|^IMAGE_API=.*|IMAGE_API=$API|" -e "s|^IMAGE_WEB=.*|IMAGE_WEB=$WEB|" \
   -e "s|^APP_DOMAIN=.*|APP_DOMAIN=localhost|" -e "s|^INTERNAL_DOMAIN=.*|INTERNAL_DOMAIN=$NAME|" \
   -e "s|^POSTGRES_SERVER_NAME=.*|POSTGRES_SERVER_NAME=$NAME|" -e "s|^OBS_VM=.*|OBS_VM=$P|" \
-  -e "s|^ACME_EMAIL=.*|ACME_EMAIL=verify@example.invalid|" \
   -e "s|^POSTGRES_SUPERUSER_PASSWORD=.*|POSTGRES_SUPERUSER_PASSWORD=$SUPER|" \
   -e "s|^APP_DB_PASSWORD=.*|APP_DB_PASSWORD=$APPPW|" \
   "$ROOT/infra/package/env.example" >"$MOD/.env"
@@ -127,6 +130,7 @@ QD_TRAEFIK_CHECK_EVERY=5
 QD_PG_TLS_CHECK_EVERY=5
 POSTGRES_BIND=127.0.0.1
 TRAEFIK_METRICS_BIND=127.0.0.1
+TRAEFIK_INTERNAL_BIND=127.0.0.1
 MIMIR_BIND=127.0.0.1
 EOF
 if out=$(dc config --quiet 2>&1); then ok "the package's compose reads with the .env"; else ko "config: $out"; exit 1; fi
@@ -244,6 +248,38 @@ for ip in $(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAdd
 done
 expect "the API's networks" "data-quality-api data-quality-backend" \
   "$(docker inspect --format '{{range $n, $_ := .NetworkSettings.Networks}}{{$n}} {{end}}' "$(dc ps -q api)" | sed 's/ $//')"
+
+# --- The web's certificate source (decision 0087) -------------------------------
+expect "the .env's certificate source" file "$(sed -n 's/^QD_TLS_MODE=//p' "$MOD/.env")"
+want="serial=$(openssl x509 -in "$MOD/certs/local.crt" -noout -serial | cut -d= -f2)"
+expect "file: the web entry point serves certs/local.crt" "$want" "$(openssl s_client -connect 127.0.0.1:443 \
+  -servername localhost </dev/null 2>/dev/null | openssl x509 -noout -serial 2>/dev/null)"
+expect "file: the web through it" 200 "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+  --cacert "$MOD/certs/local.crt" https://localhost/)"
+expect "file: no resolver in the static configuration Traefik runs" 0 \
+  "$(docker exec "$TRAEFIK" grep -c -e certificatesResolvers -e certResolver /run/qd-traefik/traefik.yml)"
+# Traefik starts its TLS-ALPN challenge provider whatever its configuration.
+expect "file: no ACME line in Traefik's log" 0 \
+  "$(docker logs "$TRAEFIK" 2>&1 | grep -iE 'acme|resolver' | grep -vc 'acme.ChallengeTLSALPN')"
+for port in 9443 9444; do
+  expect "TRAEFIK_INTERNAL_BIND publishes $port" 127.0.0.1:$port "$(docker port "$TRAEFIK" $port/tcp | tr '\n' ' ' | sed 's/ $//')"
+done
+TRAEFIK_IMAGE=$(docker inspect --format '{{.Config.Image}}' "$TRAEFIK")
+render() { # MODE EMAIL [then]: tls-source.sh in Traefik's image, offline
+  docker run --rm --network none -e "QD_TLS_MODE=$1" -e "ACME_EMAIL=$2" --tmpfs /letsencrypt \
+    -v "$MOD/current/infra/traefik:/t:ro" --entrypoint sh "$TRAEFIK_IMAGE" -c \
+    "/t/machine/tls-source.sh /t/traefik.yml /run/qd-traefik/traefik.yml && ${3:-true}" 2>&1 |
+    grep -v "^tls-source: the web's certificate source is"
+}
+expect "acme: the address in the resolver" '      email: "ops@customer.test"' \
+  "$(render acme ops@customer.test 'grep "^      email:" /run/qd-traefik/traefik.yml')"
+expect "acme: Traefik starts with it" ok "$(render acme ops@customer.test \
+  'traefik --configFile=/run/qd-traefik/traefik.yml >/tmp/log 2>&1 & sleep 3; traefik healthcheck \
+   --configFile=/run/qd-traefik/traefik.yml >/dev/null && grep -q "Starting provider \\*acme.Provider" /tmp/log &&
+   ! grep -q "ACME resolve is skipped" /tmp/log && echo ok')"
+expect "acme without an address: refused" "tls-source: QD_TLS_MODE=acme needs ACME_EMAIL, an e-mail address (Let's Encrypt's contact)" \
+  "$(render acme '')"
+expect "an unknown mode: refused" "tls-source: QD_TLS_MODE is file or acme, not 'both'" "$(render both '')"
 
 [ "$FAILED" = 0 ] && echo "All checks passed." || echo "Some checks failed."
 exit "$FAILED"

@@ -21,7 +21,8 @@
 #   secrets/   database_url and postgres_superuser_password, as Docker
 #              secrets (readable by the containers' users: PostgreSQL's is
 #              uid 70)
-#   certs/     Traefik's default certificate (local.crt, local.key)
+#   certs/     Traefik's default certificate (local.crt, local.key): the
+#              customer's, or the installer's self-signed one
 #   internal/  Traefik's watched folder (decision 0081): internal.yml, the
 #              CA's machines-ca.crt, app-machine.pem (renewed in place);
 #              the package's dynamic files are read-only inside it, at
@@ -37,6 +38,11 @@
 # without waiting, the app-machine one-shot, this `up`, then the
 # updater-certificate one-shot and internal/'s internal.yml and
 # machines-ca.crt.
+#
+# The web entry point's certificate source is QD_TLS_MODE (decision 0087):
+# `file` (the default) serves certs/local.crt and makes no ACME request;
+# `acme` is Let's Encrypt by HTTP-01, with ACME_EMAIL. Traefik runs the
+# static configuration machine/tls-source.sh writes from traefik.yml.
 #
 # The images are the agent's IMAGE_* (the signed index's digests).
 name: quality-data
@@ -68,6 +74,12 @@ secrets:
 
 services:
   traefik:
+    command:
+      - "--configFile=/run/qd-traefik/traefik.yml"
+    environment:
+      QD_TLS_MODE: ${QD_TLS_MODE:-file}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL: ${ACME_EMAIL:-}
     networks:
       - edge
       - api
@@ -87,6 +99,10 @@ services:
 
   api:
     image: ${IMAGE_API:-${API_IMAGE:?set IMAGE_API or API_IMAGE to a versioned image}}
+    # The routers' resolver by the certificate source, `file` by default
+    # (decision 0087), not development's `acme`.
+    label_file: !override
+      - ./infra/traefik/tls-source/${QD_TLS_MODE:-file}-api.labels
     # PostgreSQL's network and its own; never data-quality-edge (0083).
     networks: !override
       - backend
@@ -111,3 +127,5 @@ services:
 
   web:
     image: ${IMAGE_WEB:-${WEB_IMAGE:?set IMAGE_WEB or WEB_IMAGE to a versioned image}}
+    label_file: !override
+      - ./infra/traefik/tls-source/${QD_TLS_MODE:-file}-web.labels

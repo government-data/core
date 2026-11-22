@@ -7,6 +7,8 @@
 # a path of its own, the frame policy `app-frame-headers`, priority above the
 # web's catch-all.
 {{ $domain := env "APP_DOMAIN" | default "localhost" }}
+{{- /* The certificate source (decision 0087): none with QD_TLS_MODE=file. */}}
+{{ $resolver := "letsencrypt" }}{{ if eq (env "QD_TLS_MODE") "file" }}{{ $resolver = "" }}{{ end }}
 http:
   routers:
     # RustFS (infra/rustfs): its console, which also serves the admin API and
@@ -15,7 +17,7 @@ http:
       rule: "Host(`{{ $domain }}`) && PathPrefix(`/rustfs`)"
       entryPoints: [websecure]
       tls:
-        certResolver: letsencrypt
+        certResolver: "{{ $resolver }}"
       priority: 10
       service: rustfs
       middlewares: [app-frame-headers]
@@ -27,7 +29,7 @@ http:
       rule: "Host(`{{ $domain }}`) && PathPrefix(`/rustfs/console/_next/static/`)"
       entryPoints: [websecure]
       tls:
-        certResolver: letsencrypt
+        certResolver: "{{ $resolver }}"
       priority: 50
       service: rustfs
       middlewares: [app-frame-headers, app-static-immutable]
@@ -37,7 +39,7 @@ http:
       rule: "Host(`{{ $domain }}`) && (HeaderRegexp(`Authorization`, `^AWS4-HMAC-SHA256 `) || QueryRegexp(`X-Amz-Algorithm`, `^AWS4-HMAC-SHA256$`))"
       entryPoints: [websecure]
       tls:
-        certResolver: letsencrypt
+        certResolver: "{{ $resolver }}"
       priority: 100
       service: rustfs
     # The Iceberg REST catalog.
@@ -45,7 +47,7 @@ http:
       rule: "Host(`{{ $domain }}`) && PathPrefix(`/iceberg`)"
       entryPoints: [websecure]
       tls:
-        certResolver: letsencrypt
+        certResolver: "{{ $resolver }}"
       priority: 10
       service: rustfs
 

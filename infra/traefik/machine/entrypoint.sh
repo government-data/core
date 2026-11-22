@@ -25,6 +25,13 @@ DYN=${QD_TRAEFIK_DYNAMIC:-/etc/traefik/dynamic}
 EVERY=${QD_TRAEFIK_CHECK_EVERY:-30}
 
 log() { echo "app-machine: $*" >&2; }
+
+# The package (QD_TLS_MODE set) runs the static configuration of its web
+# certificate source (decision 0087), written first: if it cannot be, Traefik
+# does not start.
+if [ -n "${QD_TLS_MODE:-}" ]; then
+  /etc/qd/traefik/tls-source.sh /etc/traefik/traefik.yml /run/qd-traefik/traefik.yml
+fi
 # What the agent's certificate is now. Never printed.
 fingerprint() { sha256sum "$SRC/machine.pem" 2>/dev/null | cut -d' ' -f1; }
 

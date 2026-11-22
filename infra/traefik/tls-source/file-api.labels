@@ -1,0 +1,3 @@
+# The API's routers' certificate resolver with QD_TLS_MODE=file (decision 0087).
+traefik.http.routers.api.tls.certresolver=
+traefik.http.routers.api-events.tls.certresolver=

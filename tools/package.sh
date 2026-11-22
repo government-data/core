@@ -43,6 +43,8 @@ files=(
   infra/traefik/traefik.yml
   infra/traefik/internal.yml
   infra/traefik/machine/entrypoint.sh
+  infra/traefik/machine/tls-source.sh
+  infra/traefik/tls-source
   infra/traefik/dynamic
   infra/postgres/docker-compose.yml
   infra/postgres/api.override.yml

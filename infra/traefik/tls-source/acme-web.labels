@@ -1,0 +1,2 @@
+# The web's router's certificate resolver with QD_TLS_MODE=acme (decision 0087).
+traefik.http.routers.web.tls.certresolver=letsencrypt
