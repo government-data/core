@@ -62,7 +62,7 @@ pub use oauth::{
     OAuthIdentityRepository, OAuthProvider, OAuthSecretGenerator, PendingAuthStore,
     PendingAuthorization, PkcePair, ProviderId,
 };
-pub use password_reset::{LoginHandoffStore, PasswordResetStore, ResetTokenGenerator};
+pub use password_reset::{PasswordResetStore, ResetTokenGenerator};
 pub use provider::{
     AccountPolicies, AuthorizationCode, AuthorizationCodeStore, ClientAuth, ClientId,
     ClientIdError, ClientSettings, ListedApp, OidcClient, OidcClientRegistry, SigningAlg,

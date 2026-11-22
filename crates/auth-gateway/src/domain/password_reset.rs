@@ -39,25 +39,6 @@ pub trait PasswordResetStore: Send + Sync {
     ) -> Result<Option<AdminId>, RepositoryError>;
 }
 
-/// Port: the single-use passes from the common entrance (`entrar.<domain>`) to
-/// a company, stored by their hash in the current company.
-#[async_trait::async_trait]
-pub trait LoginHandoffStore: Send + Sync {
-    async fn issue(
-        &self,
-        admin: &AdminId,
-        token_hash: &str,
-        expires_at: SystemTime,
-    ) -> Result<(), RepositoryError>;
-
-    /// Using it deletes it: it works once. `None` if it does not exist or expired.
-    async fn redeem(
-        &self,
-        token_hash: &str,
-        now: SystemTime,
-    ) -> Result<Option<AdminId>, RepositoryError>;
-}
-
 /// Port: the secret in a reset link and the hash that is stored instead.
 pub trait ResetTokenGenerator: Send + Sync {
     /// A fresh, unguessable token for the link.

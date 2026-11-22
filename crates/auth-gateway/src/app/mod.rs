@@ -1,11 +1,10 @@
-//! The identity use cases: signing in (password, directory, OAuth, the
-//! central login of the online edition), sessions, accounts, password resets
+//! The identity use cases: signing in (password, directory, OAuth),
+//! sessions, accounts, password resets
 //! and the audit trail they write. Wires the [`crate::domain`] ports together.
 
 pub mod account_mail;
 pub mod audit;
 pub mod auth;
-pub mod central;
 pub mod machines;
 pub mod mail;
 pub mod mail_notice;
@@ -20,7 +19,6 @@ pub use auth::{
     BootstrapError, BootstrapOutcome, BootstrapService, DirectoryLogin, DirectorySlot, LoginError,
     LoginRequest, LoginService, DIRECTORY_USER_ROLE,
 };
-pub use central::{CentralLoginService, Entry, HANDOFF_PATH, HANDOFF_TTL};
 pub use mail::{MailLoader, MailSlot, Mailer, OutgoingMail};
 pub use mail_notice::{MailNotice, MailTone};
 pub use oauth::{BeginOutcome, CompleteOutcome, OAuthAuthenticatedAdmin, OAuthLoginService};

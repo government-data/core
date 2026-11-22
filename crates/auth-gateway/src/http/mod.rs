@@ -1,12 +1,10 @@
 //! The identity routes (axum): signing in and out, the session cookies and the
-//! middleware that requires them, OAuth, the central login of the online
-//! edition, password resets, user management and the gateway's own OIDC
+//! middleware that requires them, OAuth, password resets, user management and the gateway's own OIDC
 //! provider. The `api` crate mounts them
 //! next to its own routes.
 
 pub mod auth;
 pub mod captcha;
-pub mod central;
 pub mod client_cert;
 pub mod client_cert_info;
 pub mod oauth;
