@@ -50,18 +50,17 @@ pub struct LakeRead {
 }
 
 impl Runner {
-    /// Installs the extensions a job needs in DuckDB's extension
-    /// directory, so it loads them without fetching anything: the lake's
-    /// (`iceberg`, the `avro` it loads, `httpfs`) and each source driver's
-    /// ([`Runner::attach_source`]: `postgres`, `mysql`, and the community's
-    /// `mssql` and `oracle_scanner`). The worker's image does it once, when
-    /// it is built, and checks each source extension's hash (decision 0077
-    /// point 8).
+    /// Installs the lake's extensions (`iceberg`, the `avro` it loads,
+    /// `httpfs`) in DuckDB's extension directory, so a job loads them
+    /// without fetching anything. The worker's image does it once, when it
+    /// is built. The source drivers' ([`Runner::attach_source`]: `postgres`,
+    /// `mysql`, `mssql`, `oracle_scanner`) are not installed here: the image
+    /// puts the reviewed files there itself, pinned by their hashes
+    /// (decision 0077 point 8).
     pub fn install_extensions() -> Result<(), Error> {
-        Runner::new()?.con.execute_batch(
-            "INSTALL avro; INSTALL iceberg; INSTALL httpfs; INSTALL postgres; INSTALL mysql;\n\
-             INSTALL mssql FROM community; INSTALL oracle_scanner FROM community;",
-        )
+        Runner::new()?
+            .con
+            .execute_batch("INSTALL avro; INSTALL iceberg; INSTALL httpfs;")
     }
 
     /// Attaches the warehouse as `lake` and locks the connection down.

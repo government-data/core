@@ -44,9 +44,9 @@
 //! - `QD_DUCKDB_EXTENSIONS`: DuckDB's extension directory, which sources
 //!   load from offline (`~/.duckdb/extensions`; decision 0077).
 //!
-//! `qd-worker --install-extensions` installs DuckDB's extensions, the
-//! lake's and the sources' drivers', and exits: the image runs it when it
-//! is built and checks their hashes, so jobs fetch nothing.
+//! `qd-worker --install-extensions` installs the lake's DuckDB extensions
+//! and exits: the image runs it when it is built and adds the sources'
+//! drivers from pinned files, so jobs fetch nothing.
 
 mod api;
 mod config;

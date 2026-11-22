@@ -45,8 +45,7 @@ pub(crate) fn env(name: &str) -> Option<String> {
 
 /// DuckDB's extension directory, which the worker's image fills when it is
 /// built (decision 0077 point 8): `QD_DUCKDB_EXTENSIONS`, else DuckDB's own
-/// under `$HOME` (`~/.duckdb/extensions`, where `--install-extensions`
-/// puts them).
+/// under `$HOME` (`~/.duckdb/extensions`, where the image puts them).
 pub(crate) fn extension_directory() -> Option<String> {
     extension_directory_of(env("QD_DUCKDB_EXTENSIONS"), env("HOME"))
 }

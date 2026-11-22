@@ -92,14 +92,14 @@ SQL
 ok "invented rows: $(printf 'SET HEADING OFF FEEDBACK OFF\nSELECT count(*) FROM clients;\n' | sqlplus qs_app "$APP" | tr -d ' \t\n')"
 
 echo "== DuckDB reads it through the extension oracle_scanner"
-duckdb_check -e EXT=oracle_scanner -e REPO=community -e SRC_PASSWORD="$READER" \
+duckdb_check -e EXT=oracle_scanner -e PINS="$(ext_pins oracle_scanner)" -e SRC_PASSWORD="$READER" \
   -e SECRET_SQL="CREATE SECRET src_secret (TYPE oracle, HOST '$ORA', PORT 1521, SERVICE_NAME 'FREEPDB1', USER 'qs_reader', PASSWORD '@PASSWORD@')" \
   -e ATTACH_SQL="ATTACH 'src_secret' AS src (TYPE oracle_scanner, SCHEMA 'QS_APP', READ_ONLY)" \
   -e SCHEMA=main -e TABLE=src.main.clients \
   -e TYPES='{"id": ["INTEGER", "BIGINT", "DECIMAL(10,0)"], "code": ["VARCHAR"], "name": ["VARCHAR"], "opened": ["DATE", "TIMESTAMP"], "amount": ["DECIMAL(12,2)"], "updated": ["TIMESTAMP", "TIMESTAMP_NS"]}'
 
 echo "== The extension from a directory, offline (decision 0077 point 8)"
-ext_install oracle_scanner community
+ext_install oracle_scanner
 ext_offline oracle_scanner
 
 echo "== A case-insensitive session: filters, aggregates, DISTINCT and joins are DuckDB's"
