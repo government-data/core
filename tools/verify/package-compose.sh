@@ -26,7 +26,9 @@
 #     the included files' relative paths are the version folder's;
 #   - a folder of QD_MODULE_DIR mounted inside the package's Traefik dynamic
 #     folder is read by Traefik's file provider (a router of its own), and
-#     whether its mount point must be in the package (reported);
+#     whether its mount point must be in the package, and whether a file
+#     put in it after Traefik started is read; and the other way round, the
+#     QD_MODULE_DIR folder watched with the package's inside it (reported);
 #   - what happens when `current` moves to a new version whose files differ
 #     but whose compose is the same: the bind mounts' sources, and whether
 #     `up` recreates the containers (reported, not asserted).
@@ -64,7 +66,7 @@ dc() { # the agent's command line, then ARGS
 }
 cleanup() {
   dc down --volumes --remove-orphans --timeout 5 >/dev/null 2>&1
-  docker rm -f "$P-psql" "$P-nested" >/dev/null 2>&1
+  docker rm -f "$P-psql" "$P-nested" "$P-swapped" >/dev/null 2>&1
   rm -rf -- "${D:?}"
 }
 trap cleanup EXIT
@@ -283,6 +285,32 @@ web() { curl -o /dev/null -w '%{http_code}' --resolve "$1:$PORT:127.0.0.1" "http
 for _ in $(seq 20); do [ "$(web installation.localhost)" = 200 ] && break; sleep 1; done
 expect "the package's route" 200 "$(web localhost)"
 expect "a route from QD_MODULE_DIR mounted in the dynamic folder" 200 "$(web installation.localhost)"
+# A file put in the nested folder after Traefik started (as a renewal or the
+# installer's internal.yml would be), aside then renamed; then a change at
+# the top of the watched folder.
+late() { printf 'http:\n  routers:\n    late:\n      rule: "Host(`late.localhost`)"\n      entryPoints: [websecure]\n      tls: {}\n      service: web\n' >"$MOD/traefik/.late.yml.new" &&
+  mv -f "$MOD/traefik/.late.yml.new" "$MOD/traefik/late.yml"; }
+late
+sleep 5
+found "a file renamed into the nested folder after start: $(web late.localhost) (200 read, 404 not)"
+touch "$MOD/current/infra/edge/dynamic/routes.yml"
+sleep 5
+found "the same after a change at the top of the watched folder: $(web late.localhost)"
+# The other way round: QD_MODULE_DIR's folder is the watched one, the
+# package's dynamic folder a read-only folder inside it.
+rm -f "$MOD/traefik/late.yml"
+docker run -d --name "$P-swapped" --network "${P}_default" -p "127.0.0.1:$((PORT + 1)):443" \
+  -v "$MOD/current/infra/edge/traefik.yml:/etc/traefik/traefik.yml:ro" -v "$MOD/certs:/etc/traefik/certs:ro" \
+  -v "$MOD/traefik:/etc/traefik/dynamic" -v "$MOD/current/infra/edge/dynamic:/etc/traefik/dynamic/package:ro" \
+  "$TRAEFIK" --configFile=/etc/traefik/traefik.yml >/dev/null
+swapped() { curl -o /dev/null -w '%{http_code}' --resolve "$1:$((PORT + 1)):127.0.0.1" "https://$1:$((PORT + 1))/"; }
+for _ in $(seq 20); do [ "$(swapped localhost)" = 200 ] && break; sleep 1; done
+found "swapped: the package's route from the nested folder: $(swapped localhost)"
+found "swapped: the nested mount point made in QD_MODULE_DIR: $([ -d "$MOD/traefik/package" ] && echo yes || echo no)"
+late
+sleep 5
+found "swapped: a file renamed into the watched folder after start: $(swapped late.localhost)"
+docker rm -f "$P-swapped" >/dev/null 2>&1
 version() { curl -D - -o /dev/null --resolve "localhost:$PORT:127.0.0.1" "https://localhost:$PORT/" |
   tr -d '\r' | sed -n 's/^X-Package-Version: //Ip'; }
 expect "the package's dynamic files are version 1.0.0's" 1.0.0 "$(version)"
