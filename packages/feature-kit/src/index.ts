@@ -138,7 +138,6 @@ export function isRoleAllowed(userRole: string, allowedRoles?: string[]): boolea
  */
 export const PUBLIC_PATHS = [
   "/login",
-  "/handoff",
   "/forgot-password",
   "/reset-password",
   "/activate",

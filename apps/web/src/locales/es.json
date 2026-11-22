@@ -26,17 +26,6 @@
     "continueWith": "Continuar con {{provider}}",
     "activated": "Listo: tu cuenta quedó activada. Entra con tu correo y tu contraseña."
   },
-  "signInPage": {
-    "intro": "Escribe tu correo y tu contraseña: te llevamos a tu empresa.",
-    "orByAddress": "o por la dirección",
-    "addressHelp": "¿Entras con Google o Microsoft, o olvidaste tu contraseña? Entra por la dirección de tu empresa.",
-    "address": "Dirección de tu empresa",
-    "addressExample": "tuempresa",
-    "go": "Ir",
-    "pick": "¿A cuál entras?",
-    "pickHelp": "Tu cuenta está en varias empresas.",
-    "linkExpired": "Este enlace para entrar ya no sirve. Vuelve a iniciar sesión."
-  },
   "forgot": {
     "title": "Restablecer la contraseña",
     "intro": "Escribe el correo de tu cuenta y te enviamos un enlace para elegir una contraseña nueva.",
