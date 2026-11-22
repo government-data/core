@@ -100,9 +100,9 @@ psql_as() {
   docker run --rm --network "$P-backend" -u "$(id -u):$(id -g)" -v "$D/client:/client:ro" \
     postgres:16-alpine psql -XAtq "$1" -c "${2:-select current_user}" 2>&1
 }
-APP="dbname=knime user=knime_app password=$APP_DB_PASSWORD sslrootcert=/client/ca.crt"
-QUEUE="host=$NAME dbname=knime user=qd_queue sslmode=verify-full sslrootcert=/client/ca.crt"
-admin() { compose exec -T -u postgres postgres psql -XAtq -d knime -c "$1" 2>&1; }
+APP="dbname=quality_data user=quality_data_app password=$APP_DB_PASSWORD sslrootcert=/client/ca.crt"
+QUEUE="host=$NAME dbname=quality_data user=qd_queue sslmode=verify-full sslrootcert=/client/ca.crt"
+admin() { compose exec -T -u postgres postgres psql -XAtq -d quality_data -c "$1" 2>&1; }
 
 echo "== The files PostgreSQL reads, and who watches them"
 expect "the installed key's owner and mode" "postgres 600" \
@@ -114,7 +114,7 @@ expect "the watcher is a child of the container's init, not of PostgreSQL" 1 \
         awk "/^PPid:/ {print \$2}" "$p/status"; done' | sort -u)"
 
 echo "== TLS for every remote connection"
-expect "the API's role over TLS, the server's name verified" "knime_app|t" \
+expect "the API's role over TLS, the server's name verified" "quality_data_app|t" \
   "$(psql_as "host=$NAME sslmode=verify-full $APP" "select current_user, ssl from pg_stat_ssl where pid = pg_backend_pid()")"
 like "the API's role without TLS" "no encryption" "$(psql_as "host=$NAME sslmode=disable $APP")"
 like "the API's role by another name than the certificate's" "does not match host name" \
@@ -128,11 +128,11 @@ like "a worker's certificate of another CA" "unknown ca" \
   "$(psql_as "$QUEUE sslcert=/client/stranger.pem sslkey=/client/stranger.pem")"
 like "a password, no certificate" "requires a valid client certificate" \
   "$(psql_as "$QUEUE password=anything")"
-like "without TLS" "no encryption" "$(psql_as "host=$NAME dbname=knime user=qd_queue sslmode=disable")"
+like "without TLS" "no encryption" "$(psql_as "host=$NAME dbname=quality_data user=qd_queue sslmode=disable")"
 expect "the queue's role has no password" t \
   "$(admin "select rolpassword is null from pg_authid where rolname = 'qd_queue'")"
 expect "the API's role may see and end the queue's sessions" t \
-  "$(admin "select pg_has_role('knime_app', 'pg_read_all_stats', 'USAGE') and pg_has_role('knime_app', 'pg_signal_backend', 'USAGE')")"
+  "$(admin "select pg_has_role('quality_data_app', 'pg_read_all_stats', 'USAGE') and pg_has_role('quality_data_app', 'pg_signal_backend', 'USAGE')")"
 
 echo "== The certificate the agent renews"
 serial() {

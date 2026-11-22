@@ -141,7 +141,7 @@ services:
       # host is the name in PostgreSQL's certificate (infra/postgres/tls.yml).
       GRAFANA_PG_HOST: ${GRAFANA_PG_HOST:-${POSTGRES_SERVER_NAME:-postgres}}
       GRAFANA_PG_PORT: ${GRAFANA_PG_PORT:-5432}
-      GRAFANA_PG_DATABASE: ${GRAFANA_PG_DATABASE:-${POSTGRES_DB:-knime}}
+      GRAFANA_PG_DATABASE: ${GRAFANA_PG_DATABASE:-${POSTGRES_DB:-quality_data}}
       GRAFANA_PG_SSLMODE: ${GRAFANA_PG_SSLMODE:-verify-full}
       # Its /metrics (decision 0071, point 7) only with this basic auth, which
       # Alloy sends: /grafana/metrics on the public entry point gives 401.

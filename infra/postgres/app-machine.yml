@@ -25,7 +25,7 @@ services:
     network_mode: "service:postgres"
     entrypoint: ["/usr/local/bin/server", "app-machine"]
     environment:
-      DATABASE_URL: postgres://${APP_DB_USER:-knime_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=prefer
+      DATABASE_URL: postgres://${APP_DB_USER:-quality_data_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@127.0.0.1:5432/${POSTGRES_DB:-quality_data}?sslmode=prefer
       CA_CERT_FILE: /run/qd-ca/ca.crt
       CA_KEY_FILE: /run/qd-ca/ca.key
     volumes:

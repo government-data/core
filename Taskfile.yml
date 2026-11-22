@@ -251,7 +251,7 @@ tasks:
   db:shell:
     desc: Open a psql shell into the dev database
     cmds:
-      - "{{.DC}} exec postgres psql -U ${APP_DB_USER:-knime_app} -d ${POSTGRES_DB:-knime}"
+      - "{{.DC}} exec postgres psql -U ${APP_DB_USER:-quality_data_app} -d ${POSTGRES_DB:-quality_data}"
 
   db:logs:
     desc: Follow Postgres logs

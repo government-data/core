@@ -32,14 +32,14 @@ chmod 755 "$D/node" && chmod 644 "$D/node/"*
 openssl rand -hex 16 >"$D/c/pg_super" && openssl rand -hex 16 >"$D/c/grafana_db" && chmod 644 "$D/c/pg_super" "$D/c/grafana_db"
 docker run -d --name "$P-pg" --network "$NET" --network-alias qd-postgres --init \
   -v "$ROOT/infra/postgres/tls:/etc/qd/postgres:ro" -v "$D/node:/run/qd-node:ro" -v "$D/c:/c:ro" \
-  -e POSTGRES_PASSWORD_FILE=/c/pg_super -e POSTGRES_DB=knime --entrypoint /etc/qd/postgres/entrypoint.sh postgres:16-alpine \
+  -e POSTGRES_PASSWORD_FILE=/c/pg_super -e POSTGRES_DB=quality_data --entrypoint /etc/qd/postgres/entrypoint.sh postgres:16-alpine \
   postgres -c ssl=on -c ssl_cert_file=/var/lib/postgresql/tls/machine.pem -c ssl_key_file=/var/lib/postgresql/tls/machine.pem \
   -c ssl_ca_file=/var/lib/postgresql/tls/ca.crt -c hba_file=/var/lib/postgresql/tls/pg_hba.conf \
   -c ident_file=/var/lib/postgresql/tls/pg_ident.conf >/dev/null
-psql_() { docker exec "$P-pg" psql -XAtq -U postgres -d "${2:-knime}" -c "$1"; }
+psql_() { docker exec "$P-pg" psql -XAtq -U postgres -d "${2:-quality_data}" -c "$1"; }
 for i in $(seq 60); do [ "$(psql_ 'show ssl' 2>/dev/null)" = on ] && break; sleep 2; done
 expect "PostgreSQL with TLS" on "$(psql_ 'show ssl')"
-docker exec -i "$P-pg" psql -XAtq -U postgres -d knime -v ON_ERROR_STOP=1 >/dev/null <<SQL
+docker exec -i "$P-pg" psql -XAtq -U postgres -d quality_data -v ON_ERROR_STOP=1 >/dev/null <<SQL
 \set pw \`cat /c/grafana_db\`
 CREATE ROLE grafana LOGIN PASSWORD :'pw';
 CREATE DATABASE grafana OWNER grafana;

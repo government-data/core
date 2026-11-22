@@ -14,7 +14,7 @@ services:
     network_mode: host
     environment:
       QD_MACHINE_DIR: ""
-      QD_QUEUE_DATABASE_URL: postgres://qd_queue:${QD_QUEUE_PASSWORD:?run tools/dev/queue-role.sh}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=disable
+      QD_QUEUE_DATABASE_URL: postgres://qd_queue:${QD_QUEUE_PASSWORD:?run tools/dev/queue-role.sh}@127.0.0.1:5432/${POSTGRES_DB:-quality_data}?sslmode=disable
       QD_API_URL: https://localhost/api
       QD_WORKER_CLIENT_ID: qd-worker-dev
       QD_WORKER_CLIENT_SECRET: ${QD_WORKER_DEV_CLIENT_SECRET:?register qd-worker-dev (see .env.example)}

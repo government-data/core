@@ -14,7 +14,7 @@ use crate::testing::{write_machine, TempDir, TestCa};
 
 #[test]
 fn with_a_secret_the_url_is_as_it_is() {
-    let url = "postgres://qd_queue:pw@127.0.0.1:5432/knime?sslmode=disable";
+    let url = "postgres://qd_queue:pw@127.0.0.1:5432/quality_data?sslmode=disable";
     let o = options(url, None).unwrap();
     assert!(matches!(o.get_ssl_mode(), PgSslMode::Disable));
     assert_eq!(o.get_username(), "qd_queue");
