@@ -218,7 +218,7 @@ async fn a_linked_identity_signs_in_whatever_email_it_now_carries() {
         OAuthIdentity {
             email_verified: false,
             picture: None,
-            ..identity("personal@gmail.com")
+            ..identity("personal@example.org")
         },
     );
     assert_eq!(sign_in(&svc).await.unwrap().id, admin_id);
@@ -235,7 +235,7 @@ async fn a_link_flow_links_any_email_to_the_admin_who_started_it() {
         OAuthIdentity {
             email_verified: false,
             picture: None,
-            ..identity("personal@gmail.com")
+            ..identity("personal@example.org")
         },
     );
 

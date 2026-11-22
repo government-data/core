@@ -34,7 +34,7 @@ async fn a_restored_company_is_handed_to_the_new_admin_only() {
     .unwrap();
     sqlx::query(
         "INSERT INTO admin_oauth_identities (provider, subject, admin_id, email)
-         VALUES ('google', 's', $1::uuid, 'empleado@gmail.com')",
+         VALUES ('google', 's', $1::uuid, 'empleado@example.org')",
     )
     .bind(empleado.as_str())
     .execute(&db.pool)
