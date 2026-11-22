@@ -1,8 +1,8 @@
-//! [`MachineApi`], [`TrinoGate`] and Dolt's gate ([`DoltApi`]) over HTTPS,
-//! with rustls, and Trino's [`TrinoInfo`]. Never an invalid certificate accepted: the join trusts the
-//! public roots and the CA file it is given (`QD_CA_FILE`, which `join.sh`
-//! writes after checking it); the renewal and Trino's hold trust the
-//! installation's CA alone and present the machine's certificate.
+//! [`MachineApi`] and Dolt's gate ([`DoltApi`]) over HTTPS, with rustls.
+//! Never an invalid certificate accepted: the join trusts the public roots
+//! and the CA file it is given (`QD_CA_FILE`, which `join.sh` writes after
+//! checking it); the renewal and Dolt's hold trust the installation's CA
+//! alone and present the machine's certificate.
 
 use std::time::Duration;
 
@@ -14,7 +14,6 @@ use crate::api::{answer, classify, CallError, Issued, MachineApi};
 use crate::cert::Credentials;
 use crate::dolt::{self, DoltGate};
 use crate::restart::Release;
-use crate::trino::{read_info, HoldAnswer, Info, TrinoGate, TrinoInfo};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -71,17 +70,6 @@ impl MachineApi for HttpApi {
             .await;
         let (status, retry_after, body) = read(sent).await?;
         answer(status, retry_after, &body)
-    }
-}
-
-#[async_trait]
-impl TrinoGate for HttpApi {
-    async fn hold(&self, identity: &Credentials, ca: &str) -> Result<HoldAnswer, CallError> {
-        self.hold_of("trino", identity, ca).await
-    }
-
-    async fn release(&self, identity: &Credentials, ca: &str) -> Result<bool, CallError> {
-        self.release_of("trino", identity, ca).await
     }
 }
 
@@ -147,49 +135,6 @@ fn machine_client(identity: &Credentials, ca: &str) -> Result<Client, CallError>
         .identity(identity)
         .build()
         .map_err(local)
-}
-
-/// Trino's `/v1/info` at `url`, which needs no token: over HTTPS trusting
-/// the installation's CA (the coordinator serves the machine's certificate),
-/// or plain HTTP inside its host.
-#[derive(Debug)]
-pub struct HttpTrinoInfo {
-    url: String,
-    client: Client,
-}
-
-impl HttpTrinoInfo {
-    pub fn new(url: &str, ca: Option<&str>) -> Result<Self, String> {
-        let mut client = Client::builder().timeout(Duration::from_secs(5));
-        if let Some(ca) = ca {
-            let ca = Certificate::from_pem(ca.as_bytes()).map_err(|e| e.to_string())?;
-            client = client
-                .tls_built_in_root_certs(false)
-                .add_root_certificate(ca);
-        }
-        Ok(Self {
-            url: url.to_string(),
-            client: client.build().map_err(|e| e.to_string())?,
-        })
-    }
-}
-
-#[async_trait]
-impl TrinoInfo for HttpTrinoInfo {
-    async fn info(&self) -> Result<Info, String> {
-        let response = self
-            .client
-            .get(&self.url)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        let status = response.status();
-        let body = response.bytes().await.map_err(|e| e.to_string())?;
-        if !status.is_success() {
-            return Err(format!("HTTP {status}"));
-        }
-        read_info(&body).ok_or_else(|| "not Trino's /v1/info".into())
-    }
 }
 
 /// A success status, or what the other means.

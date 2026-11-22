@@ -7,7 +7,7 @@ const HELD: Mode = Mode::Held {
 
 #[tokio::test]
 async fn held_renews_into_next_and_takes_it_only_when_the_service_is_ready() {
-    // A year, as Trino's coordinator gets.
+    // A year, as a role that takes its certificate only at a restart gets.
     let w = World::new(YEAR);
     let start = w.clock.now();
     let mut agent = w.agent(HELD);

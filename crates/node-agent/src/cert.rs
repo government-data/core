@@ -25,8 +25,7 @@ impl std::fmt::Debug for Credentials {
 }
 
 impl Credentials {
-    /// One PEM file, the certificate then the key: what the agent presents
-    /// and what Trino reads.
+    /// One PEM file, the certificate then the key: what the agent presents.
     pub fn bundle(&self) -> String {
         format!("{}\n{}\n", self.cert_pem.trim(), self.key_pem.trim())
     }

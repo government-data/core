@@ -113,22 +113,6 @@ impl Settings {
     }
 }
 
-/// The settings of `qd-node trino-ready` and `qd-node trino-restart` (0066,
-/// step 9), run by the agent itself in held mode, in its environment.
-#[derive(Debug, Clone)]
-pub struct TrinoSettings {
-    pub dir: PathBuf,
-    pub internal_url: String,
-    /// `QD_TRINO_RESTART`: restarts the coordinator.
-    pub restart: Option<Vec<String>>,
-    /// `QD_TRINO_INFO_URL`: the coordinator's `/v1/info`.
-    pub info_url: Option<String>,
-    /// `QD_TRINO_WAIT`: how long Trino may take to answer again.
-    pub wait: Duration,
-}
-
-const TRINO_WAIT: Duration = Duration::from_secs(180);
-
 /// The settings of the follower that restarts Dolt when it is free (0066,
 /// step 10), on the application VM's agent, which runs rolling. Only with
 /// `QD_DOLT_RESTART`.
@@ -168,31 +152,6 @@ impl DoltSettings {
             after: duration("QD_HELD_AFTER", 24 * 3600)?,
             every: duration("QD_HELD_ASK_EVERY", 300)?,
         }))
-    }
-}
-
-impl TrinoSettings {
-    pub fn from(get: impl Fn(&str) -> Option<String>) -> Result<Self, String> {
-        let get = |name: &str| {
-            get(name)
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-        };
-        let required = |name: &str| get(name).ok_or_else(|| format!("{name} is needed"));
-        let restart = get("QD_TRINO_RESTART")
-            .map(|v| parse_command(&v).map_err(|e| format!("QD_TRINO_RESTART: {e}")))
-            .transpose()?;
-        let wait = match get("QD_TRINO_WAIT") {
-            Some(v) => parse_duration(&v).map_err(|e| format!("QD_TRINO_WAIT: {e}"))?,
-            None => TRINO_WAIT,
-        };
-        Ok(Self {
-            dir: required("QD_AGENT_DIR")?.into(),
-            internal_url: required("QD_INTERNAL_URL")?,
-            restart,
-            info_url: get("QD_TRINO_INFO_URL"),
-            wait,
-        })
     }
 }
 
