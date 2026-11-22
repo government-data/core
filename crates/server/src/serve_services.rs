@@ -49,6 +49,11 @@ pub(crate) struct Services {
     pub(crate) admin_access: Option<AdminAccessRoute>,
 }
 
+/// Where the settings key is read from: `SETTINGS_KEY_FILE`, or the default.
+pub(crate) fn settings_key_file() -> String {
+    env_value("SETTINGS_KEY_FILE").unwrap_or_else(|| DEFAULT_SETTINGS_KEY_FILE.into())
+}
+
 /// The services. The health probe reflects live database connectivity;
 /// the login service verifies admin credentials with argon2id,
 /// constant-time equalization, and progressive account/IP lockout.
@@ -73,9 +78,7 @@ pub(crate) async fn services(
 
     // The key that seals the settings' secrets and the global secrets: `SETTINGS_ENCRYPTION_KEY` or, without it, the file in
     // `SETTINGS_KEY_FILE`.
-    let secret_box = SecretBox::from_env_or_file(
-        env_value("SETTINGS_KEY_FILE").unwrap_or_else(|| DEFAULT_SETTINGS_KEY_FILE.into()),
-    )?;
+    let secret_box = SecretBox::from_env_or_file(settings_key_file())?;
 
     let platform = platform(&pool, platform_repo.clone(), edition, &secret_box);
     // Update maintenance: while it lasts, no new work starts.
@@ -178,7 +181,7 @@ fn platform(
 /// one shared HTTP client. The settings (LDAP, mail, OAuth) are edited from
 /// the UI and applied live; what was never stored takes `LDAP_*` /
 /// `OAUTH_*` from the environment.
-async fn settings(
+pub(crate) async fn settings(
     pool: &PgPool,
     auth: &AuthConfig,
     secret_box: &SecretBox,
@@ -228,7 +231,7 @@ async fn settings(
 /// that asked for it (the tenant middleware already rejected any other).
 /// With it, the administrator's entry from the server (internal routes):
 /// on-premise only, where there is one company and a fixed public address.
-fn password_reset(
+pub(crate) fn password_reset(
     pool: &PgPool,
     admins: &Arc<dyn auth_gateway::AdminRepository>,
     auth: &AuthConfig,
