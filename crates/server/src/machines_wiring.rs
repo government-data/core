@@ -11,7 +11,7 @@
 //! it does not start.
 //!
 //! `INTERNAL_CLIENT_CERT_HEADER=trusted` lets the renew route, the OIDC
-//! provider's token endpoint, Trino's rules route, the lake's gate and the
+//! provider's token endpoint, Trino's hold, Dolt's, the lake's gate and the
 //! alerts route read the client certificate Traefik's internal entry point
 //! passes. Set it only where the API cannot be reached but through Traefik:
 //! anyone who reaches the API directly could write that header. Unset, the
@@ -22,8 +22,7 @@ use std::sync::Arc;
 use api::rate_limit::RateLimitConfig;
 use application::{MachinesService, TrinoGate};
 use auth_gateway::http::client_cert::ClientCertificates;
-use auth_gateway::{AuthorizationServer, MachineRole, SessionService};
-use axum::http::HeaderMap;
+use auth_gateway::{AuthorizationServer, SessionService};
 use infrastructure::ca::{Ca, X509CertificateReader};
 use infrastructure::mimir_series::MimirSeries;
 use infrastructure::rustfs_admin::RustfsLakeAdmin;
@@ -32,11 +31,11 @@ use infrastructure::{
     PgMachineAlerts, PgMachineSessions, PgMachines, PgPool, RingJoinTokenMint, SecretBox,
     SystemClock,
 };
-use quality::machine_certs::MachineCertificates;
 
 use crate::config::{env_value, public_url_from_env};
 use crate::replication_wiring;
-use crate::trino_wiring::{ApiTrino, CellTenants, QueueTrinoJobs};
+use crate::tenants::CellTenants;
+use crate::trino_wiring::{ApiTrino, QueueTrinoJobs};
 
 /// The machines' routes, both for people (a session and
 /// `admin:ManageMachines`) and for machines: the install routes that check
@@ -170,41 +169,6 @@ fn base(pool: &PgPool) -> MachinesService {
         Arc::new(SystemClock),
     )
     .with_sessions(Arc::new(PgMachineSessions::new(pool.clone())))
-}
-
-/// A machine known by its certificate on a module's route (Trino's rules,
-/// 0066 point 9), read and checked as the machines' own routes do:
-/// `MachinesService::caller`. `None` where the header is not trusted.
-pub(crate) fn certificate_callers(
-    certificates: &ClientCertificates,
-    machines: &MachinesService,
-) -> Option<Arc<dyn MachineCertificates>> {
-    certificates.is_trusted().then(|| {
-        Arc::new(CertificateCallers {
-            certificates: certificates.clone(),
-            machines: machines.clone(),
-        }) as Arc<dyn MachineCertificates>
-    })
-}
-
-struct CertificateCallers {
-    certificates: ClientCertificates,
-    machines: MachinesService,
-}
-
-#[async_trait::async_trait]
-impl MachineCertificates for CertificateCallers {
-    async fn machine(&self, headers: &HeaderMap, role: &str) -> Option<String> {
-        let role = MachineRole::parse(role)?;
-        let presented = self.certificates.read(headers).ok()?;
-        match self.machines.caller(&presented, role).await {
-            Ok(machine) => machine.map(|m| m.name),
-            Err(e) => {
-                tracing::error!("a machine by its certificate: {e:?}");
-                None
-            }
-        }
-    }
 }
 
 /// Whether the client certificate header is read, by

@@ -17,7 +17,6 @@ use std::sync::Arc;
 
 use api::internal::AdminAccessRoute;
 use application::{Edition, MachinesService};
-use auth_gateway::http::client_cert::ClientCertificates;
 use auth_gateway::{AdminRepository, AuditService, AuthorizationServer};
 use auth_gateway::{LoginService, SessionService};
 use axum::Router;
@@ -134,7 +133,7 @@ fn app(
     // Who the session is, for every route that requires a capability: the
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
-    let (machines, modules) = machines_and_modules(&tenancy, provider, &secret_box, &certificates)?;
+    let (machines, modules) = machines_and_modules(&tenancy, provider, &secret_box)?;
     // What the update agent waits for: each module's own work, and each
     // installed application module's as the agent tells them (0003).
     let app_modules =
@@ -229,7 +228,6 @@ fn machines_and_modules(
     tenancy: &Tenancy,
     provider: Option<AuthorizationServer>,
     secret_box: &SecretBox,
-    certificates: &ClientCertificates,
 ) -> Result<(MachinesService, ModuleRegistry), Failure> {
     let dolt = crate::catalog_wiring::DoltSnapshots::from_env()?;
     let machines = machines_wiring::service(
@@ -242,15 +240,7 @@ fn machines_and_modules(
         Some(d) => machines.with_dolt(d.clone()),
         None => machines,
     };
-    let callers = machines_wiring::certificate_callers(certificates, &machines);
-    let modules = crate::modules::serving(
-        &tenancy.pool,
-        provider,
-        secret_box.clone(),
-        tenancy.into(),
-        callers,
-        dolt,
-    )?;
+    let modules = crate::modules::serving(&tenancy.pool, provider, secret_box.clone(), dolt)?;
     Ok((machines, modules))
 }
 

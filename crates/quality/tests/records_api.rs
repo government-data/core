@@ -517,7 +517,6 @@ async fn a_worker_gets_the_source_and_its_page_of_another_table_is_refused() {
         !source.on_trino() && source.secrets.contains_key("password"),
         "DuckDB reads it, with its credentials"
     );
-    assert!(details.trino.is_none());
 
     let report = format!("{uri}/report");
     let page = |table: &str| json!({ "source": "core", "table": table, "columns": ["id"], "rows": [["1"]], "more": false });

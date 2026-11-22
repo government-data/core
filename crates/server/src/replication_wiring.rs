@@ -19,8 +19,8 @@ use application::{MachinesService, ReplicationReadiness};
 use auth_gateway::{ReplicationOutcome, Warehouses};
 use domain::RepositoryError;
 
-use crate::trino_wiring::CellTenants;
-use ::quality::trino_rules_api::Tenants;
+use crate::tenants::CellTenants;
+use ::quality::tenants::Tenants;
 
 /// The cell's tenants' warehouses: `qd-tenant-<id>`, as the quality module
 /// names them.

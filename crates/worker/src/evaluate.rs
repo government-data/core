@@ -352,7 +352,6 @@ mod tests {
             catalog: None,
             source: None,
             entity_key: None,
-            trino: None,
         }
     }
 
