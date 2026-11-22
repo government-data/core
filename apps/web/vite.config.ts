@@ -5,7 +5,7 @@ import solid from "vite-plugin-solid";
 
 /** The release's commit or, in development, git's (without git, none). */
 function commit(): string {
-  if (process.env.ORQ_COMMIT) return process.env.ORQ_COMMIT;
+  if (process.env.APP_COMMIT) return process.env.APP_COMMIT;
   try {
     return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] })
       .toString()
@@ -34,7 +34,7 @@ export default defineConfig({
   // The release's version and commit (see infra/docker/web.Dockerfile), for
   // the foot of the menu; in development, «dev» and git's commit.
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.ORQ_VERSION || "dev"),
+    __APP_VERSION__: JSON.stringify(process.env.APP_VERSION || "dev"),
     __APP_COMMIT__: JSON.stringify(commit()),
   },
   server: {

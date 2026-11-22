@@ -30,11 +30,13 @@ FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
-# The tag's version (domain::VERSION); without it, the crate's.
-ARG ORQ_VERSION=""
-ARG ORQ_COMMIT=""
-RUN if [ -n "$ORQ_VERSION" ]; then export ORQ_VERSION; else unset ORQ_VERSION; fi; \
-    if [ -n "$ORQ_COMMIT" ]; then export ORQ_COMMIT; else unset ORQ_COMMIT; fi; \
+# The module's version and commit (domain::VERSION and domain::COMMIT, read
+# at compile time): CI passes version.txt's and the commit's. Without them,
+# the crate's version and no commit.
+ARG APP_VERSION=""
+ARG APP_COMMIT=""
+RUN if [ -n "$APP_VERSION" ]; then export APP_VERSION; else unset APP_VERSION; fi; \
+    if [ -n "$APP_COMMIT" ]; then export APP_COMMIT; else unset APP_COMMIT; fi; \
     cargo build --release --locked -p server
 # The folder of the key that encrypts the Settings secrets: the final image
 # has no shell to create it, and a new volume inherits its owner. The same
