@@ -17,10 +17,10 @@
 #
 # Required environment, besides tls.yml's:
 #   QD_CA_DIR   the installation's CA (`server ca-init`): ca.crt and ca.key
-# Optional: API_IMAGE (data-quality-api:local).
+# Optional: IMAGE_API, else API_IMAGE (data-quality-api:local).
 services:
   app-machine:
-    image: ${API_IMAGE:-data-quality-api:local}
+    image: ${IMAGE_API:-${API_IMAGE:-data-quality-api:local}}
     profiles: ["app-machine"]
     network_mode: "service:postgres"
     entrypoint: ["/usr/local/bin/server", "app-machine"]

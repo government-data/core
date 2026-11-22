@@ -6,9 +6,9 @@
 #          compose.override.yml (host ports, an admin-seed one-shot).
 #
 #   prod:  docker compose -f compose.yml -f compose.prod.yml --profile prod up -d
-#          Versioned images (API_IMAGE / WEB_IMAGE) + Docker secrets. The `-f`
-#          list deliberately omits compose.override.yml, so no dev convenience
-#          leaks into production.
+#          Versioned images (IMAGE_API / IMAGE_WEB, else API_IMAGE / WEB_IMAGE)
+#          + Docker secrets. The `-f` list deliberately omits
+#          compose.override.yml, so no dev convenience leaks into production.
 #
 # Two networks stay separated (see the included files): `edge` fronts Traefik and
 # `backend` carries API↔DB traffic. Only Traefik publishes ports to the host; the
@@ -33,8 +33,8 @@ services:
 
   api:
     profiles: ["dev", "prod"]
-    image: ${API_IMAGE:-data-quality-api:local}
+    image: ${IMAGE_API:-${API_IMAGE:-data-quality-api:local}}
 
   web:
     profiles: ["dev", "prod"]
-    image: ${WEB_IMAGE:-data-quality-web:local}
+    image: ${IMAGE_WEB:-${WEB_IMAGE:-data-quality-web:local}}

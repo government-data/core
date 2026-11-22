@@ -35,7 +35,7 @@ volumes:
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: ${IMAGE_POSTGRES:-postgres:16-alpine}
     restart: unless-stopped
     environment:
       # The bootstrap superuser. Used only for administration, migrations of the
@@ -77,7 +77,7 @@ services:
     # Scheduled logical backups (pg_dump custom-format), pruned to a retention
     # count. Opt-in: enable with `--profile backup`. Runs pg_dump on an interval
     # against the healthy database and writes archives to the `pgbackups` volume.
-    image: postgres:16-alpine
+    image: ${IMAGE_POSTGRES:-postgres:16-alpine}
     profiles: ["backup"]
     restart: unless-stopped
     depends_on:
