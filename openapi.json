@@ -7111,7 +7111,7 @@
               "string",
               "null"
             ],
-            "description": "IANA; `America/Bogota` when left out."
+            "description": "IANA; the platform's time zone when left out (UTC if it has none)."
           },
           "trigger": {
             "type": [

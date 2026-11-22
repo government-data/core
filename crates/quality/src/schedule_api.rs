@@ -14,15 +14,20 @@ use axum::routing::{get, put};
 use axum::{Extension, Json, Router};
 use chrono::{DateTime, Utc};
 use contracts::{AuditEntry, Caller, Change};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 use uuid::Uuid;
 
 use crate::catalog::Catalog;
-use crate::schedule::{Rerun, ScheduleError, ScheduleTrigger, Target, DEFAULT_TIMEZONE};
+use crate::schedule::{Rerun, ScheduleError, ScheduleTrigger, Target};
 use crate::schedule_store::{self, Deleted, ScheduleSpec, SpecError, StoredSchedule};
+
+mod body;
+
+use body::spec_of;
+pub use body::ScheduleBody;
 
 pub const VIEW: &str = "quality:ViewPipelines";
 pub const MANAGE: &str = "quality:ManageSchedules";
@@ -49,35 +54,6 @@ pub fn routes(pool: PgPool, catalog: Option<Arc<dyn Catalog>>) -> Router {
     tags((name = "schedules", description = "When a dataset's cut, or a job, fires")),
 )]
 pub struct ScheduleDoc;
-
-/// A schedule as a person writes it.
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct ScheduleBody {
-    /// Five fields: minute hour day month weekday (`0 6 * * 1-5`); left
-    /// out with a trigger.
-    #[serde(default)]
-    pub cron: String,
-    /// In the style of the Windows Task Scheduler: a start, how often
-    /// (`once`, `daily`, `weekly`, `monthly`), and repetition, a random
-    /// delay and expiry. When given, the schedule fires by it, not by `cron`.
-    #[schema(value_type = Option<Object>)]
-    pub trigger: Option<ScheduleTrigger>,
-    /// IANA; `America/Bogota` when left out.
-    pub timezone: Option<String>,
-    /// `true` when left out; a schedule with cuts is disabled, not deleted.
-    pub enabled: Option<bool>,
-    /// `cut` (extraction, then evaluation) or `job` (one that needs no cut).
-    pub fires: String,
-    /// A cut's and a `map`'s; none for a `maintain` of the whole warehouse.
-    pub dataset: Option<String>,
-    /// A cut's: `block` (the default) or `replace`.
-    pub rerun: Option<String>,
-    /// A job's: `map` or `maintain`.
-    pub kind: Option<String>,
-    /// A job's parameters.
-    #[schema(value_type = Option<Object>)]
-    pub parameters: Option<serde_json::Value>,
-}
 
 /// A schedule, with what the scheduler keeps of it.
 #[derive(Debug, Serialize, ToSchema)]
@@ -167,36 +143,17 @@ const FORBIDDEN: Refused = Refused(StatusCode::FORBIDDEN, "forbidden");
 const NOT_FOUND: Refused = Refused(StatusCode::NOT_FOUND, "not_found");
 const NO_CATALOG: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
 
+/// The platform's time zone, for a schedule that names none (decision 0079).
+async fn platform_timezone(pool: &PgPool) -> Result<String, Refused> {
+    schedule_store::platform_timezone(pool)
+        .await
+        .map_err(internal)
+}
+
 /// The pipeline a schedule acts on, for IAM.
 fn pipeline(spec: &ScheduleSpec) -> String {
     spec.dataset()
         .map_or("*".into(), |d| format!("pipeline/{d}"))
-}
-
-fn spec_of(body: ScheduleBody) -> Result<ScheduleSpec, Refused> {
-    let target = match body.fires.as_str() {
-        "cut" => Target::Cut {
-            dataset: body.dataset.unwrap_or_default(),
-            rerun: match body.rerun.as_deref() {
-                None | Some("block") => Rerun::Block,
-                Some("replace") => Rerun::Replace,
-                Some(_) => return Err(Refused(StatusCode::UNPROCESSABLE_ENTITY, "rerun")),
-            },
-        },
-        "job" => Target::Job {
-            kind: body.kind.unwrap_or_default(),
-            dataset: body.dataset,
-            parameters: body.parameters.unwrap_or_else(|| json!({})),
-        },
-        _ => return Err(Refused(StatusCode::UNPROCESSABLE_ENTITY, "fires")),
-    };
-    Ok(ScheduleSpec {
-        cron: body.cron,
-        trigger: body.trigger,
-        timezone: body.timezone.unwrap_or_else(|| DEFAULT_TIMEZONE.into()),
-        enabled: body.enabled.unwrap_or(true),
-        target,
-    })
 }
 
 impl ScheduleApi {
@@ -297,7 +254,7 @@ async fn create(
     Extension(caller): Extension<Caller>,
     Json(body): Json<ScheduleBody>,
 ) -> Result<Response, Refused> {
-    let spec = spec_of(body)?;
+    let spec = spec_of(body, platform_timezone(&api.pool).await?)?;
     if !caller.can(MANAGE, &pipeline(&spec)) {
         return Err(FORBIDDEN);
     }
@@ -336,7 +293,7 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(body): Json<ScheduleBody>,
 ) -> Result<Json<ScheduleOut>, Refused> {
-    let spec = spec_of(body)?;
+    let spec = spec_of(body, platform_timezone(&api.pool).await?)?;
     let before = schedule_store::get(&api.pool, id)
         .await
         .map_err(internal)?

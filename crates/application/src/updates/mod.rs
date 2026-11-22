@@ -162,13 +162,18 @@ impl UpdatesService {
             .filter(|r| report.handled_request.as_deref() != Some(r.id.as_str()))
     }
 
-    /// What the daemon reads: the policy and the pending "Update now".
+    /// What the daemon reads: the policy and the pending "Update now". The
+    /// window's time zone is the platform's (decision 0079), UTC when it was
+    /// never saved or does not parse; the policy's own is not read.
     pub async fn orders(&self) -> Result<serde_json::Value, String> {
         let row = self.store.updater().await?;
         let report = Self::report_of(&row);
         let request = Self::pending(&row, &report).map(|r| serde_json::json!({ "id": r.id }));
+        let mut policy = Self::policy_of(&row);
+        let timezone = self.store.platform_timezone().await?;
+        policy.window.timezone = schedule_core::timezone_or_utc(timezone.as_deref());
         Ok(serde_json::json!({
-            "policy": Self::policy_of(&row),
+            "policy": policy,
             "request": request,
         }))
     }

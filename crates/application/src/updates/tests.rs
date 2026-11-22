@@ -9,6 +9,7 @@ use super::*;
 #[derive(Default)]
 pub(crate) struct MemoryMaintenance {
     pub(crate) current: Mutex<Option<Maintenance>>,
+    pub(crate) timezone: Mutex<Option<String>>,
     pub(crate) row: Mutex<UpdaterRow>,
     pub(crate) history: Mutex<Vec<HistoryEntry>>,
 }
@@ -48,6 +49,9 @@ impl UpdatesStore for MemoryMaintenance {
     }
     async fn updater(&self) -> Result<UpdaterRow, String> {
         Ok(self.row.lock().unwrap().clone())
+    }
+    async fn platform_timezone(&self) -> Result<Option<String>, String> {
+        Ok(self.timezone.lock().unwrap().clone())
     }
     async fn save_report(&self, report: &serde_json::Value) -> Result<(), String> {
         self.row.lock().unwrap().report = Some((report.clone(), Utc::now()));
@@ -277,6 +281,31 @@ async fn the_policy_is_validated_and_read_back() {
     assert_eq!(
         updates.orders().await.unwrap()["policy"]["window"]["days"],
         serde_json::json!([6, 7])
+    );
+}
+
+#[tokio::test]
+async fn the_window_in_the_orders_is_in_the_platforms_time_zone() {
+    let (updates, store, _) = with_mail();
+    let mut p = UpdatePolicy::default();
+    p.window.timezone = "America/Bogota".into();
+    updates.set_policy("a", p).await.unwrap();
+    let zone = || async { updates.orders().await.unwrap()["policy"]["window"]["timezone"].clone() };
+    assert_eq!(
+        zone().await,
+        "UTC",
+        "never saved: UTC, not the window's own"
+    );
+
+    *store.timezone.lock().unwrap() = Some("Europe/Madrid".into());
+    assert_eq!(zone().await, "Europe/Madrid");
+
+    *store.timezone.lock().unwrap() = Some("Mars/Olympus".into());
+    assert_eq!(zone().await, "UTC", "one that does not parse: UTC");
+    assert_eq!(
+        updates.view().await.unwrap().policy.window.timezone,
+        "America/Bogota",
+        "the stored window is not rewritten"
     );
 }
 

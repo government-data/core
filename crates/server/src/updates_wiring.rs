@@ -56,6 +56,10 @@ impl UpdatesStore for Store {
         self.0.save_report(report).await
     }
 
+    async fn platform_timezone(&self) -> Result<Option<String>, String> {
+        self.0.platform_timezone().await
+    }
+
     async fn save_policy(&self, policy: &serde_json::Value, admin_id: &str) -> Result<(), String> {
         self.0.save_policy(policy, admin_id).await
     }

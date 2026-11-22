@@ -103,6 +103,9 @@ pub trait UpdatesStore: Send + Sync {
     async fn add_history(&self, entry: &HistoryEntry) -> Result<(), String>;
     /// The latest of the history, newest first.
     async fn history(&self, limit: u32) -> Result<Vec<HistoryEntry>, String>;
+    /// The platform's time zone as saved in Settings (decision 0079), `None`
+    /// when it never was.
+    async fn platform_timezone(&self) -> Result<Option<String>, String>;
 }
 
 /// What an administrator sees in Settings → Updates.
