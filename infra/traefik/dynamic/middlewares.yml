@@ -88,14 +88,6 @@ http:
       inFlightReq:
         amount: 100
 
-    # The same per company (each tenant is a subdomain): one cannot hog the
-    # API and slow down the others.
-    tenant-inflight:
-      inFlightReq:
-        amount: 400
-        sourceCriterion:
-          requestHost: true
-
     # The web is static, but the first load asks for dozens of files.
     web-ratelimit:
       rateLimit:
@@ -118,7 +110,6 @@ http:
           - api-strip
           - api-ratelimit
           - api-inflight
-          - tenant-inflight
           - security-headers
           - compression
     # The live notices (`/api/events`, SSE): a connection that stays open.
@@ -187,12 +178,6 @@ http:
         customResponseHeaders:
           Server: ""
           X-Powered-By: ""
-    # In the online cell /docs is not served (it belongs to the local
-    # installation): a 403 for everyone.
-    docs-closed:
-      ipAllowList:
-        sourceRange:
-          - "127.0.0.1/32"
     docs-chain:
       chain:
         middlewares:

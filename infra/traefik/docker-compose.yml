@@ -109,7 +109,7 @@ services:
       ADMIN_PASSWORD_REQUIRE_SYMBOL: ${ADMIN_PASSWORD_REQUIRE_SYMBOL:-false}
       # Password recovery: how many minutes the email's link works, and the
       # UI's public address it points to (empty, OAUTH_REDIRECT_BASE without
-      # "/api"; online, the company's subdomain).
+      # "/api").
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-30}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-https://${APP_DOMAIN:-localhost}}
       # Where a joined machine's Alloy pushes its metrics, given in its join
