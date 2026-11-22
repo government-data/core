@@ -104,6 +104,16 @@ impl QualityModule {
     }
 }
 
+/// A migration of `migrations/<name>.sql`, by its name.
+macro_rules! migration {
+    ($name:literal) => {
+        Migration::new(
+            $name,
+            include_str!(concat!("../migrations/", $name, ".sql")),
+        )
+    };
+}
+
 impl Module for QualityModule {
     fn name(&self) -> &'static str {
         "quality"
@@ -111,106 +121,34 @@ impl Module for QualityModule {
 
     fn migrations(&self) -> Vec<Migration> {
         vec![
-            Migration::new("0001_jobs", include_str!("../migrations/0001_jobs.sql")),
-            Migration::new("0002_queue", include_str!("../migrations/0002_queue.sql")),
-            Migration::new(
-                "0003_results",
-                include_str!("../migrations/0003_results.sql"),
-            ),
-            Migration::new(
-                "0004_schedules",
-                include_str!("../migrations/0004_schedules.sql"),
-            ),
-            Migration::new(
-                "0005_manifests",
-                include_str!("../migrations/0005_manifests.sql"),
-            ),
-            Migration::new(
-                "0006_sources",
-                include_str!("../migrations/0006_sources.sql"),
-            ),
-            Migration::new(
-                "0007_source_tables",
-                include_str!("../migrations/0007_source_tables.sql"),
-            ),
-            Migration::new(
-                "0008_rule_tests",
-                include_str!("../migrations/0008_rule_tests.sql"),
-            ),
-            Migration::new(
-                "0009_lake_tables",
-                include_str!("../migrations/0009_lake_tables.sql"),
-            ),
-            Migration::new(
-                "0010_source_records",
-                include_str!("../migrations/0010_source_records.sql"),
-            ),
-            Migration::new(
-                "0011_schedule_triggers",
-                include_str!("../migrations/0011_schedule_triggers.sql"),
-            ),
-            Migration::new(
-                "0012_console",
-                include_str!("../migrations/0012_console.sql"),
-            ),
-            Migration::new(
-                "0013_rule_results_grouping",
-                include_str!("../migrations/0013_rule_results_grouping.sql"),
-            ),
-            Migration::new(
-                "0014_field_quality",
-                include_str!("../migrations/0014_field_quality.sql"),
-            ),
-            Migration::new(
-                "0015_entity_keys",
-                include_str!("../migrations/0015_entity_keys.sql"),
-            ),
-            Migration::new("0016_icd", include_str!("../migrations/0016_icd.sql")),
-            Migration::new(
-                "0017_recency",
-                include_str!("../migrations/0017_recency.sql"),
-            ),
-            Migration::new(
-                "0018_group_metrics",
-                include_str!("../migrations/0018_group_metrics.sql"),
-            ),
-            Migration::new(
-                "0019_distribution_checks",
-                include_str!("../migrations/0019_distribution_checks.sql"),
-            ),
-            Migration::new(
-                "0020_job_stats",
-                include_str!("../migrations/0020_job_stats.sql"),
-            ),
-            Migration::new("0021_cells", include_str!("../migrations/0021_cells.sql")),
-            Migration::new(
-                "0022_queue_findings",
-                include_str!("../migrations/0022_queue_findings.sql"),
-            ),
-            Migration::new(
-                "0023_remediation_slas",
-                include_str!("../migrations/0023_remediation_slas.sql"),
-            ),
-            Migration::new(
-                "0024_queue_machines",
-                include_str!("../migrations/0024_queue_machines.sql"),
-            ),
-            Migration::new(
-                "0025_trino_hold",
-                include_str!("../migrations/0025_trino_hold.sql"),
-            ),
-            Migration::new(
-                "0026_jobs_uses_trino",
-                include_str!("../migrations/0026_jobs_uses_trino.sql"),
-            ),
-            Migration::new(
-                "0027_claim_in_maintenance",
-                include_str!("../migrations/0027_claim_in_maintenance.sql"),
-            ),
-            Migration::new(
-                "0028_claim_without_trino_hold",
-                include_str!("../migrations/0028_claim_without_trino_hold.sql"),
-            ),
+            migration!("0001_jobs"),
+            migration!("0002_queue"),
+            migration!("0003_results"),
+            migration!("0004_schedules"),
+            migration!("0005_manifests"),
+            migration!("0006_sources"),
+            migration!("0007_source_tables"),
+            migration!("0008_rule_tests"),
+            migration!("0009_lake_tables"),
+            migration!("0010_source_records"),
+            migration!("0011_schedule_triggers"),
+            migration!("0012_console"),
+            migration!("0013_rule_results_grouping"),
+            migration!("0014_field_quality"),
+            migration!("0015_entity_keys"),
+            migration!("0016_icd"),
+            migration!("0017_recency"),
+            migration!("0018_group_metrics"),
+            migration!("0019_distribution_checks"),
+            migration!("0020_job_stats"),
+            migration!("0021_cells"),
+            migration!("0022_queue_findings"),
+            migration!("0023_remediation_slas"),
+            migration!("0024_queue_machines"),
+            migration!("0025_trino_hold"),
+            migration!("0026_jobs_uses_trino"),
+            migration!("0027_claim_in_maintenance"),
+            migration!("0028_claim_without_trino_hold"),
         ]
     }
 
