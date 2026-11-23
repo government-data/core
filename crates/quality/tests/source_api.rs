@@ -60,11 +60,11 @@ impl AuditTrail for Log {
     }
 }
 
-/// The catalog's `main`: these mappings, for the main tenant only.
+/// The catalog's `main`: these mappings.
 struct Mappings(Vec<DatasetMapping>);
 #[async_trait::async_trait]
 impl Catalog for Mappings {
-    async fn snapshot(&self, _: Uuid, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
         Ok(self
             .0
             .iter()
@@ -76,8 +76,7 @@ impl Catalog for Mappings {
                 others: Vec::new(),
             }))
     }
-    async fn mappings(&self, tenant: Uuid) -> Result<Vec<DatasetMapping>, String> {
-        assert_eq!(tenant.to_string(), tenancy::MAIN_ID, "the request's tenant");
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         Ok(self.0.clone())
     }
 }

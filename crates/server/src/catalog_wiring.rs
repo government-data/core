@@ -43,14 +43,10 @@ impl application::DoltStore for DoltSnapshots {
 
 #[async_trait::async_trait]
 impl Catalog for DoltSnapshots {
-    async fn snapshot(
-        &self,
-        tenant: Uuid,
-        dataset: &str,
-    ) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
         let files = self
             .0
-            .files(&quality::catalog::database(tenant), dataset)
+            .files(quality::catalog::DATABASE, dataset)
             .await
             .map_err(|e| e.to_string())?;
         Ok(files.map(|f| CatalogSnapshot {
@@ -69,10 +65,10 @@ impl Catalog for DoltSnapshots {
         }))
     }
 
-    async fn mappings(&self, tenant: Uuid) -> Result<Vec<DatasetMapping>, String> {
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         let mappings = self
             .0
-            .mappings(&quality::catalog::database(tenant))
+            .mappings(quality::catalog::DATABASE)
             .await
             .map_err(|e| e.to_string())?;
         Ok(mappings

@@ -160,7 +160,7 @@ async fn delete_dataset(
     let Some(catalog) = &api.catalog else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
-    let mapping = match catalog.snapshot(tenant, &dataset).await {
+    let mapping = match catalog.snapshot(&dataset).await {
         Ok(Some(snap)) => snap.mapping,
         Ok(None) => return refuse(StatusCode::NOT_FOUND, "not_found"),
         Err(e) => {
@@ -244,7 +244,7 @@ async fn delete_table(
     let Some(catalog) = &api.catalog else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
-    let mappings = match catalog.mappings(tenant).await {
+    let mappings = match catalog.mappings().await {
         Ok(m) => m,
         Err(e) => {
             tracing::error!("delete: catalog: {e}");
@@ -315,7 +315,7 @@ async fn delete_namespace(
             return refuse(StatusCode::SERVICE_UNAVAILABLE, "lake_unavailable");
         }
     };
-    let mappings = match catalog.mappings(tenant).await {
+    let mappings = match catalog.mappings().await {
         Ok(m) => m,
         Err(e) => {
             tracing::error!("delete: catalog: {e}");

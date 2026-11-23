@@ -155,10 +155,7 @@ async fn ask(
     let Some(catalog) = catalog else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return refuse(StatusCode::INTERNAL_SERVER_ERROR, "tenant");
-    };
-    match catalog.snapshot(tenant, &body.dataset).await {
+    match catalog.snapshot(&body.dataset).await {
         Ok(None) => {}
         Ok(Some(_)) => return refuse(StatusCode::CONFLICT, "dataset_exists"),
         Err(e) => {

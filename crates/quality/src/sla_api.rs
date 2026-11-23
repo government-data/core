@@ -24,7 +24,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::catalog::Catalog;
 use crate::mapping::{FieldRole, Mapping};
@@ -173,9 +172,7 @@ impl SlaApi {
     /// mapping for it.
     async fn dimensions(&self, dataset: &str) -> Result<Option<Vec<String>>, Refused> {
         let catalog = self.catalog.as_ref().ok_or(NO_CATALOG)?;
-        let tenant =
-            Uuid::parse_str(&tenancy::key()).map_err(|_| internal("the request's tenant"))?;
-        match catalog.snapshot(tenant, dataset).await {
+        match catalog.snapshot(dataset).await {
             Ok(snapshot) => Ok(snapshot.map(|s| dimensions(&s.mapping))),
             Err(e) => {
                 tracing::error!("slas: catalog: {e}");

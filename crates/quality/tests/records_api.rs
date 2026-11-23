@@ -83,10 +83,10 @@ impl Access for Viewer {
 struct Mappings;
 #[async_trait::async_trait]
 impl Catalog for Mappings {
-    async fn snapshot(&self, _: Uuid, _: &str) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, _: &str) -> Result<Option<CatalogSnapshot>, String> {
         Ok(None)
     }
-    async fn mappings(&self, _: Uuid) -> Result<Vec<DatasetMapping>, String> {
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         let read = |dataset: &str, source: &str, table: &str| {
             DatasetMapping {
             dataset: dataset.into(),

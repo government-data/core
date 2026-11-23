@@ -176,9 +176,7 @@ impl ScheduleApi {
             return Ok(next);
         };
         let catalog = self.catalog.as_ref().ok_or(NO_CATALOG)?;
-        let tenant =
-            Uuid::parse_str(&tenancy::key()).map_err(|_| internal("the request's tenant"))?;
-        match catalog.snapshot(tenant, dataset).await {
+        match catalog.snapshot(dataset).await {
             Ok(Some(_)) => Ok(next),
             Ok(None) => Err(Refused(StatusCode::UNPROCESSABLE_ENTITY, "unknown_dataset")),
             Err(e) => {

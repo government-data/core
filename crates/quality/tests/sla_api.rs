@@ -17,7 +17,6 @@ use quality::source_store::Sealer;
 use serde_json::{json, Value};
 use sqlx::postgres::PgPoolOptions;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const OTHER: &str = "00000000-0000-0000-0000-0000000000ff";
 const URI: &str = "/quality/datasets/loans/queues/slas";
@@ -83,7 +82,7 @@ impl AuditTrail for Log {
 struct OneDataset;
 #[async_trait::async_trait]
 impl Catalog for OneDataset {
-    async fn snapshot(&self, _: Uuid, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
         Ok((dataset == "loans").then(|| CatalogSnapshot {
             commit: "c1".into(),
             mapping: LOANS.into(),
@@ -91,7 +90,7 @@ impl Catalog for OneDataset {
             rules: Vec::new(),
         }))
     }
-    async fn mappings(&self, _: Uuid) -> Result<Vec<DatasetMapping>, String> {
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         Ok(Vec::new())
     }
 }

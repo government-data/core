@@ -252,13 +252,12 @@ impl WorkerApi {
     /// The dataset's mapping and rules on the catalog's `main`, if any.
     pub(crate) async fn snapshot(
         &self,
-        tenant: Uuid,
         dataset: &str,
     ) -> Result<Option<CatalogSnapshot>, StatusCode> {
         let Some(catalog) = &self.services.catalog else {
             return Ok(None);
         };
-        catalog.snapshot(tenant, dataset).await.map_err(|e| {
+        catalog.snapshot(dataset).await.map_err(|e| {
             tracing::error!("catalog: {e}");
             StatusCode::SERVICE_UNAVAILABLE
         })
@@ -316,7 +315,7 @@ async fn details(
         let evaluate = matches!(job.kind.as_str(), "evaluate" | "test_rule" | "query");
         let extract = job.kind == "extract";
         let catalog = match &job.dataset {
-            Some(dataset) if evaluate || extract => api.snapshot(tenant, dataset).await?,
+            Some(dataset) if evaluate || extract => api.snapshot(dataset).await?,
             _ => None,
         };
         let mapping = catalog.as_ref().map(|c| c.mapping.as_str());

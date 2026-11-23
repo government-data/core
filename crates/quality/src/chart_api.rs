@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::catalog::Catalog;
 use crate::charts::{self, Chart, Parameters};
@@ -162,10 +161,10 @@ async fn rows(
 /// The roles the dataset's mapping on the catalog's `main` gives its
 /// fields, by name; none without a catalog or a mapping that reads.
 async fn roles(api: &ChartApi, dataset: &str) -> Vec<String> {
-    let (Some(catalog), Ok(tenant)) = (&api.catalog, Uuid::parse_str(&tenancy::key())) else {
+    let Some(catalog) = &api.catalog else {
         return Vec::new();
     };
-    match catalog.snapshot(tenant, dataset).await {
+    match catalog.snapshot(dataset).await {
         Ok(Some(snapshot)) => Mapping::parse(&snapshot.mapping)
             .map(|m| {
                 m.roles()

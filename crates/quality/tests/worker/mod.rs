@@ -81,13 +81,9 @@ impl LakeIssuer for Issuer {
 pub struct OneDataset;
 #[async_trait::async_trait]
 impl Catalog for OneDataset {
-    async fn snapshot(
-        &self,
-        tenant: Uuid,
-        dataset: &str,
-    ) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
         Ok((dataset == "clientes").then(|| CatalogSnapshot {
-            commit: format!("commit-of-{tenant}"),
+            commit: "commit-of-main".into(),
             mapping: MAPPING.into(),
             others: Vec::new(),
             rules: vec![RulesSource {
@@ -97,7 +93,7 @@ impl Catalog for OneDataset {
         }))
     }
 
-    async fn mappings(&self, _: Uuid) -> Result<Vec<DatasetMapping>, String> {
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         Ok(Vec::new())
     }
 }
