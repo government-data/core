@@ -115,9 +115,8 @@ async fn with_a_session_the_gate_hands_over_who_it_is() {
     assert_eq!(headers["x-auth-email"], "ana@empresa.com");
     assert_eq!(headers["x-auth-role"], "admin");
     assert!(!headers["x-auth-user"].is_empty());
-    // On-premise there is no company, but the header still goes (empty), so
-    // Traefik replaces whatever the client sent.
-    assert_eq!(headers["x-auth-org"], "");
+    // No company header any more (decision 0076).
+    assert!(!headers.contains_key("x-auth-org"));
 
     let (status, _) = send(
         &app,
@@ -177,7 +176,7 @@ async fn without_a_session_a_page_goes_to_sign_in_and_a_script_gets_401() {
         &app,
         asked("/auth/docs", "/docs/uso/")
             .header("x-forwarded-proto", "https")
-            .header("x-forwarded-host", "admin.orquestador.app")
+            .header("x-forwarded-host", "quality.example.com")
             .body(Body::empty())
             .unwrap(),
     )
@@ -185,7 +184,7 @@ async fn without_a_session_a_page_goes_to_sign_in_and_a_script_gets_401() {
     assert_eq!(status, StatusCode::FOUND);
     assert_eq!(
         headers[header::LOCATION],
-        "https://admin.orquestador.app/login?next=/docs/uso/"
+        "https://quality.example.com/login?next=/docs/uso/"
     );
 }
 

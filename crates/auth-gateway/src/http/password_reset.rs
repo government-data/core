@@ -33,25 +33,15 @@ use http_kit::rate_limit::{RateLimitConfig, RateLimiter};
 /// Where the links in the emails point.
 #[derive(Debug, Clone)]
 pub enum ResetLinkBase {
-    /// A fixed public address of the web app (on-premise).
+    /// The fixed public address of the web app.
     Fixed(String),
-    /// `https://` plus the request's `Host` (online edition, where each
-    /// company has its own subdomain and the tenancy layer has already
-    /// refused any host that is not one of ours).
-    FromHost,
 }
 
 impl ResetLinkBase {
-    /// The base address for this request's links, if one can be told.
-    pub(crate) fn resolve(&self, headers: &HeaderMap) -> Option<String> {
+    /// The base address of the links.
+    pub(crate) fn resolve(&self) -> String {
         match self {
-            Self::Fixed(base) => Some(base.clone()),
-            Self::FromHost => headers
-                .get(header::HOST)
-                .and_then(|h| h.to_str().ok())
-                .map(str::trim)
-                .filter(|h| !h.is_empty())
-                .map(|host| format!("https://{host}")),
+            Self::Fixed(base) => base.clone(),
         }
     }
 }
@@ -177,8 +167,8 @@ impl ResetState {
         })
     }
 
-    fn link_base(&self, headers: &HeaderMap) -> Option<String> {
-        self.links.resolve(headers)
+    fn link_base(&self) -> String {
+        self.links.resolve()
     }
 
     async fn audit(
@@ -263,10 +253,7 @@ pub async fn request_handler(
             return e.into_response();
         }
     }
-    let Some(base) = state.link_base(&headers) else {
-        return ApiError::new(StatusCode::BAD_REQUEST, "no_host", "Missing Host header.")
-            .into_response();
-    };
+    let base = state.link_base();
     match state.service.request(email.as_str(), &base).await {
         Ok(admin) => {
             state

@@ -39,7 +39,7 @@ describe("diagnostics", () => {
       { version: "1.0.3", commit: "2b11a4c9f00d" },
       { version: "1.0.3", commit: null },
       {
-        host: "admin.orquestador.app",
+        host: "quality.example.com",
         userAgent: "UA",
         now: new Date("2026-10-18T23:00:00Z"),
         role: "admin",
@@ -50,7 +50,7 @@ describe("diagnostics", () => {
         "Quality Data",
         "web: 1.0.3 (2b11a4c)",
         "api: 1.0.3",
-        "host: admin.orquestador.app",
+        "host: quality.example.com",
         "role: admin",
         "browser: UA",
         "time: 2026-10-18T23:00:00.000Z",

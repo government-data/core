@@ -199,9 +199,7 @@ pub async fn create_handler(
     headers: HeaderMap,
     Json(body): Json<CreateUserIn>,
 ) -> Response {
-    let Some(base) = state.links.resolve(&headers) else {
-        return ApiError::bad_request("no_host", "The request has no Host header.").into_response();
-    };
+    let base = state.links.resolve();
     let is_admin = current.acts_as_admin();
     if let Err(e) = state
         .users
@@ -267,9 +265,7 @@ pub async fn resend_handler(
     ClientIp(ip): ClientIp,
     headers: HeaderMap,
 ) -> Response {
-    let Some(base) = state.links.resolve(&headers) else {
-        return ApiError::bad_request("no_host", "The request has no Host header.").into_response();
-    };
+    let base = state.links.resolve();
     match state.users.resend(&AdminId::new(id), &base).await {
         Ok(account) => {
             state
