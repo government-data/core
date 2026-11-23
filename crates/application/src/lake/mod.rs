@@ -6,6 +6,7 @@
 //! Nothing is wired to them yet.
 
 mod properties;
+mod wire;
 
 use std::time::{Duration, SystemTime};
 
