@@ -46,23 +46,23 @@ impl Sealer for NoSealer {
 struct Main;
 #[async_trait::async_trait]
 impl DraftCatalog for Main {
-    async fn list(&self, _: Uuid, _: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, _: &str) -> Result<Vec<DraftInfo>, String> {
         Ok(Vec::new())
     }
-    async fn read(&self, _: Uuid, _: &str, dataset: &str) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, _: &str, dataset: &str) -> Result<Option<DraftFiles>, String> {
         Ok(matches!(dataset, "loans" | "cards").then(|| DraftFiles {
             commit: "c1".into(),
             mapping: MAPPING.replace("loans", dataset),
             rules: Vec::new(),
         }))
     }
-    async fn approve(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<Approval, String> {
+    async fn approve(&self, _: &str, _: &str, _: &str) -> Result<Approval, String> {
         unreachable!("nothing here writes")
     }
-    async fn discard(&self, _: Uuid, _: &str) -> Result<bool, String> {
+    async fn discard(&self, _: &str) -> Result<bool, String> {
         unreachable!("nothing here writes")
     }
-    async fn save_file(&self, _: Uuid, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
+    async fn save_file(&self, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
         unreachable!("nothing here writes")
     }
 }

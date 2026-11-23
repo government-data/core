@@ -20,7 +20,6 @@ use serde::Serialize;
 use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 pub use crate::draft_catalog::{
     Approval, DraftCatalog, DraftFiles, DraftInfo, FileEdit, FileSaved, FilesEdit, MappingEdit,
@@ -99,11 +98,6 @@ fn unavailable(e: impl std::fmt::Display) -> Refused {
     Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable")
 }
 
-fn tenant() -> Result<Uuid, Refused> {
-    Uuid::parse_str(&tenancy::key())
-        .map_err(|_| Refused(StatusCode::INTERNAL_SERVER_ERROR, "tenant"))
-}
-
 /// The branch of `dataset`'s draft `id`, if both are names a branch may
 /// have.
 pub(crate) fn branch(dataset: &str, id: &str) -> Result<String, Refused> {
@@ -155,11 +149,7 @@ async fn list(
     if !caller.can_some(VIEW) {
         return Err(Refused(StatusCode::FORBIDDEN, "forbidden"));
     }
-    let all = api
-        .drafts
-        .list(tenant()?, PREFIX)
-        .await
-        .map_err(unavailable)?;
+    let all = api.drafts.list(PREFIX).await.map_err(unavailable)?;
     let seen = all
         .into_iter()
         .filter(|d| {
@@ -190,7 +180,7 @@ async fn read(
     let branch = branch(&dataset, &id)?;
     let files = api
         .drafts
-        .read(tenant()?, &branch, &dataset)
+        .read(&branch, &dataset)
         .await
         .map_err(unavailable)?
         .ok_or(Refused(StatusCode::NOT_FOUND, "not_found"))?;
@@ -217,10 +207,9 @@ async fn approve(
         return Err(Refused(StatusCode::FORBIDDEN, "forbidden"));
     }
     let branch = branch(&dataset, &id)?;
-    let tenant = tenant()?;
     let files = api
         .drafts
-        .read(tenant, &branch, &dataset)
+        .read(&branch, &dataset)
         .await
         .map_err(unavailable)?
         .ok_or(Refused(StatusCode::NOT_FOUND, "not_found"))?;
@@ -245,7 +234,7 @@ async fn approve(
     let author = format!("{0} <{0}@accounts.invalid>", caller.account);
     match api
         .drafts
-        .approve(tenant, &branch, &dataset, &author)
+        .approve(&branch, &dataset, &author)
         .await
         .map_err(unavailable)?
     {
@@ -281,12 +270,7 @@ async fn discard(
         return Err(Refused(StatusCode::FORBIDDEN, "forbidden"));
     }
     let branch = branch(&dataset, &id)?;
-    if !api
-        .drafts
-        .discard(tenant()?, &branch)
-        .await
-        .map_err(unavailable)?
-    {
+    if !api.drafts.discard(&branch).await.map_err(unavailable)? {
         return Err(Refused(StatusCode::NOT_FOUND, "not_found"));
     }
     let entry = AuditEntry {

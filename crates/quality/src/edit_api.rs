@@ -141,16 +141,13 @@ fn fields_file<'a>(file: &str, mapping: &Mapping, bodies: impl Iterator<Item = &
 /// one not there.
 async fn draft_column(
     catalog: &dyn DraftCatalog,
-    tenant: Uuid,
     branch: &str,
     dataset: &str,
 ) -> Result<Option<String>, String> {
-    let Some(history) = catalog.history(tenant, branch).await? else {
+    let Some(history) = catalog.history(branch).await? else {
         return Ok(None);
     };
-    let changes = catalog
-        .changes(tenant, &history.base, branch, dataset)
-        .await?;
+    let changes = catalog.changes(&history.base, branch, dataset).await?;
     Ok(match changes.as_slice() {
         [one] if one.file != "mapping" => Some(one.file.clone()),
         _ => None,
@@ -183,11 +180,8 @@ async fn save_on(
         }
         Err(Refused(code, error)) => return refuse(code, error),
     };
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return refuse(StatusCode::INTERNAL_SERVER_ERROR, "tenant");
-    };
     if !create {
-        match draft_column(catalog, tenant, &branch, dataset).await {
+        match draft_column(catalog, &branch, dataset).await {
             Ok(Some(column)) if column != file => {
                 return refuse(StatusCode::CONFLICT, "other_file");
             }
@@ -207,7 +201,7 @@ async fn save_on(
         author: &author,
         adds,
     };
-    let commit = match catalog.save_file(tenant, &edit, create).await {
+    let commit = match catalog.save_file(&edit, create).await {
         Ok(FileSaved::Saved(commit)) => commit,
         Ok(FileSaved::NoDraft | FileSaved::NoFile) => {
             return refuse(StatusCode::NOT_FOUND, "not_found")

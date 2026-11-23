@@ -23,7 +23,6 @@ use quality::worker_api::WorkerServices;
 use serde_json::{json, Value};
 use sqlx::postgres::PgPoolOptions;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const MAIN: &str = "00000000-0000-0000-0000-000000000001";
 
@@ -58,22 +57,22 @@ impl Catalog for Main {
 }
 #[async_trait::async_trait]
 impl DraftCatalog for Main {
-    async fn list(&self, _: Uuid, _: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, _: &str) -> Result<Vec<DraftInfo>, String> {
         Ok(Vec::new())
     }
-    async fn read(&self, _: Uuid, _: &str, _: &str) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, _: &str, _: &str) -> Result<Option<DraftFiles>, String> {
         Ok(None)
     }
-    async fn approve(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<Approval, String> {
+    async fn approve(&self, _: &str, _: &str, _: &str) -> Result<Approval, String> {
         unreachable!("not here")
     }
-    async fn discard(&self, _: Uuid, _: &str) -> Result<bool, String> {
+    async fn discard(&self, _: &str) -> Result<bool, String> {
         unreachable!("not here")
     }
-    async fn save_file(&self, _: Uuid, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
+    async fn save_file(&self, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
         unreachable!("not here")
     }
-    async fn remove_dataset(&self, _: Uuid, dataset: &str, _: &str) -> Result<bool, String> {
+    async fn remove_dataset(&self, dataset: &str, _: &str) -> Result<bool, String> {
         self.0.lock().unwrap().push(dataset.into());
         Ok(true)
     }

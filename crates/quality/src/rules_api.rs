@@ -23,7 +23,6 @@ use quality_rules::sql::Tables;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::draft_api::{DraftCatalog, VIEW};
 use crate::mapping::Mapping;
@@ -164,8 +163,8 @@ pub(crate) async fn draft_globals(
     branch: Option<&str>,
     files: &[(String, String)],
 ) -> Option<String> {
-    if let (Some(branch), Ok(tenant)) = (branch, Uuid::parse_str(&tenancy::key())) {
-        if let Ok(Some(draft)) = catalog.read(tenant, branch, dataset).await {
+    if let Some(branch) = branch {
+        if let Ok(Some(draft)) = catalog.read(branch, dataset).await {
             return global_rules(&draft.rules).map(str::to_string);
         }
     }
@@ -261,10 +260,7 @@ pub(crate) async fn on_main(
     catalog: &dyn DraftCatalog,
     dataset: &str,
 ) -> Result<Option<crate::draft_api::DraftFiles>, (StatusCode, &'static str)> {
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, "tenant"));
-    };
-    catalog.read(tenant, MAIN, dataset).await.map_err(|e| {
+    catalog.read(MAIN, dataset).await.map_err(|e| {
         tracing::error!("rules: catalog: {e}");
         (StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable")
     })

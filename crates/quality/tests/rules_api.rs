@@ -15,7 +15,6 @@ use quality::draft_api::{Approval, DraftCatalog, DraftFiles, DraftInfo};
 use quality::module::QualityModule;
 use serde_json::{json, Value};
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const MAPPING: &str =
     "dataset: loans\nsource: loans\nkey: [Id]\nfields:\n  Id: { column: id, type: text }\n";
@@ -31,15 +30,10 @@ struct Main;
 
 #[async_trait::async_trait]
 impl DraftCatalog for Main {
-    async fn list(&self, _: Uuid, _: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, _: &str) -> Result<Vec<DraftInfo>, String> {
         Ok(Vec::new())
     }
-    async fn read(
-        &self,
-        _: Uuid,
-        branch: &str,
-        dataset: &str,
-    ) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, branch: &str, dataset: &str) -> Result<Option<DraftFiles>, String> {
         // Rules are read from main, and a draft of `people` for its global rules.
         if branch == "proposal/people/d-1" {
             return Ok(Some(DraftFiles {
@@ -67,15 +61,14 @@ impl DraftCatalog for Main {
             rules,
         }))
     }
-    async fn approve(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<Approval, String> {
+    async fn approve(&self, _: &str, _: &str, _: &str) -> Result<Approval, String> {
         unreachable!("nothing here writes")
     }
-    async fn discard(&self, _: Uuid, _: &str) -> Result<bool, String> {
+    async fn discard(&self, _: &str) -> Result<bool, String> {
         unreachable!("nothing here writes")
     }
     async fn save_file(
         &self,
-        _: Uuid,
         _: &quality::draft_api::FileEdit<'_>,
         _: bool,
     ) -> Result<quality::draft_api::FileSaved, String> {

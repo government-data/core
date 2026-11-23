@@ -15,7 +15,6 @@ use quality::draft_api::{
 use quality::module::QualityModule;
 use serde_json::Value;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const MAPPING: &str = "dataset: loans\nsource: loans\nkey: [Id]\nfields:\n  Id: { column: Id, type: text }\n  Kind: { column: Kind, type: text }\n";
 /// Fields named otherwise than their columns: renamed as they are split.
@@ -37,15 +36,10 @@ struct Memory {
 
 #[async_trait::async_trait]
 impl DraftCatalog for Memory {
-    async fn list(&self, _: Uuid, _: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, _: &str) -> Result<Vec<DraftInfo>, String> {
         Ok(Vec::new())
     }
-    async fn read(
-        &self,
-        _: Uuid,
-        branch: &str,
-        dataset: &str,
-    ) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, branch: &str, dataset: &str) -> Result<Option<DraftFiles>, String> {
         assert_eq!(branch, "main", "split from main");
         let other = GROUP
             .replace("[A, B]", "[A]")
@@ -70,16 +64,16 @@ impl DraftCatalog for Memory {
             rules,
         }))
     }
-    async fn approve(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<Approval, String> {
+    async fn approve(&self, _: &str, _: &str, _: &str) -> Result<Approval, String> {
         unreachable!("not here")
     }
-    async fn discard(&self, _: Uuid, _: &str) -> Result<bool, String> {
+    async fn discard(&self, _: &str) -> Result<bool, String> {
         unreachable!("not here")
     }
-    async fn save_file(&self, _: Uuid, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
+    async fn save_file(&self, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
         unreachable!("one save for every file")
     }
-    async fn save_files(&self, _: Uuid, edit: &FilesEdit<'_>) -> Result<String, String> {
+    async fn save_files(&self, edit: &FilesEdit<'_>) -> Result<String, String> {
         self.saved.lock().unwrap().push((
             edit.branch.into(),
             edit.files.to_vec(),

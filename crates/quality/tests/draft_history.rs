@@ -16,7 +16,6 @@ use quality::draft_history::{DraftCommit, DraftHistory, FileChange, MainChange};
 use quality::module::QualityModule;
 use serde_json::{json, Value};
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const BASE: &str = "b0000000000000000000000000000000";
 const ONE: &str = "c1000000000000000000000000000000";
@@ -30,22 +29,22 @@ struct Memory {
 
 #[async_trait::async_trait]
 impl DraftCatalog for Memory {
-    async fn list(&self, _: Uuid, _: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, _: &str) -> Result<Vec<DraftInfo>, String> {
         Ok(Vec::new())
     }
-    async fn read(&self, _: Uuid, _: &str, _: &str) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, _: &str, _: &str) -> Result<Option<DraftFiles>, String> {
         unreachable!("not read here")
     }
-    async fn approve(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<Approval, String> {
+    async fn approve(&self, _: &str, _: &str, _: &str) -> Result<Approval, String> {
         unreachable!("nothing here writes")
     }
-    async fn discard(&self, _: Uuid, _: &str) -> Result<bool, String> {
+    async fn discard(&self, _: &str) -> Result<bool, String> {
         unreachable!("nothing here writes")
     }
-    async fn save_file(&self, _: Uuid, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
+    async fn save_file(&self, _: &FileEdit<'_>, _: bool) -> Result<FileSaved, String> {
         unreachable!("nothing here writes")
     }
-    async fn history(&self, _: Uuid, branch: &str) -> Result<Option<DraftHistory>, String> {
+    async fn history(&self, branch: &str) -> Result<Option<DraftHistory>, String> {
         let commit = |commit: &str, parent: &str, author: &str| DraftCommit {
             commit: commit.into(),
             parent: parent.into(),
@@ -63,7 +62,6 @@ impl DraftCatalog for Memory {
     }
     async fn changes(
         &self,
-        _: Uuid,
         from: &str,
         to: &str,
         dataset: &str,
@@ -78,7 +76,6 @@ impl DraftCatalog for Memory {
     }
     async fn file_history(
         &self,
-        _: Uuid,
         dataset: &str,
         file: Option<&str>,
         limit: usize,

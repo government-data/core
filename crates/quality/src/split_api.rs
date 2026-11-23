@@ -98,9 +98,6 @@ async fn split(
         Ok(branch) => branch,
         Err(Refused(code, error)) => return refuse(code, error),
     };
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return refuse(StatusCode::INTERNAL_SERVER_ERROR, "tenant");
-    };
     let author = format!("{0} <{0}@accounts.invalid>", caller.account);
     let message = format!("catalog: split {dataset} by field");
     let edit = FilesEdit {
@@ -111,7 +108,7 @@ async fn split(
         author: &author,
         message: &message,
     };
-    let commit = match catalog.save_files(tenant, &edit).await {
+    let commit = match catalog.save_files(&edit).await {
         Ok(commit) => commit,
         Err(e) => {
             tracing::error!("split: catalog: {e}");

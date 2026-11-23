@@ -14,7 +14,6 @@ use quality::draft_api::{Approval, DraftCatalog, DraftFiles, DraftInfo, FileEdit
 use quality::module::QualityModule;
 use serde_json::{json, Value};
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const MAPPING: &str =
     "dataset: loans\nsource: loans\nkey: [Id]\nfields:\n  Id: { column: id, type: text }\n";
@@ -29,15 +28,10 @@ struct Memory {
 
 #[async_trait::async_trait]
 impl DraftCatalog for Memory {
-    async fn list(&self, _: Uuid, _: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, _: &str) -> Result<Vec<DraftInfo>, String> {
         Ok(Vec::new())
     }
-    async fn read(
-        &self,
-        _: Uuid,
-        branch: &str,
-        dataset: &str,
-    ) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, branch: &str, dataset: &str) -> Result<Option<DraftFiles>, String> {
         if branch != "main" {
             return Ok(None);
         }
@@ -47,18 +41,13 @@ impl DraftCatalog for Memory {
             rules: vec![("Id.yaml".into(), GOOD.into())],
         }))
     }
-    async fn approve(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<Approval, String> {
+    async fn approve(&self, _: &str, _: &str, _: &str) -> Result<Approval, String> {
         unreachable!("not here")
     }
-    async fn discard(&self, _: Uuid, _: &str) -> Result<bool, String> {
+    async fn discard(&self, _: &str) -> Result<bool, String> {
         unreachable!("not here")
     }
-    async fn save_file(
-        &self,
-        _: Uuid,
-        edit: &FileEdit<'_>,
-        create: bool,
-    ) -> Result<FileSaved, String> {
+    async fn save_file(&self, edit: &FileEdit<'_>, create: bool) -> Result<FileSaved, String> {
         assert!(!create, "main is never made");
         let mut saved = self.saved.lock().unwrap();
         saved.push((edit.branch.into(), edit.file.into(), edit.body.into()));

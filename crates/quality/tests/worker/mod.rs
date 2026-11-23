@@ -157,7 +157,6 @@ pub struct Drafted(pub Mutex<Vec<(String, String)>>);
 impl Drafts for Drafted {
     async fn publish(
         &self,
-        _: Uuid,
         dataset: &str,
         mapping: &str,
         _: &[(String, String)],

@@ -5,7 +5,6 @@
 use async_trait::async_trait;
 use serde::Serialize;
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 use crate::draft_history::{DraftHistory, FileChange, MainChange};
 
@@ -90,26 +89,14 @@ pub enum Approval {
 /// The tenant's catalog, for its drafts.
 #[async_trait]
 pub trait DraftCatalog: Send + Sync {
-    async fn list(&self, tenant: Uuid, prefix: &str) -> Result<Vec<DraftInfo>, String>;
-    async fn read(
-        &self,
-        tenant: Uuid,
-        branch: &str,
-        dataset: &str,
-    ) -> Result<Option<DraftFiles>, String>;
-    async fn approve(
-        &self,
-        tenant: Uuid,
-        branch: &str,
-        dataset: &str,
-        author: &str,
-    ) -> Result<Approval, String>;
-    async fn discard(&self, tenant: Uuid, branch: &str) -> Result<bool, String>;
+    async fn list(&self, prefix: &str) -> Result<Vec<DraftInfo>, String>;
+    async fn read(&self, branch: &str, dataset: &str) -> Result<Option<DraftFiles>, String>;
+    async fn approve(&self, branch: &str, dataset: &str, author: &str) -> Result<Approval, String>;
+    async fn discard(&self, branch: &str) -> Result<bool, String>;
     /// Saves a dataset's mapping on a draft, made from `main` if `create`
     /// (decision 0043, _Add to the mapping_). A catalog that cannot says so.
     async fn save_mapping(
         &self,
-        _tenant: Uuid,
         _edit: &MappingEdit<'_>,
         _create: bool,
     ) -> Result<FileSaved, String> {
@@ -117,28 +104,22 @@ pub trait DraftCatalog: Send + Sync {
     }
     /// Saves several rules files on a new draft made from `main`, in one
     /// commit (decision 0044). A catalog that cannot says so.
-    async fn save_files(&self, _tenant: Uuid, _edit: &FilesEdit<'_>) -> Result<String, String> {
+    async fn save_files(&self, _edit: &FilesEdit<'_>) -> Result<String, String> {
         Err("this catalog saves one file at a time".into())
     }
     /// Saves one rules file on a draft, made from `main` if `create`
     /// (decision 0019's editor; `crate::edit_api`).
-    async fn save_file(
-        &self,
-        tenant: Uuid,
-        edit: &FileEdit<'_>,
-        create: bool,
-    ) -> Result<FileSaved, String>;
+    async fn save_file(&self, edit: &FileEdit<'_>, create: bool) -> Result<FileSaved, String>;
     /// A draft's commits and where it left `main`; `None` if there is no
     /// such branch (`crate::draft_history`). A catalog without history
     /// says so.
-    async fn history(&self, _tenant: Uuid, _branch: &str) -> Result<Option<DraftHistory>, String> {
+    async fn history(&self, _branch: &str) -> Result<Option<DraftHistory>, String> {
         Err("this catalog keeps no history".into())
     }
     /// The changes on `main` to the dataset's rules file `file`, or to its
     /// mapping without one, newest first, at most `limit` (decision 0050).
     async fn file_history(
         &self,
-        _tenant: Uuid,
         _dataset: &str,
         _file: Option<&str>,
         _limit: usize,
@@ -147,19 +128,13 @@ pub trait DraftCatalog: Send + Sync {
     }
     /// Removes a dataset from `main`, as one commit by `author` (decision
     /// 0055); `false` if `main` had none of it. A catalog that cannot says so.
-    async fn remove_dataset(
-        &self,
-        _tenant: Uuid,
-        _dataset: &str,
-        _author: &str,
-    ) -> Result<bool, String> {
+    async fn remove_dataset(&self, _dataset: &str, _author: &str) -> Result<bool, String> {
         Err("this catalog deletes no dataset".into())
     }
     /// The dataset's files that changed from `from` to `to` (commits or
     /// branches), before and after.
     async fn changes(
         &self,
-        _tenant: Uuid,
         _from: &str,
         _to: &str,
         _dataset: &str,
