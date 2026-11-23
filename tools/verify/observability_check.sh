@@ -258,13 +258,12 @@ for q in "INSERT INTO quality.remediation_slas (dataset, dimension, days) VALUES
     *) ko "write: $q: $out" ;;
   esac
 done
-# The tenant: the one open tenant (or QD_GRAFANA_TENANT), and the policies
-# hide another's rows (one made and rolled back by the superuser, read as
-# qd_grafana with its tenant).
-tenant=$(printf "SELECT id FROM public.tenants WHERE status <> 'closed' AND (:'t' = '' OR id::text = :'t' OR slug = :'t')\n" |
-  docker exec -i "$pg" psql -X -At -U "${POSTGRES_SUPERUSER:-postgres}" -d "$db" --set t="${QD_GRAFANA_TENANT:-}")
-seen=$(echo "SELECT current_setting('app.tenant_id') || ' ' || public.current_tenant()" | as_grafana_pg)
-[ "$seen" = "$tenant $tenant" ] && ok "qd_grafana's tenant: $tenant" || ko "qd_grafana's tenant: $seen (expected $tenant)"
+# The tenant: none of its own, so the policies see the main tenant
+# (decision 0076), and they hide another's rows (one made and rolled back
+# by the superuser, read as qd_grafana).
+tenant=00000000-0000-0000-0000-000000000001
+seen=$(echo "SELECT coalesce(current_setting('app.tenant_id', true), '') || ' ' || public.current_tenant()" | as_grafana_pg)
+[ "$seen" = " $tenant" ] && ok "qd_grafana's tenant: the main one" || ko "qd_grafana's tenant: $seen (expected the main one)"
 other=$(printf "BEGIN;
 INSERT INTO quality.remediation_slas (tenant_id, dataset, dimension, days) VALUES (gen_random_uuid(), 'probe', 'probe', 1);
 SET LOCAL app.tenant_id = '%s';
