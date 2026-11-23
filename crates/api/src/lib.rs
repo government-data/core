@@ -25,9 +25,7 @@ pub mod settings;
 pub mod tenancy;
 pub mod updater_v1;
 
-pub use auth_gateway::http::{
-    auth, captcha, central, oauth, password_reset, rbac, session, users, verify,
-};
+pub use auth_gateway::http::{auth, captcha, oauth, password_reset, rbac, session, users, verify};
 pub use http_kit::{error, rate_limit, telemetry};
 use oauth::OAuthRedirects;
 pub use openapi::ApiDoc;
