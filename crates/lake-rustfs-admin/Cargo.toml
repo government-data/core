@@ -1,0 +1,36 @@
+[package]
+name = "lake-rustfs-admin"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The lake admin adapter of `lake-rustfs` (decision 0078, point 8): a
+# service of its own serving `lake-admin/1` with mTLS, built in the core's
+# `crates/` until it moves to the module's repository (step 15). Never a
+# dependency of `server`: among the core's crates it depends on
+# `contracts` alone (and on `sigv4` once it calls RustFS, step 11).
+[dependencies]
+contracts.workspace = true
+axum.workspace = true
+tokio = { workspace = true, features = ["sync", "signal"] }
+rustls.workspace = true
+tokio-rustls.workspace = true
+# The caller's role: its certificate's `OU` (decision 0066).
+x509-parser.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+# The contract suite's lake-admin/1 cases, and a test CA.
+lake-contract = { path = "../lake-contract" }
+testkit.workspace = true
+reqwest.workspace = true
