@@ -22,6 +22,9 @@ application.workspace = true
 contracts.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true
+# The data protocols' requests, signed as RustFS checks them (src/data_wire.rs).
+sigv4.workspace = true
+chrono.workspace = true
 
 [dev-dependencies]
 testkit.workspace = true
