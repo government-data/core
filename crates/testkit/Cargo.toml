@@ -29,3 +29,15 @@ testcontainers-modules.workspace = true
 # 0078).
 application.workspace = true
 async-trait.workspace = true
+# lake-admin/1 served in process with mTLS of a test CA (src/lake_admin.rs,
+# src/tls.rs), over ring as the rest of the workspace.
+contracts.workspace = true
+rcgen.workspace = true
+rustls.workspace = true
+tokio-rustls.workspace = true
+x509-parser.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true

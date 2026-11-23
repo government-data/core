@@ -8,6 +8,8 @@
 //! cross-test bleed. Requires a running Docker daemon.
 
 pub mod lake;
+pub mod lake_admin;
+pub mod tls;
 
 use sqlx::PgPool;
 use testcontainers::runners::AsyncRunner;
