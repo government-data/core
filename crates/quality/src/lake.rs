@@ -1,18 +1,16 @@
-//! A job's access to its tenant's lake (decisions 0017 and 0030): the
-//! tenant's warehouse and credentials of its own, issued per job and
+//! A job's access to the lake (decisions 0017 and 0030): the
+//! warehouse and credentials of its own, issued per job and
 //! narrowed by a session policy to that warehouse. The policies are
 //! written in [`crate::lake_policy`]; issuing them is the [`LakeIssuer`]'s
 //! (RustFS's STS, in `infrastructure`).
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-/// The tenant's warehouse: `qd-tenant-<id>`, the id without hyphens (an
-/// id is never renamed, a subdomain can be).
-pub fn warehouse(tenant: Uuid) -> String {
-    format!("qd-tenant-{}", tenant.simple())
-}
+/// The lake's warehouse: one installation is one organisation (decision
+/// 0076, point 5), so it is a fixed name, the one the main tenant's had
+/// (`qd-tenant-<id>`; S3 renames no bucket).
+pub const WAREHOUSE: &str = "qd-tenant-00000000000000000000000000000001";
 
 pub use crate::lake_policy::*;
 
@@ -86,11 +84,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_tenants_warehouse_has_its_id_without_hyphens() {
-        let tenant = Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap();
+    fn the_warehouse_keeps_the_main_tenants_name() {
         assert_eq!(
-            warehouse(tenant),
-            "qd-tenant-00000000000000000000000000000001"
+            WAREHOUSE,
+            format!("qd-tenant-{}", tenancy::MAIN_ID.replace('-', ""))
         );
     }
 }

@@ -320,12 +320,11 @@ async fn details(
         };
         let mapping = catalog.as_ref().map(|c| c.mapping.as_str());
         let source = api.job_source(&job.kind, mapping, &job.parameters).await?;
-        let ids = (tenant, id);
         source_given(&api, id, &job.kind, &client, &headers, source.as_ref()).await?;
         let lake = if evaluate {
-            job_lake::read_access(&api, tenant, id, &job.kind, &client, &headers).await?
+            job_lake::read_access(&api, id, &job.kind, &client, &headers).await?
         } else {
-            lake_of(&api, ids, (&job, catalog.as_ref()), &client, &headers).await?
+            lake_of(&api, id, (&job, catalog.as_ref()), &client, &headers).await?
         };
         let entity_key = entity_key::for_job(&api, id, &job.kind, &client, &headers).await?;
         Ok(Json(JobDetails {
@@ -366,19 +365,19 @@ async fn source_given(
 /// listing of the lake's tables, the lake's.
 async fn lake_of(
     api: &WorkerApi,
-    (tenant, id): (Uuid, Uuid),
+    id: Uuid,
     (job, catalog): (&HeldJob, Option<&CatalogSnapshot>),
     client: &str,
     headers: &HeaderMap,
 ) -> Result<Option<LakeAccess>, StatusCode> {
     match (catalog, job.kind.as_str(), &job.dataset) {
         (Some(snapshot), "extract", _) => {
-            job_lake::extract_access(api, tenant, id, client, headers, &snapshot.mapping).await
+            job_lake::extract_access(api, id, client, headers, &snapshot.mapping).await
         }
         (_, "maintain", Some(dataset)) => {
-            job_maintain::access(api, tenant, id, client, headers, dataset).await
+            job_maintain::access(api, id, client, headers, dataset).await
         }
-        (_, lake_tables::KIND, _) => lake_tables::access(api, tenant, id, client, headers).await,
+        (_, lake_tables::KIND, _) => lake_tables::access(api, id, client, headers).await,
         _ => Ok(None),
     }
 }

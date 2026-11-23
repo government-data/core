@@ -12,7 +12,7 @@ use uuid::Uuid;
 pub const DATABASE: &str = "tenant_00000000000000000000000000000001";
 
 /// The tenant's catalog database: `tenant_<id>`, the id without hyphens
-/// (as the lake's warehouse, [`crate::lake::warehouse`]).
+/// (as the lake's warehouse, [`crate::lake::WAREHOUSE`]).
 pub fn database(tenant: Uuid) -> String {
     format!("tenant_{}", tenant.simple())
 }

@@ -20,7 +20,6 @@ use serde::Deserialize;
 use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::catalog::Catalog;
 use crate::draft_catalog::DraftCatalog;
@@ -85,23 +84,14 @@ fn refuse(code: StatusCode, error: &str) -> Response {
 /// Why a deletion stopped: its status and its word.
 type Refusal = (StatusCode, &'static str);
 
-fn tenant() -> Result<Uuid, Refusal> {
-    Uuid::parse_str(&tenancy::key()).map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "tenant"))
-}
-
 /// The lake's table, deleted with its files; a lake there is none of is
 /// nothing to delete.
-async fn drop_from_lake(
-    api: &DeleteApi,
-    tenant: Uuid,
-    namespace: &str,
-    table: &str,
-) -> Result<bool, Refusal> {
+async fn drop_from_lake(api: &DeleteApi, namespace: &str, table: &str) -> Result<bool, Refusal> {
     let Some(lake) = &api.lake else {
         return Ok(false);
     };
     let dropped = lake
-        .drop_table(&lake::warehouse(tenant), namespace, table)
+        .drop_table(lake::WAREHOUSE, namespace, table)
         .await
         .map_err(|e| {
             tracing::error!("delete: lake: {e}");
@@ -153,10 +143,6 @@ async fn delete_dataset(
     if body.confirm != dataset {
         return refuse(StatusCode::UNPROCESSABLE_ENTITY, "confirm");
     }
-    let tenant = match tenant() {
-        Ok(t) => t,
-        Err((code, why)) => return refuse(code, why),
-    };
     let Some(catalog) = &api.catalog else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
@@ -187,7 +173,7 @@ async fn delete_dataset(
     // Its bronze and silver tables (decision 0061).
     if let Ok(table) = Mapping::parse(&mapping).map(|m| m.source.value) {
         for namespace in layers::namespaces(&dataset) {
-            if let Err((code, why)) = drop_from_lake(&api, tenant, &namespace, &table).await {
+            if let Err((code, why)) = drop_from_lake(&api, &namespace, &table).await {
                 return refuse(code, why);
             }
         }
@@ -237,10 +223,6 @@ async fn delete_table(
     if body.confirm != format!("{namespace}.{table}") {
         return refuse(StatusCode::UNPROCESSABLE_ENTITY, "confirm");
     }
-    let tenant = match tenant() {
-        Ok(t) => t,
-        Err((code, why)) => return refuse(code, why),
-    };
     let Some(catalog) = &api.catalog else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
@@ -254,7 +236,7 @@ async fn delete_table(
     if read_by_dataset(&mappings, &namespace, &table) {
         return refuse(StatusCode::CONFLICT, "in_use");
     }
-    match drop_from_lake(&api, tenant, &namespace, &table).await {
+    match drop_from_lake(&api, &namespace, &table).await {
         Ok(true) => {}
         Ok(false) => return refuse(StatusCode::NOT_FOUND, "not_found"),
         Err((code, why)) => return refuse(code, why),
@@ -300,14 +282,10 @@ async fn delete_namespace(
     if body.confirm != namespace {
         return refuse(StatusCode::UNPROCESSABLE_ENTITY, "confirm");
     }
-    let tenant = match tenant() {
-        Ok(t) => t,
-        Err((code, why)) => return refuse(code, why),
-    };
     let (Some(catalog), Some(lake)) = (&api.catalog, &api.lake) else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
-    let tables = match lake.tables(&lake::warehouse(tenant), &namespace).await {
+    let tables = match lake.tables(lake::WAREHOUSE, &namespace).await {
         Ok(t) if t.is_empty() => return refuse(StatusCode::NOT_FOUND, "not_found"),
         Ok(t) => t,
         Err(e) => {
@@ -329,7 +307,7 @@ async fn delete_namespace(
         return refuse(StatusCode::CONFLICT, "in_use");
     }
     for table in &tables {
-        if let Err((code, why)) = drop_from_lake(&api, tenant, &namespace, table).await {
+        if let Err((code, why)) = drop_from_lake(&api, &namespace, table).await {
             return refuse(code, why);
         }
     }
