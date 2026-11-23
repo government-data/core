@@ -150,7 +150,7 @@ impl MailSlot {
             return;
         }
         let slot = self.clone();
-        tenancy::spawn(async move {
+        tokio::spawn(async move {
             if let Err(e) = slot.send(&mail).await {
                 tracing::warn!("{what}: could not send the email: {e}");
             }

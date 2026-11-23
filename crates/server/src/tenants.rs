@@ -1,14 +1,14 @@
-//! The database pool and the tenant of each request: everything belongs to
-//! the main tenant (decision 0076: one installation is one organisation).
+//! The database pool: one installation is one organisation (decision 0076);
+//! the rows' `tenant_id` takes the main tenant from the database's default
+//! until the schema's contraction.
 
 use async_trait::async_trait;
 use infrastructure::PgConfig;
 use quality::tenants::Tenants;
 
-/// The pool and how the tenant of each request is found.
+/// The pool.
 pub(crate) struct Tenancy {
     pub(crate) pool: infrastructure::PgPool,
-    pub(crate) resolver: api::tenancy::TenantResolver,
 }
 
 /// Connect (eagerly, so a bad DSN or a down database fails now) and bring the
@@ -17,10 +17,7 @@ pub(crate) struct Tenancy {
 pub(crate) async fn connect(pg_config: &PgConfig) -> Result<Tenancy, Box<dyn std::error::Error>> {
     let pool = infrastructure::connect(pg_config).await?;
     infrastructure::run_migrations(&pool).await?;
-    Ok(Tenancy {
-        pool,
-        resolver: api::tenancy::TenantResolver::single(),
-    })
+    Ok(Tenancy { pool })
 }
 
 /// The tenants the scheduler finds: the main one.

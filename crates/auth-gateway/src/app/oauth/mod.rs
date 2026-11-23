@@ -143,7 +143,7 @@ impl OAuthLoginService {
         let (admins, mail) = (self.admins.clone(), self.mail.clone());
         let (id, provider) = (admin_id.clone(), provider.clone());
         let external = external.map(str::to_string);
-        tenancy::spawn(async move {
+        tokio::spawn(async move {
             let Ok(Some(account)) = admins.find_by_id(&id).await else {
                 return;
             };

@@ -18,16 +18,12 @@ pub(crate) fn spawn_background(settings: SettingsService) {
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             interval.tick().await;
-            tenancy::within(tenancy::Tenant::main(), async {
-                // The platform mail, if there is one, stays set (and up to
-                // date).
-                match settings.seed_platform_mail().await {
-                    Ok(true) => tracing::info!("platform mail set"),
-                    Ok(false) => {}
-                    Err(e) => tracing::error!("settings: {e}"),
-                }
-            })
-            .await;
+            // The platform mail, if there is one, stays set (and up to date).
+            match settings.seed_platform_mail().await {
+                Ok(true) => tracing::info!("platform mail set"),
+                Ok(false) => {}
+                Err(e) => tracing::error!("settings: {e}"),
+            }
         }
     });
 }

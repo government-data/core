@@ -7,7 +7,7 @@
 //! 4. Initialize the modules.
 //! 5. Build the services ([`serve_services`]) and the router: health,
 //!    sign-in, the platform, settings, and each module's routes, behind the
-//!    tenant and language layers.
+//!    language layer.
 //! 6. Start the HTTP server (and the internal routes, on their own port).
 //!
 //! [`serve_services`]: crate::serve_services
@@ -213,11 +213,6 @@ fn layered(
     let app = app.layer(axum::Extension(captcha));
     // The language of each request's messages (Accept-Language).
     let app = app.layer(axum::middleware::from_fn(api::language::per_request));
-    // Each request's company wraps everything, modules included.
-    let app = app.layer(axum::middleware::from_fn_with_state(
-        tenancy.resolver,
-        api::tenancy::resolve,
-    ));
     // Each request counted by its route's template, and its metrics file
     // (decision 0071), with the approved machines' gauge (0072).
     let metrics = crate::metrics_wiring::start(tenancy.pool.clone(), machines);

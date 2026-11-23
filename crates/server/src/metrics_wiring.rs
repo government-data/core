@@ -61,9 +61,9 @@ pub(crate) fn start(pool: infrastructure::PgPool, machines: MachinesService) -> 
         let mut machines_failing = false;
         loop {
             interval.tick().await;
-            // The installation's machines are the main tenant's rows. Once
-            // until it works again, as the queue's.
-            match tenancy::within(tenancy::Tenant::main(), machines.list()).await {
+            // The installation's machines. Once until it works again, as the
+            // queue's.
+            match machines.list().await {
                 Ok(list) => {
                     approved.set(&list);
                     machines_failing = false;
@@ -94,9 +94,9 @@ pub(crate) fn start(pool: infrastructure::PgPool, machines: MachinesService) -> 
     http
 }
 
-/// The ready jobs, read inside the main tenant.
+/// The ready jobs.
 async fn read_queue(
     pool: &infrastructure::PgPool,
 ) -> Result<Vec<queue_ready::Ready>, Box<dyn std::error::Error + Send + Sync>> {
-    Ok(tenancy::within(tenancy::Tenant::main(), queue_ready::ready(pool)).await?)
+    Ok(queue_ready::ready(pool).await?)
 }
