@@ -89,7 +89,7 @@ async fn fixture() -> (testkit::TestDb, Router) {
     }
     results(&db.pool).await;
     icd(&db.pool).await;
-    let app = infrastructure::db::with_tenancy(PgPoolOptions::new(), tenancy::Mode::Single)
+    let app = PgPoolOptions::new()
         .max_connections(2)
         .connect_with(options)
         .await

@@ -20,7 +20,7 @@ use crate::records_api;
 use crate::results;
 use crate::rule_test;
 use crate::source_tables;
-use crate::worker_api::{internal, job_tenant, Report, WorkerApi};
+use crate::worker_api::{internal, Report, WorkerApi};
 
 /// A report the tables refuse (a bad date, negative or impossible counts,
 /// a rule twice) is the worker's error; anything else is ours.
@@ -42,7 +42,7 @@ pub(crate) async fn report(
     Json(body): Json<serde_json::Value>,
 ) -> Result<StatusCode, StatusCode> {
     let client = api.caller(&headers)?;
-    tenancy::within(job_tenant(tenant), async {
+    async {
         let job = api.held(tenant, id, &client).await?;
         if job.kind == source_tables::KIND {
             return source_tables::report(&api.pool, id, &job.parameters, body).await;
@@ -113,7 +113,7 @@ pub(crate) async fn report(
             _ => return Err(StatusCode::UNPROCESSABLE_ENTITY),
         }
         Ok(StatusCode::NO_CONTENT)
-    })
+    }
     .await
 }
 

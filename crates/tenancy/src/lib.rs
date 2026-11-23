@@ -1,11 +1,9 @@
 //! The tenant of the current task.
 //!
-//! One installation is one organisation, the main tenant (decision 0076):
-//! the API runs each request inside it ([`within`]) and the Postgres pool
-//! reads it with [`current`] when it lends each connection and sets it in
-//! `app.tenant_id`, which the RLS policies still filter on until the
-//! schema's contraction. A task launched with [`spawn`] inherits the tenant
-//! of whoever launched it.
+//! One installation is one organisation, the main tenant (decision 0076).
+//! What is left until the crate goes: the main tenant's id, [`key`] for
+//! what is kept in memory, and [`within`], [`current`] and [`spawn`] for
+//! the code that still names a tenant.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -13,19 +11,6 @@ use std::sync::{Arc, RwLock};
 
 /// The on-premise tenant, and the one of the data from before tenants.
 pub const MAIN_ID: &str = "00000000-0000-0000-0000-000000000001";
-
-/// What is set when a pool with several tenants has none: it matches none,
-/// so nothing is seen or written.
-pub const NONE_ID: &str = "00000000-0000-0000-0000-000000000000";
-
-/// How many tenants the installation serves.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    /// On-premise: everything belongs to the main tenant.
-    Single,
-    /// Online: each request and each task brings its tenant.
-    Multiple,
-}
 
 /// The tenant being worked with.
 #[derive(Debug, Clone, PartialEq, Eq)]

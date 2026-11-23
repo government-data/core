@@ -125,7 +125,7 @@ async fn fixture(catalog: Option<Arc<dyn Catalog>>) -> Fixture {
     ] {
         sqlx::query(sql).execute(&db.pool).await.unwrap();
     }
-    let app = infrastructure::db::with_tenancy(PgPoolOptions::new(), tenancy::Mode::Single)
+    let app = PgPoolOptions::new()
         .max_connections(4)
         .connect_with(options)
         .await
