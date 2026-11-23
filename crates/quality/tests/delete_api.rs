@@ -36,7 +36,7 @@ fn mapping(dataset: &str) -> String {
 struct Main(Mutex<Vec<String>>);
 #[async_trait::async_trait]
 impl Catalog for Main {
-    async fn snapshot(&self, _: Uuid, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
         let there = ["loans", "cards"].contains(&dataset)
             && !self.0.lock().unwrap().iter().any(|d| d == dataset);
         Ok(there.then(|| CatalogSnapshot {
@@ -46,7 +46,7 @@ impl Catalog for Main {
             others: Vec::new(),
         }))
     }
-    async fn mappings(&self, _: Uuid) -> Result<Vec<DatasetMapping>, String> {
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         Ok(["loans", "cards"]
             .iter()
             .map(|d| DatasetMapping {

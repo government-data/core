@@ -60,7 +60,7 @@ impl AuditTrail for Log {
 struct TwoDatasets;
 #[async_trait::async_trait]
 impl Catalog for TwoDatasets {
-    async fn snapshot(&self, _: Uuid, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
         Ok(["loans", "cards"]
             .contains(&dataset)
             .then(|| CatalogSnapshot {
@@ -70,7 +70,7 @@ impl Catalog for TwoDatasets {
                 rules: Vec::new(),
             }))
     }
-    async fn mappings(&self, _: Uuid) -> Result<Vec<DatasetMapping>, String> {
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         Ok(Vec::new())
     }
 }

@@ -163,10 +163,7 @@ async fn run_now(
 async fn source_of(api: &CutApi, dataset: &str) -> Result<String, (StatusCode, &'static str)> {
     let unavailable = (StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     let catalog = api.catalog.as_ref().ok_or(unavailable)?;
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, "tenant"));
-    };
-    match catalog.snapshot(tenant, dataset).await {
+    match catalog.snapshot(dataset).await {
         Ok(Some(snap)) => Mapping::parse(&snap.mapping)
             .ok()
             .and_then(|m| m.from)

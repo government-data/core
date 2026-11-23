@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::catalog::{Catalog, DatasetMapping};
 use crate::mapping::Mapping;
@@ -343,10 +342,7 @@ async fn delete_source(
     let Some(catalog) = &api.catalog else {
         return unavailable();
     };
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return internal("the request's tenant");
-    };
-    let mappings = match catalog.mappings(tenant).await {
+    let mappings = match catalog.mappings().await {
         Ok(m) => m,
         Err(e) => {
             tracing::error!("sources: catalog: {e}");

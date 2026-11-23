@@ -187,9 +187,6 @@ async fn datasets(
     let Some(catalog) = &api.catalog else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return refuse(StatusCode::INTERNAL_SERVER_ERROR, "tenant");
-    };
     let last: Result<Vec<(String, String)>, sqlx::Error> =
         sqlx::query_as("SELECT dataset, max(cut)::text FROM quality.cuts GROUP BY dataset")
             .fetch_all(&api.pool)
@@ -197,7 +194,7 @@ async fn datasets(
     let Ok(last) = last.map(|rows| rows.into_iter().collect::<HashMap<_, _>>()) else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
-    match catalog.mappings(tenant).await {
+    match catalog.mappings().await {
         Ok(mappings) => {
             let seen: Vec<DatasetOut> = mappings
                 .into_iter()

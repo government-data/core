@@ -42,7 +42,7 @@ async fn a_job_is_served_only_to_the_machine_holding_it_under_its_tenant() {
         quality::lake::read_only_policy(&lake.warehouse)
     );
     // The catalog's snapshot, read as the job's tenant.
-    assert_eq!(details.catalog.unwrap().commit, format!("commit-of-{A}"));
+    assert_eq!(details.catalog.unwrap().commit, "commit-of-main");
 
     // Another machine, a prefix of its name, another tenant, no token.
     let other = "00000000-0000-0000-0000-00000000000b";
@@ -90,7 +90,7 @@ async fn the_route_without_the_tenant_serves_the_main_tenants_job() {
         .await;
     assert_eq!(status, StatusCode::OK);
     let details: JobDetails = serde_json::from_slice(&body).unwrap();
-    assert_eq!(details.catalog.unwrap().commit, format!("commit-of-{main}"));
+    assert_eq!(details.catalog.unwrap().commit, "commit-of-main");
     let other = f
         .job("00000000-0000-0000-0000-00000000000b", "w1/0", 60)
         .await;

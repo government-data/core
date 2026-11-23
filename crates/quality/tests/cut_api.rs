@@ -60,7 +60,7 @@ impl AuditTrail for Log {
 struct OneDataset;
 #[async_trait::async_trait]
 impl Catalog for OneDataset {
-    async fn snapshot(&self, _: Uuid, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String> {
         let mapping = match dataset {
             "loans" => "dataset: loans\nsource: loans\nfrom: { source: core, table: public.loans }\nkey: [Id]\nfields:\n  Id: { column: loan_id, type: text }\n",
             "uploaded" => "dataset: uploaded\nsource: uploaded\nkey: [Id]\nfields:\n  Id: { column: id, type: text }\n",
@@ -73,7 +73,7 @@ impl Catalog for OneDataset {
             rules: Vec::new(),
         }))
     }
-    async fn mappings(&self, _: Uuid) -> Result<Vec<DatasetMapping>, String> {
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String> {
         // `loans` read from a source's table; `cards` by a mapping that does not read.
         let loans = "dataset: loans\nsource: loans\nfrom: { source: core, table: public.loans }\nkey: [Id]\nfields:\n  Id: { column: loan_id, type: text }\n";
         Ok(vec![

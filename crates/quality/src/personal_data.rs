@@ -4,7 +4,6 @@
 //! console, and a table no dataset reads, on every dataset.
 
 use contracts::Caller;
-use uuid::Uuid;
 
 use crate::catalog::{Catalog, DatasetMapping};
 use crate::mapping::Mapping;
@@ -40,9 +39,8 @@ pub async fn sees_table(
     source: &str,
     table: &str,
 ) -> bool {
-    let tenant = Uuid::parse_str(&tenancy::key()).ok();
-    let mappings = match (catalog, tenant) {
-        (Some(catalog), Some(tenant)) => catalog.mappings(tenant).await.map_err(|e| {
+    let mappings = match catalog {
+        Some(catalog) => catalog.mappings().await.map_err(|e| {
             tracing::error!("personal data: catalog: {e}");
         }),
         _ => Err(()),

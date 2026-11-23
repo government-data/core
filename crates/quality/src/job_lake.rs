@@ -120,7 +120,7 @@ pub(crate) async fn lake_again(
             return Err(StatusCode::NOT_FOUND);
         };
         let snapshot = catalog
-            .snapshot(tenant, dataset)
+            .snapshot(dataset)
             .await
             .map_err(|e| {
                 tracing::error!("catalog: {e}");

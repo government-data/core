@@ -7,6 +7,10 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// The catalog's database: one installation is one organisation (decision
+/// 0076, point 5), so it is a fixed name, the one the main tenant's had.
+pub const DATABASE: &str = "tenant_00000000000000000000000000000001";
+
 /// The tenant's catalog database: `tenant_<id>`, the id without hyphens
 /// (as the lake's warehouse, [`crate::lake::warehouse`]).
 pub fn database(tenant: Uuid) -> String {
@@ -41,17 +45,13 @@ pub struct RulesSource {
 /// Reads the catalog's `main`.
 #[async_trait]
 pub trait Catalog: Send + Sync {
-    /// The dataset's snapshot now; `None` if the tenant's catalog has no
-    /// mapping for it.
-    async fn snapshot(
-        &self,
-        tenant: Uuid,
-        dataset: &str,
-    ) -> Result<Option<CatalogSnapshot>, String>;
+    /// The dataset's snapshot now; `None` if the catalog has no mapping for
+    /// it.
+    async fn snapshot(&self, dataset: &str) -> Result<Option<CatalogSnapshot>, String>;
 
-    /// Every dataset's mapping now, by dataset; none if the tenant has no
-    /// catalog yet.
-    async fn mappings(&self, tenant: Uuid) -> Result<Vec<DatasetMapping>, String>;
+    /// Every dataset's mapping now, by dataset; none if there is no catalog
+    /// yet.
+    async fn mappings(&self) -> Result<Vec<DatasetMapping>, String>;
 }
 
 #[cfg(test)]
@@ -62,5 +62,6 @@ mod tests {
     fn a_tenants_catalog_database() {
         let main = Uuid::parse_str(tenancy::MAIN_ID).unwrap();
         assert_eq!(database(main), "tenant_00000000000000000000000000000001");
+        assert_eq!(database(main), DATABASE);
     }
 }
