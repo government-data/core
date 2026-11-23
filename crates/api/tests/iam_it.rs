@@ -130,7 +130,7 @@ async fn policies_reach_accounts_through_groups_directories_and_tokens() {
         .sync_groups(&AdminId::new(&luis_id), &groups)
         .await
         .unwrap();
-    platform.invalidate_permissions(None);
+    platform.invalidate_permissions();
     let luis = platform.actor(&luis_id, &user(), None).await.unwrap();
     assert!(luis.may("admin:ViewAudit"));
     let listed = platform.list_groups(&root).await.unwrap();

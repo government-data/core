@@ -49,7 +49,7 @@ impl PlatformService {
     // --- The actor -----------------------------------------------------------
 
     /// A session's actor (with `service_account`, of a token), from memory
-    /// while still valid: it is reloaded when the tenant's permissions change
+    /// while still valid: it is reloaded when the permissions change
     /// or after [`crate::actors::TTL`].
     pub async fn actor(
         &self,
@@ -57,32 +57,30 @@ impl PlatformService {
         role: &Role,
         service_account: Option<&str>,
     ) -> R<Actor> {
-        let tenant = tenancy::key();
         let key = match service_account {
             Some(sa) => format!("{admin_id}/{sa}"),
             None => admin_id.to_string(),
         };
-        if let Some(actor) = self.actors.get(&tenant, &key, role.as_str()) {
+        if let Some(actor) = self.actors.get(&key, role.as_str()) {
             return Ok(actor);
         }
-        let generation = self.actors.generation(&tenant);
+        let generation = self.actors.generation();
         let actor = self.load_actor(admin_id, role, service_account).await?;
         self.actors
-            .put(&tenant, &key, role.as_str(), actor.clone(), generation);
+            .put(&key, role.as_str(), actor.clone(), generation);
         Ok(actor)
     }
 
-    /// What someone can do changed in `tenant` (or in all of them, with
-    /// `None`): called by Postgres's `permissions` notice (changes made in
-    /// another replica or directly in the database).
-    pub fn invalidate_permissions(&self, tenant: Option<&str>) {
-        self.actors.invalidate(tenant);
+    /// What someone can do changed: called by Postgres's `permissions`
+    /// notice (changes made in another replica or directly in the database).
+    pub fn invalidate_permissions(&self) {
+        self.actors.invalidate();
     }
 
     /// A permission change made here: make it count in this process right
     /// away, without waiting for the notice.
     fn permissions_changed(&self) {
-        self.actors.invalidate(Some(&tenancy::key()));
+        self.actors.invalidate();
     }
 
     /// The policies named `names`: managed ones from the code, custom ones

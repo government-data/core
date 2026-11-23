@@ -28,7 +28,7 @@ struct MemStore(Mutex<BTreeMap<String, serde_json::Value>>);
 #[async_trait]
 impl SettingsStore for MemStore {
     async fn load(&self, section: &str) -> Result<Option<StoredSection>, String> {
-        let key = format!("{}:{section}", tenancy::key());
+        let key = section.to_string();
         Ok(self.0.lock().unwrap().get(&key).map(|d| StoredSection {
             data: d.clone(),
             updated_at: Utc::now(),
@@ -41,7 +41,7 @@ impl SettingsStore for MemStore {
         data: serde_json::Value,
         updated_by: &str,
     ) -> Result<StoredSection, String> {
-        let key = format!("{}:{section}", tenancy::key());
+        let key = section.to_string();
         self.0.lock().unwrap().insert(key, data.clone());
         Ok(StoredSection {
             data,
@@ -50,10 +50,7 @@ impl SettingsStore for MemStore {
         })
     }
     async fn delete(&self, section: &str) -> Result<(), String> {
-        self.0
-            .lock()
-            .unwrap()
-            .remove(&format!("{}:{section}", tenancy::key()));
+        self.0.lock().unwrap().remove(section);
         Ok(())
     }
 }
@@ -161,80 +158,6 @@ fn ldap() -> LdapSettings {
     }
 }
 
-#[tokio::test]
-async fn each_company_uses_its_own_directory_and_the_platforms_mail() {
-    let store = Arc::new(MemStore::default());
-    let (svc, directory) = service(store, EnvSettings::default());
-    let company = |id: &str| tenancy::Tenant {
-        id: id.into(),
-        slug: id.into(),
-    };
-    let mail = OutgoingMail {
-        to: vec!["ana@coop.co".into()],
-        subject: "x".into(),
-        text: "x".into(),
-        html: None,
-    };
-
-    // Cooperative A sets its mail and its directory.
-    tenancy::within(company("a"), async {
-        svc.ensure_loaded().await.unwrap();
-        svc.save_mail(
-            MailSettings {
-                enabled: true,
-                from_address: "avisos@coop-a.co".into(),
-                smtp_host: "smtp.coop-a.co".into(),
-                smtp_port: 587,
-                ..Default::default()
-            },
-            "admin-a",
-        )
-        .await
-        .unwrap();
-        svc.save_ldap(ldap(), "admin-a").await.unwrap();
-    })
-    .await;
-
-    // The platform's mail arrives: the management panel runs it, so A sends
-    // with it; so does B, which configured nothing, and B neither sees nor
-    // uses A's directory.
-    svc.set_platform_mail(Some(MailSettings {
-        enabled: true,
-        from_address: "avisos@orquestador.app".into(),
-        smtp_host: "email-smtp.us-east-1.amazonaws.com".into(),
-        ..Default::default()
-    }))
-    .unwrap();
-    tenancy::within(company("a"), async {
-        assert!(svc.seed_platform_mail().await.unwrap());
-        let a = svc.mailer().send(&mail).await;
-        assert_eq!(a.unwrap_err(), "from avisos@orquestador.app");
-        assert!(directory.get().is_some());
-    })
-    .await;
-    tenancy::within(company("b"), async {
-        svc.ensure_loaded().await.unwrap();
-        let b = svc.mailer().send(&mail).await;
-        assert_eq!(b.unwrap_err(), "from avisos@orquestador.app");
-        assert!(matches!(svc.mail().source, SettingsSource::Database { .. }));
-        assert!(svc.mail().value.platform);
-        assert_eq!(
-            svc.mail().value.smtp_host,
-            "email-smtp.us-east-1.amazonaws.com"
-        );
-        assert!(svc.ldap().value.url.is_empty());
-        assert!(
-            directory.get().is_none(),
-            "B does not sign in against A's LDAP"
-        );
-    })
-    .await;
-    assert_eq!(
-        svc.platform_mail_from().as_deref(),
-        Some("avisos@orquestador.app")
-    );
-}
-
 fn platform(user: &str, password: &str) -> MailSettings {
     MailSettings {
         enabled: true,
@@ -252,11 +175,7 @@ fn platform(user: &str, password: &str) -> MailSettings {
 async fn the_platform_mail_replaces_the_own_stays_up_to_date_and_never_leaks() {
     let store = Arc::new(MemStore::default());
     let (svc, _) = service(store.clone(), EnvSettings::default());
-    let company = tenancy::Tenant {
-        id: "b".into(),
-        slug: "b".into(),
-    };
-    tenancy::within(company, async {
+    async {
         // The company had its own, with notices in English.
         svc.ensure_loaded().await.unwrap();
         svc.save_mail(
@@ -333,7 +252,7 @@ async fn the_platform_mail_replaces_the_own_stays_up_to_date_and_never_leaks() {
             matches!(&err, SettingsError::Invalid(f) if f.contains_key("smtp_password")),
             "{err:?}"
         );
-    })
+    }
     .await;
 }
 
@@ -399,7 +318,7 @@ async fn secrets_are_stored_encrypted_and_kept_when_sent_empty() {
     let (svc, _) = service(store.clone(), EnvSettings::default());
     svc.init().await.unwrap();
     svc.save_ldap(ldap(), "admin").await.unwrap();
-    let raw = store.0.lock().unwrap()[&format!("{}:ldap", tenancy::MAIN_ID)].clone();
+    let raw = store.0.lock().unwrap()["ldap"].clone();
     assert_eq!(raw["bind_password"], "enc:s3cret");
 
     // Sending it again without a password keeps it.

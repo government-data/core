@@ -36,20 +36,19 @@ pub trait Mailer: Send + Sync {
 /// A tenant's mail: what it sends with, how long a recovery link works (0: the
 /// usual) and which language the notices go out in.
 #[derive(Clone, Default)]
-struct TenantMail {
+struct AppliedMail {
     mailer: Option<Arc<dyn Mailer>>,
     reset_link_minutes: u64,
     notice_language: texts::Language,
 }
 
-/// The [`Mailer`] in use, shared with whoever sends mail: the one each tenant
-/// configured in Settings → Mail (in memory per tenant, see
-/// [`tenancy::PerTenant`]) with how long its password reset links work (`0`:
-/// the environment's) and, for a tenant that configured none, the platform's
-/// (online, the one management sends).
+/// The [`Mailer`] in use, shared with whoever sends mail: the one configured
+/// in Settings → Mail (in memory, see [`domain::slot::Slot`]) with how long
+/// its password reset links work (`0`: the environment's) and, without one,
+/// the platform's.
 #[derive(Clone, Default)]
 pub struct MailSlot {
-    per_tenant: tenancy::PerTenant<TenantMail>,
+    applied: domain::slot::Slot<AppliedMail>,
     platform: Arc<RwLock<Option<Arc<dyn Mailer>>>>,
 }
 
@@ -90,32 +89,32 @@ impl MailSlot {
     /// The minutes a password reset link works, if the tenant's mail settings
     /// set them.
     pub fn reset_link_minutes(&self) -> Option<u64> {
-        self.per_tenant
+        self.applied
             .get()
             .map(|m| m.reset_link_minutes)
             .filter(|m| *m > 0)
     }
 
     pub fn set_reset_link_minutes(&self, minutes: u64) {
-        self.per_tenant.update(|m| m.reset_link_minutes = minutes);
+        self.applied.update(|m| m.reset_link_minutes = minutes);
     }
 
     /// The current tenant's notice language (Settings → Mail): the one for
     /// emails that do not go to an account with its own language.
     pub fn notice_language(&self) -> texts::Language {
-        self.per_tenant
+        self.applied
             .get()
             .map(|m| m.notice_language)
             .unwrap_or_default()
     }
 
     pub fn set_notice_language(&self, lang: texts::Language) {
-        self.per_tenant.update(|m| m.notice_language = lang);
+        self.applied.update(|m| m.notice_language = lang);
     }
 
     /// The current tenant's or, if it configured none, the platform's.
     fn get(&self) -> Option<Arc<dyn Mailer>> {
-        self.per_tenant.get().and_then(|m| m.mailer).or_else(|| {
+        self.applied.get().and_then(|m| m.mailer).or_else(|| {
             self.platform
                 .read()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -124,7 +123,7 @@ impl MailSlot {
     }
 
     pub fn set(&self, mailer: Option<Arc<dyn Mailer>>) {
-        self.per_tenant.update(|m| m.mailer = mailer);
+        self.applied.update(|m| m.mailer = mailer);
     }
 
     /// Whether the current tenant has outgoing mail (its own or the

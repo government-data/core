@@ -136,7 +136,7 @@ pub struct SettingsService {
     mail: MailSlot,
     env: EnvSettings,
     key_source: &'static str,
-    current: tenancy::PerTenant<Current>,
+    current: domain::slot::Slot<Current>,
     /// The platform's mail (online, the one the management panel sends), if
     /// any.
     platform: Arc<RwLock<Option<MailSettings>>>,
@@ -187,7 +187,7 @@ impl SettingsService {
             mail: MailSlot::default(),
             env,
             key_source: "file",
-            current: tenancy::PerTenant::default(),
+            current: domain::slot::Slot::default(),
             platform: Arc::default(),
             platform_oauth: Arc::default(),
         }

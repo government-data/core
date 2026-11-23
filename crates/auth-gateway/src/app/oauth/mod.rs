@@ -73,7 +73,7 @@ type ProviderMap = HashMap<String, Arc<dyn OAuthProvider>>;
 pub struct OAuthLoginService {
     /// Each tenant's (from the settings), and the environment's for a tenant
     /// that has not applied its own yet.
-    providers: tenancy::PerTenant<Arc<ProviderMap>>,
+    providers: domain::slot::Slot<Arc<ProviderMap>>,
     env_providers: Arc<ProviderMap>,
     pending: Arc<dyn PendingAuthStore>,
     identities: Arc<dyn OAuthIdentityRepository>,
@@ -109,7 +109,7 @@ impl OAuthLoginService {
         redirect_base: impl Into<String>,
     ) -> Self {
         Self {
-            providers: tenancy::PerTenant::default(),
+            providers: domain::slot::Slot::default(),
             env_providers: Arc::new(Self::index(providers)),
             pending,
             identities,

@@ -14,15 +14,14 @@ workspace = true
 # Identity: the model and ports for signing in, and the use cases that wire
 # them. Its `domain` layer is as pure as the `domain` crate it builds on (the
 # shared kernel: ids, email, role, repository error, clock) — no web framework,
-# no database driver; `app` adds what the use cases need: the tenant in course
-# (`tenancy`), the texts of the account emails (`textos`), and `tokio` to send
-# a reset email without holding the request.
+# no database driver; `app` adds what the use cases need: the texts of the
+# account emails (`texts`), and `tokio` to send a reset email without holding
+# the request.
 [dependencies]
 async-trait.workspace = true
 # Capabilities globales (ADR 0013): `rbac::requiere`.
 iam.workspace = true
 domain.workspace = true
-tenancy.workspace = true
 texts.workspace = true
 tracing.workspace = true
 tokio = { workspace = true, features = ["sync"] }
