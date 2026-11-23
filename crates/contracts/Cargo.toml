@@ -22,7 +22,8 @@ axum.workspace = true
 async-trait.workspace = true
 # A module's routes for people, in the OpenAPI document (src/module.rs).
 utoipa.workspace = true
-# A view's purpose, as the API speaks it (src/view.rs).
+# A view's purpose, as the API speaks it (src/view.rs); a lake grant
+# (src/lake_grant.rs).
 serde.workspace = true
 
 [dev-dependencies]
