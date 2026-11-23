@@ -23,6 +23,7 @@
 
 mod access;
 mod drain;
+pub mod lake_admin;
 mod lake_grant;
 mod migration;
 mod module;
