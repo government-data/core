@@ -15,14 +15,12 @@
 #   QD_GRAFANA_PG_PASSWORD_FILE  the role's password, a file (production), or
 #   QD_GRAFANA_PG_PASSWORD       the password itself, in the environment (the
 #                                wrapper's); never on a command line
-#   QD_GRAFANA_TENANT            optional: the tenant Grafana shows (id or
-#                                slug); without it, the only tenant that is
-#                                not closed
 #
 # The grants are the real control: a Grafana Viewer can send any SELECT
 # through Grafana's query API, so what is not granted here is what Grafana
-# can never show. Row-level security does the rest, untouched: the role's
-# `app.tenant_id` is the installation's one active tenant (0065).
+# can never show. One installation is one organisation (decision 0076): the
+# role sets no `app.tenant_id`, so the policies' `current_tenant()` is the
+# main tenant until the tenants' contraction.
 set -euo pipefail
 : "${POSTGRES_USER:?POSTGRES_USER must be set}"
 : "${POSTGRES_DB:?POSTGRES_DB must be set}"
@@ -42,22 +40,6 @@ export QD_GRAFANA_PG_PASSWORD
 migrated=$(query <<<"SELECT to_regclass('quality.jobs') IS NOT NULL")
 [ "$migrated" = t ] || fail "quality.jobs does not exist: start the API once, so it runs its migrations, then run this again"
 
-if [ -n "${QD_GRAFANA_TENANT:-}" ]; then
-  tenant=$(query --set wanted="$QD_GRAFANA_TENANT" <<-'SQL'
-	SELECT id FROM public.tenants
-	 WHERE status <> 'closed' AND (id::text = :'wanted' OR slug = :'wanted')
-	SQL
-  )
-  [ -n "$tenant" ] || fail "QD_GRAFANA_TENANT=$QD_GRAFANA_TENANT is not a tenant that is open"
-else
-  tenant=$(query <<<"SELECT id FROM public.tenants WHERE status <> 'closed'")
-  case "$(printf '%s' "$tenant" | grep -c .)" in
-    1) ;;
-    0) fail "no tenant is open" ;;
-    *) fail "more than one tenant is open: set QD_GRAFANA_TENANT to the one Grafana shows" ;;
-  esac
-fi
-
 # The password is set only when the role does not sign in with it already
 # (over TCP, as Grafana does): a second run leaves even its hash as it was.
 rotate=true
@@ -66,20 +48,21 @@ if PGPASSWORD=$QD_GRAFANA_PG_PASSWORD psql -X -At -h 127.0.0.1 -U qd_grafana -d 
   rotate=false
 fi
 
-query --set tenant="$tenant" --set app_db="$POSTGRES_DB" --set rotate="$rotate" >/dev/null <<-'SQL'
+query --set app_db="$POSTGRES_DB" --set rotate="$rotate" >/dev/null <<-'SQL'
 	\getenv grafana_password QD_GRAFANA_PG_PASSWORD
 	BEGIN;
 	SELECT 'CREATE ROLE qd_grafana LOGIN'
 	WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'qd_grafana')
 	\gexec
-	-- Every time, so the attributes, a rotated password and the tenant hold.
+	-- Every time, so the attributes and a rotated password hold.
 	ALTER ROLE qd_grafana LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT
 	  NOBYPASSRLS NOREPLICATION CONNECTION LIMIT 10;
 	\if :rotate
 	ALTER ROLE qd_grafana PASSWORD :'grafana_password';
 	\endif
-	-- The existing policies (tenant_id = current_tenant()) apply as they are.
-	ALTER ROLE qd_grafana SET app.tenant_id = :'tenant';
+	-- No tenant of its own any more (decision 0076): a setting an earlier
+	-- run left goes, and current_tenant() is the main tenant.
+	ALTER ROLE qd_grafana RESET app.tenant_id;
 	-- Defence in depth: the grants already forbid every write.
 	ALTER ROLE qd_grafana SET default_transaction_read_only = on;
 	ALTER ROLE qd_grafana SET statement_timeout = '30s';

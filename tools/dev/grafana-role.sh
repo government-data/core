@@ -14,7 +14,6 @@ set -a; . ./.env; set +a
 file=${QD_SECRETS_DIR:-./secrets}/grafana_pg_password
 [ -s "$file" ] || { echo "$file is missing: run infra/observability/setup-secrets.sh" >&2; exit 1; }
 QD_GRAFANA_PG_PASSWORD=$(cat "$file")
-QD_GRAFANA_TENANT=${QD_GRAFANA_TENANT:-}
-export QD_GRAFANA_PG_PASSWORD QD_GRAFANA_TENANT
-docker exec -i -e QD_GRAFANA_PG_PASSWORD -e QD_GRAFANA_TENANT \
+export QD_GRAFANA_PG_PASSWORD
+docker exec -i -e QD_GRAFANA_PG_PASSWORD \
   "${POSTGRES_CONTAINER:-${APP_STACK:-data-quality}-postgres-1}" bash <infra/postgres/grafana-role.sh
