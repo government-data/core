@@ -7243,7 +7243,7 @@
         "properties": {
           "data_type": {
             "type": "string",
-            "description": "As the engine reads the source's type: DuckDB's (`INTEGER`,\n`DECIMAL(14,2)`) or Trino's (`integer`, `varchar(10)`)."
+            "description": "As the engine reads the source's type: DuckDB's (`INTEGER`,\n`DECIMAL(14,2)`)."
           },
           "name": {
             "type": "string"

@@ -222,7 +222,7 @@ async fn only_the_update_agents_certificate_in_use_is_accepted() {
         assert!(body["error"].is_string(), "{who}");
         let (status, _) = call(&w, "PUT", "/updater/v1/state", cert, Some(json!({}))).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{who}: nothing stored");
-        let modules = json!({ "modules": [{ "name": "trino", "version": "1.0.0" }] });
+        let modules = json!({ "modules": [{ "name": "orchestrator", "version": "1.0.0" }] });
         let (status, _) = call(&w, "PUT", "/updater/v1/modules", cert, Some(modules)).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{who}: no module stored");
     }
@@ -273,8 +273,7 @@ async fn the_agent_tells_the_installed_modules_whole() {
         ]
     );
 
-    let bad =
-        json!({ "modules": [{ "name": "trino", "version": "1.0.0", "drain_path": "/../api" }] });
+    let bad = json!({ "modules": [{ "name": "orchestrator", "version": "1.0.0", "drain_path": "/../api" }] });
     let (status, body) = call(&w, "PUT", "/updater/v1/modules", agent, Some(bad)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert!(body["error"]

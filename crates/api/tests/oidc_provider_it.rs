@@ -342,7 +342,7 @@ fn basic(id: &str, secret: &str) -> String {
 }
 
 /// The claims of an ES256 token, if its signature verifies with the EC key
-/// of the JWK Set under its `kid` (as Trino would check it).
+/// of the JWK Set under its `kid` (as an ES256 relying party checks it).
 fn es256_claims(jwks: &Value, token: &str) -> Value {
     let (input, signature) = token.rsplit_once('.').unwrap();
     let (header_b64, claims_b64) = input.split_once('.').unwrap();
@@ -387,12 +387,12 @@ fn authorize_without_pkce(client: &str) -> String {
 }
 
 #[tokio::test]
-async fn a_client_like_trino_signs_in_without_pkce_and_checks_an_es256_id_token() {
+async fn an_es256_client_without_pkce_signs_in_and_checks_its_id_token() {
     let db = testkit::spawn_test_db().await;
     let app = app(&db.pool).await;
     confidential(
         &db.pool,
-        "trino",
+        "sql-query",
         auth_gateway::ClientSettings {
             token_alg: auth_gateway::SigningAlg::ES256,
             pkce_required: false,
@@ -407,7 +407,7 @@ async fn a_client_like_trino_signs_in_without_pkce_and_checks_an_es256_id_token(
     // No code_challenge: still to sign in, not an error.
     let (status, headers, _) = send(
         &app,
-        Request::get(authorize_without_pkce("trino"))
+        Request::get(authorize_without_pkce("sql-query"))
             .body(Body::empty())
             .unwrap(),
     )
@@ -421,7 +421,7 @@ async fn a_client_like_trino_signs_in_without_pkce_and_checks_an_es256_id_token(
     let cookie = session_cookie(&app).await;
     let (status, headers, _) = send(
         &app,
-        Request::get(authorize_without_pkce("trino"))
+        Request::get(authorize_without_pkce("sql-query"))
             .header(header::COOKIE, &cookie)
             .body(Body::empty())
             .unwrap(),
@@ -440,7 +440,7 @@ async fn a_client_like_trino_signs_in_without_pkce_and_checks_an_es256_id_token(
         &app,
         Request::post("/oauth/token")
             .header("content-type", "application/x-www-form-urlencoded")
-            .header(header::AUTHORIZATION, basic("trino", SECRET))
+            .header(header::AUTHORIZATION, basic("sql-query", SECRET))
             .body(Body::from(format!(
                 "grant_type=authorization_code&code={code}\
                  &redirect_uri=https%3A%2F%2Fgestion.example.com%2Fcallback"
@@ -451,7 +451,7 @@ async fn a_client_like_trino_signs_in_without_pkce_and_checks_an_es256_id_token(
     assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
     let tokens = json(&body);
     let id = es256_claims(&jwks, tokens["id_token"].as_str().unwrap());
-    assert_eq!(id["aud"], "trino");
+    assert_eq!(id["aud"], "sql-query");
     assert_eq!(id["nonce"], "n-2");
     assert_eq!(id["policy"][0], "quality-admin");
     let access = es256_claims(&jwks, tokens["access_token"].as_str().unwrap());
@@ -498,7 +498,7 @@ fn client_credentials(auth: &str, extra: &str) -> Request<Body> {
 }
 
 #[tokio::test]
-async fn a_machine_gets_a_short_es256_token_for_trino_as_its_service_account() {
+async fn a_machine_gets_a_short_es256_token_for_an_audience_as_its_service_account() {
     let db = testkit::spawn_test_db().await;
     let app = app(&db.pool).await;
     // A service account of Ana's with a policy attached.
@@ -523,7 +523,7 @@ async fn a_machine_gets_a_short_es256_token_for_trino_as_its_service_account() {
         auth_gateway::ClientSettings {
             token_alg: auth_gateway::SigningAlg::ES256,
             client_credentials: true,
-            audiences: vec!["trino".into(), "lake".into()],
+            audiences: vec!["sql-query".into(), "lake".into()],
             service_account: Some(account.clone()),
             ..auth_gateway::ClientSettings::default()
         },
@@ -546,7 +546,7 @@ async fn a_machine_gets_a_short_es256_token_for_trino_as_its_service_account() {
     assert!(tokens.get("refresh_token").is_none());
     assert_eq!(tokens["expires_in"], 86_400);
     let claims = es256_claims(&jwks, tokens["access_token"].as_str().unwrap());
-    assert_eq!(claims["aud"], "trino");
+    assert_eq!(claims["aud"], "sql-query");
     assert_eq!(claims["sub"], account.as_str());
     assert_eq!(claims["client_id"], "qd-worker");
     assert_eq!(claims["policy"], serde_json::json!(["lake-reader"]));

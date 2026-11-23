@@ -34,7 +34,7 @@ pub struct SourceTable {
 pub struct SourceColumn {
     pub name: String,
     /// As the engine reads the source's type: DuckDB's (`INTEGER`,
-    /// `DECIMAL(14,2)`) or Trino's (`integer`, `varchar(10)`).
+    /// `DECIMAL(14,2)`).
     pub data_type: String,
 }
 
@@ -72,7 +72,8 @@ pub fn system_schemas(driver: &str) -> &'static [&'static str] {
     match driver {
         "postgres" => &["information_schema", "pg_catalog", "pg_toast"],
         "mysql" => &["information_schema", "mysql", "performance_schema", "sys"],
-        // As Trino's catalog shows them (decision 0048, Verification).
+        // The system schemas as first verified (decision 0048); whether DuckDB's
+        // extensions show the same is decision 0077's Open 8.
         "sqlserver" => &["information_schema", "sys"],
         "oracle" => &["information_schema"],
         _ => &[],

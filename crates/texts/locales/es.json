@@ -47,7 +47,6 @@
       "renewNoCa": "Esta instalación no tiene autoridad de certificación, así que no se puede renovar ningún certificado. Créala con server ca-init.",
       "tooManyDrives": "Como máximo {{max}} discos.",
       "tooManyAttempts": "Demasiados intentos. Inténtalo más tarde.",
-      "trinoUnavailable": "Esta API no tiene un Trino al que preguntar ni una cola donde retener sus trabajos: Trino no se puede reiniciar desde aquí.",
       "doltUnavailable": "Esta API no tiene catálogo: Dolt no se puede reiniciar desde aquí.",
       "alertsNotApp": "Solo el certificado de la VM de la aplicación entrega las alertas de Grafana.",
       "alertsUnavailable": "Esta API no guarda las alertas de las máquinas.",

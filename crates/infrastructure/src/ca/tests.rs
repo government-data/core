@@ -238,7 +238,7 @@ fn a_bad_role_name_or_host_name_is_refused() {
             "{host}"
         );
     }
-    assert!(MachineIdentity::new("trino", "trino", ["Trino.QD", "::1"]).is_ok());
+    assert!(MachineIdentity::new("dolt", "dolt", ["Dolt.QD", "::1"]).is_ok());
 }
 
 #[test]

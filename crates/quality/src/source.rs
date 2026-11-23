@@ -2,7 +2,7 @@
 //! drivers are a catalog: each says its fields, which of them are secret,
 //! and the DuckDB extension that reads it (decision 0077). Pure: the store
 //! seals the secrets, the worker connects. A saved source of a driver not
-//! in the catalog (OpenEdge's, once read by Trino) stays saved, and is
+//! in the catalog (OpenEdge's, decision 0077) stays saved, and is
 //! neither listed nor read.
 
 use std::collections::BTreeMap;
@@ -258,7 +258,7 @@ mod tests {
                 extension: "postgres"
             }
         );
-        // Read through DuckDB's extensions, not Trino (decision 0077).
+        // Read through DuckDB's extensions (decision 0077).
         assert_eq!(
             driver("sqlserver").unwrap().engine,
             Engine::DuckDb { extension: "mssql" }
@@ -270,7 +270,7 @@ mod tests {
             }
         );
         assert!(driver("excel").is_none());
-        // OpenEdge was read by Trino only: no driver any more (decision 0077).
+        // OpenEdge: no driver any more (decision 0077, Open 1).
         assert!(driver("openedge").is_none());
     }
 
