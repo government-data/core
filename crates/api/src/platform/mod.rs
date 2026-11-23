@@ -91,7 +91,6 @@ async fn me(
         // The actions it may do on some resource (ADR 0016), for the UI.
         "actions": actor.actions(),
         "version": domain::VERSION,
-        "edition": platform.edition(),
         // The platform's time zone (decision 0079), UTC when never set: the
         // default of a new schedule's form.
         "platform_timezone": platform.platform_timezone().await,

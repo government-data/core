@@ -8,12 +8,10 @@ use std::sync::Arc;
 
 use platform::{PlatformRepository, RepositoryError};
 
-mod edition;
 mod permissions;
 mod secrets;
 mod updates;
 
-pub use edition::Edition;
 pub use permissions::{CreatedServiceAccount, GroupChange, PolicyView};
 pub use platform::{MintedToken, TokenMint};
 
@@ -69,8 +67,6 @@ fn require(cond: bool, field: &str, msg: &str) -> R<()> {
 #[derive(Clone)]
 pub struct PlatformService {
     repo: Arc<dyn PlatformRepository>,
-    /// On-premise or online.
-    edition: Edition,
     /// Encrypts the secrets' values (without it, in clear: only tests and
     /// development).
     cipher: Option<Arc<dyn crate::settings::SecretCipher>>,
@@ -94,17 +90,11 @@ impl PlatformService {
     pub fn new(repo: Arc<dyn PlatformRepository>) -> Self {
         Self {
             repo,
-            edition: Edition::default(),
             cipher: None,
             tokens: None,
             updates: None,
             actors: Arc::new(crate::actors::ActorCache::default()),
         }
-    }
-
-    pub fn with_edition(mut self, edition: Edition) -> Self {
-        self.edition = edition;
-        self
     }
 
     /// Encrypt the secrets with the Settings secrets key.
@@ -123,9 +113,5 @@ impl PlatformService {
     pub fn with_updates(mut self, updates: crate::UpdatesService) -> Self {
         self.updates = Some(updates);
         self
-    }
-
-    pub fn edition(&self) -> Edition {
-        self.edition
     }
 }

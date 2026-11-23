@@ -1,14 +1,12 @@
 //! What `serve` builds from the environment before mounting it: the OIDC
 //! provider.
 
-use application::Edition;
 use auth_gateway::http::client_cert::ClientCertificates;
 use auth_gateway::SessionService;
 
 use crate::config::env_value;
 
-/// The OIDC provider, if there is a key (`OIDC_SIGNING_KEY`) and it is
-/// on-premise. The issuer is `OIDC_ISSUER` or, without it, the public address
+/// The OIDC provider, if there is a key (`OIDC_SIGNING_KEY`). The issuer is `OIDC_ISSUER` or, without it, the public address
 /// with `/api` (Traefik strips it).
 /// `certificates` says whether its token endpoint reads a machine's
 /// certificate (`INTERNAL_CLIENT_CERT_HEADER`, decision 0066).
@@ -16,15 +14,8 @@ pub(crate) fn oidc_provider(
     server: Option<auth_gateway::AuthorizationServer>,
     sessions: SessionService,
     certificates: ClientCertificates,
-    edition: Edition,
 ) -> Option<axum::Router> {
     let server = server?;
-    // Online each company has its subdomain and a fixed issuer would not be
-    // its own: there the provider is the shared account's (`account`).
-    if edition != Edition::OnPremise {
-        tracing::warn!("OIDC_SIGNING_KEY ignored: the OIDC provider is on-premise only");
-        return None;
-    }
     tracing::info!(issuer = %server.issuer(), "oidc provider enabled");
     Some(auth_gateway::http::provider::routes_with_certificates(
         server,

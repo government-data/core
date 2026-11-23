@@ -8,7 +8,7 @@
     "intro": "La versión instalada, las nuevas y cuándo se instalan. Antes de instalar se espera a que terminen las ejecuciones, se respalda la base y, si la nueva no arranca, se vuelve sola a la anterior.",
     "update": "Actualizar",
     "settings": "Configuración",
-    "notUpdatedHere": "Esta instalación no se actualiza desde aquí (edición en línea o entorno de desarrollo).",
+    "notUpdatedHere": "Esta instalación no se actualiza desde aquí (entorno de desarrollo).",
     "updateCommand": "orquestador actualizar",
     "onTheServer": "en el servidor.",
     "statusCommand": "systemctl status orquestador-actualizador",

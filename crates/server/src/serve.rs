@@ -16,13 +16,12 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use api::internal::AdminAccessRoute;
-use application::{Edition, MachinesService};
-use auth_gateway::{AdminRepository, AuditService, AuthorizationServer};
-use auth_gateway::{LoginService, SessionService};
+use application::MachinesService;
+use auth_gateway::AuthorizationServer;
 use axum::Router;
 use contracts::ModuleRegistry;
 use infrastructure::auth_config::AuthConfig;
-use infrastructure::{PgAuditRepository, PgConfig, ResetTokenAdapter, SecretBox, SystemClock};
+use infrastructure::{PgAuditRepository, PgConfig, SecretBox};
 
 use crate::config::{public_url_from_env, Config};
 use crate::serve_services::{services, Services};
@@ -40,16 +39,14 @@ pub(crate) async fn serve() -> Result<(), Failure> {
     let config = Config::from_env()?;
     let auth = AuthConfig::from_env()?;
     let pg_config = PgConfig::from_env()?;
-    let edition = Edition::parse(&std::env::var("ORQ_EDITION").unwrap_or_default())
-        .map_err(|e| format!("ORQ_EDITION {e}"))?;
 
     // 2. Register the feature modules. Adding a feature is ONE line here; its
     // crate carries everything else (routes, migrations, init). Removing a
     // feature is the reverse and never touches another module.
     let modules = crate::modules::registry();
 
-    // 3. The pool, the schema and how each request finds its tenant.
-    let tenancy = tenants::connect(edition, &pg_config).await?;
+    // 3. The pool and the schema.
+    let tenancy = tenants::connect(&pg_config).await?;
     let pool = tenancy.pool.clone();
 
     // Apply every module's migrations — isolated per module and ordered — on
@@ -65,8 +62,8 @@ pub(crate) async fn serve() -> Result<(), Failure> {
     modules.init()?;
 
     // 5. The services and the routes.
-    let services = services(&tenancy, &auth, edition).await?;
-    let (app, updates, admin_access) = app(services, tenancy, &config, &auth, edition)?;
+    let services = services(&tenancy, &auth).await?;
+    let (app, updates, admin_access) = app(services, tenancy, &config, &auth)?;
 
     crate::startup::internal_routes(updates, admin_access).await?;
 
@@ -91,7 +88,6 @@ fn app(
     tenancy: Tenancy,
     config: &Config,
     auth: &AuthConfig,
-    edition: Edition,
 ) -> Result<
     (
         Router,
@@ -115,7 +111,6 @@ fn app(
         password_reset,
         admin_access,
     } = services;
-    let central = central(&tenancy, &login, &admins, &sessions, &audit, auth);
     // The gateway as an OIDC provider (with OIDC_SIGNING_KEY): the
     // applications registered with `server oidc-client` let their users in
     // with this installation's accounts.
@@ -123,13 +118,7 @@ fn app(
     let provider =
         infrastructure::oidc::provider_from_env(&tenancy.pool, admins.clone(), &oidc_issuer)?;
     let certificates = machines_wiring::client_certificates_from_env()?;
-    let oidc = oidc_provider(
-        provider.clone(),
-        sessions.clone(),
-        certificates.clone(),
-        edition,
-    );
-    let provider = provider.filter(|_| edition == Edition::OnPremise);
+    let oidc = oidc_provider(provider.clone(), sessions.clone(), certificates.clone());
     // Who the session is, for every route that requires a capability: the
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
@@ -179,46 +168,11 @@ fn app(
             machines.clone(),
             certificates.clone(),
         ));
-    let app = match central {
-        Some(central) => app.merge(central),
-        None => app,
-    };
     let app = app.layer(axum::Extension(resolver));
     Ok((
         layered(app, tenancy, oidc, captcha, machines),
         updates,
         admin_access,
-    ))
-}
-
-/// Online, the common entrance (entrar.<domain>): the email and the
-/// password, without the company's address.
-fn central(
-    tenancy: &Tenancy,
-    login: &LoginService,
-    admins: &Arc<dyn AdminRepository>,
-    sessions: &SessionService,
-    audit: &AuditService,
-    auth: &AuthConfig,
-) -> Option<Router> {
-    let (Some(directory), Some(domain)) = (&tenancy.directory, &tenancy.domain) else {
-        return None;
-    };
-    Some(api::central::routes(
-        auth_gateway::CentralLoginService::new(
-            login.clone(),
-            directory.clone(),
-            Arc::new(infrastructure::PgLoginHandoffs::new(tenancy.pool.clone())),
-            admins.clone(),
-            Arc::new(ResetTokenAdapter),
-            Arc::new(SystemClock),
-            tenancy.cell.clone(),
-            domain.clone(),
-        )
-        .with_audit(audit.clone()),
-        sessions.clone(),
-        audit.clone(),
-        auth.login_rate_limit,
     ))
 }
 
@@ -266,12 +220,7 @@ fn layered(
     ));
     // Each request counted by its route's template, and its metrics file
     // (decision 0071), with the approved machines' gauge (0072).
-    let metrics = crate::metrics_wiring::start(
-        tenancy.pool.clone(),
-        tenancy.directory.clone(),
-        tenancy.cell.clone(),
-        machines,
-    );
+    let metrics = crate::metrics_wiring::start(tenancy.pool.clone(), machines);
     let app = app.layer(axum::middleware::from_fn_with_state(
         metrics,
         http_kit::metrics::track,

@@ -152,7 +152,6 @@
       "version": "Version"
     },
     "platform": {
-      "editionExpected": "{{other}}: onpremise or online expected",
       "forbidden": "no permission",
       "notFound": "not found",
       "notUpdatedHere": "this installation is not updated from here",
