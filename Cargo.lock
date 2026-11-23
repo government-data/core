@@ -2151,9 +2151,11 @@ name = "lake-contract"
 version = "0.1.0"
 dependencies = [
  "application",
+ "chrono",
  "contracts",
  "reqwest",
  "serde_json",
+ "sigv4",
  "testkit",
  "tokio",
 ]
