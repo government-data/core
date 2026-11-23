@@ -1,7 +1,7 @@
 //! The schedules' store on an ephemeral PostgreSQL, as the application's
-//! role with row security per tenant (decision 0035): what it saves is what
-//! the scheduler fires; an edit computes the next fire again; a schedule
-//! with cuts is not deleted; another tenant sees none of them.
+//! role, whose row security leaves it the main tenant's rows (decision
+//! 0035): what it saves is what the scheduler fires; an edit computes the
+//! next fire again; a schedule with cuts is not deleted.
 
 use chrono::{DateTime, TimeZone, Utc};
 use contracts::ModuleRegistry;
@@ -13,8 +13,8 @@ use serde_json::json;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
-const A: &str = "00000000-0000-0000-0000-00000000000a";
-const B: &str = "00000000-0000-0000-0000-00000000000b";
+/// The installation's tenant, the main one (decision 0076).
+const A: &str = "00000000-0000-0000-0000-000000000001";
 
 struct Fixture {
     _db: testkit::TestDb,
@@ -42,7 +42,7 @@ async fn fixture() -> Fixture {
     ] {
         sqlx::query(sql).execute(&db.pool).await.unwrap();
     }
-    let app = infrastructure::db::with_tenancy(PgPoolOptions::new(), tenancy::Mode::Multiple)
+    let app = PgPoolOptions::new()
         .max_connections(4)
         .connect_with(options)
         .await
@@ -115,31 +115,6 @@ async fn a_saved_schedule_is_what_the_scheduler_fires_and_an_edit_moves_its_next
         );
         assert_eq!(
             schedule_store::delete(&f.app, other).await.unwrap(),
-            Deleted::NotFound
-        );
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn another_tenant_sees_none_of_them() {
-    let f = fixture().await;
-    let daily =
-        spec(json!({ "cron": "0 6 * * *", "fires": "cut", "dataset": "loans", "rerun": "block" }));
-    let id = tenancy::within(tenant(A), async {
-        schedule_store::create(&f.app, &daily, daily.check(noon()).unwrap())
-            .await
-            .unwrap()
-    })
-    .await;
-    tenancy::within(tenant(B), async {
-        assert!(schedule_store::list(&f.app).await.unwrap().is_empty());
-        assert!(schedule_store::get(&f.app, id).await.unwrap().is_none());
-        assert!(!schedule_store::update(&f.app, id, &daily, noon())
-            .await
-            .unwrap());
-        assert_eq!(
-            schedule_store::delete(&f.app, id).await.unwrap(),
             Deleted::NotFound
         );
     })

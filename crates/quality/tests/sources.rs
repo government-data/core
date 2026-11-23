@@ -1,8 +1,8 @@
-//! The sources' store on an ephemeral PostgreSQL, as the application's role
-//! with row security per tenant (decision 0036): secrets are stored only
-//! sealed and never read back for people; an edit that leaves a secret out
-//! keeps it, one that writes a secret keeps the previous version; another
-//! tenant sees nothing. Synthetic values only.
+//! The sources' store on an ephemeral PostgreSQL, as the application's role,
+//! whose row security leaves it the main tenant's rows (decision 0036):
+//! secrets are stored only sealed and never read back for people; an edit
+//! that leaves a secret out keeps it, one that writes a secret keeps the
+//! previous version. Synthetic values only.
 
 use std::collections::BTreeMap;
 
@@ -14,8 +14,8 @@ use quality::source_store::{self, Put, Sealer, StoreError};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
-const A: &str = "00000000-0000-0000-0000-00000000000a";
-const B: &str = "00000000-0000-0000-0000-00000000000b";
+/// The installation's tenant, the main one (decision 0076).
+const A: &str = "00000000-0000-0000-0000-000000000001";
 
 /// Reverses the text behind a prefix: never the plain text in a column.
 struct Mirror;
@@ -56,7 +56,7 @@ async fn fixture() -> Fixture {
     ] {
         sqlx::query(sql).execute(&db.pool).await.unwrap();
     }
-    let app = infrastructure::db::with_tenancy(PgPoolOptions::new(), tenancy::Mode::Multiple)
+    let app = PgPoolOptions::new()
         .max_connections(4)
         .connect_with(options)
         .await
@@ -160,33 +160,6 @@ async fn a_source_that_does_not_hold_together_is_not_stored() {
             source_store::credentials(&f.app, &Mirror, "core").await,
             Err(StoreError::NotFound)
         ));
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn another_tenant_sees_none_of_them_and_may_use_the_same_name() {
-    let f = fixture().await;
-    let secrets = [("user", "reader"), ("password", "synthetic")];
-    tenancy::within(tenant(A), async {
-        source_store::put(&f.app, &Mirror, &core(&secrets))
-            .await
-            .unwrap();
-    })
-    .await;
-    tenancy::within(tenant(B), async {
-        assert!(source_store::list(&f.app, &Mirror)
-            .await
-            .unwrap()
-            .is_empty());
-        assert!(matches!(
-            source_store::credentials(&f.app, &Mirror, "core").await,
-            Err(StoreError::NotFound)
-        ));
-        source_store::put(&f.app, &Mirror, &core(&secrets))
-            .await
-            .unwrap();
-        assert_eq!(source_store::list(&f.app, &Mirror).await.unwrap().len(), 1);
     })
     .await;
 }

@@ -35,7 +35,7 @@ async fn a_job_is_served_only_to_the_machine_holding_it_under_its_tenant() {
     );
     // Credentials of its own, read-only on its tenant's warehouse.
     let lake = details.lake.unwrap();
-    assert_eq!(lake.warehouse, "qd-tenant-0000000000000000000000000000000a");
+    assert_eq!(lake.warehouse, "qd-tenant-00000000000000000000000000000001");
     assert_eq!(lake.access_key, format!("job-{job}"));
     assert_eq!(
         lake.secret_key,
@@ -45,10 +45,11 @@ async fn a_job_is_served_only_to_the_machine_holding_it_under_its_tenant() {
     assert_eq!(details.catalog.unwrap().commit, format!("commit-of-{A}"));
 
     // Another machine, a prefix of its name, another tenant, no token.
+    let other = "00000000-0000-0000-0000-00000000000b";
     for (uri, token) in [
         (format!("/internal/jobs/{A}/{job}"), "token-w2"),
         (format!("/internal/jobs/{A}/{job}"), "token-w"),
-        (format!("/internal/jobs/{B}/{job}"), "token-w1"),
+        (format!("/internal/jobs/{other}/{job}"), "token-w1"),
     ] {
         assert_eq!(
             f.call("GET", &uri, token, None).await.0,
@@ -90,7 +91,9 @@ async fn the_route_without_the_tenant_serves_the_main_tenants_job() {
     assert_eq!(status, StatusCode::OK);
     let details: JobDetails = serde_json::from_slice(&body).unwrap();
     assert_eq!(details.catalog.unwrap().commit, format!("commit-of-{main}"));
-    let other = f.job(A, "w1/0", 60).await;
+    let other = f
+        .job("00000000-0000-0000-0000-00000000000b", "w1/0", 60)
+        .await;
     assert_eq!(
         f.call("GET", &format!("/internal/jobs/{other}"), "token-w1", None)
             .await
@@ -212,10 +215,6 @@ async fn a_report_lands_in_the_jobs_tenant_and_replaces_a_repeated_one() {
         f.failures(B).await,
         [("V-01".to_string(), 5), ("V-02".to_string(), 0)]
     );
-    assert!(
-        f.failures(A).await.is_empty(),
-        "another tenant sees nothing"
-    );
     // Each field's profile, once though reported twice; an older worker's
     // report, without them, leaves none.
     let profiles = [
@@ -237,7 +236,6 @@ async fn a_report_lands_in_the_jobs_tenant_and_replaces_a_repeated_one() {
         ),
     ];
     assert_eq!(f.field_quality(B).await, profiles);
-    assert!(f.field_quality(A).await.is_empty());
     let mut older = report(5);
     older.as_object_mut().unwrap().remove("fields");
     assert_eq!(
@@ -288,7 +286,7 @@ async fn an_evaluation_leaves_its_manifest_once_and_its_results_point_to_it() {
     let (warehouse, written, body) = &objects[0];
     assert_eq!(
         (warehouse.as_str(), written.as_str()),
-        ("qd-tenant-0000000000000000000000000000000b", key.as_str())
+        ("qd-tenant-00000000000000000000000000000001", key.as_str())
     );
     let manifest: EvaluateManifest = serde_json::from_slice(body).unwrap();
     assert_eq!(
@@ -397,7 +395,7 @@ async fn an_extraction_publishes_its_cut_and_queues_its_evaluation_once() {
 async fn an_evaluation_gets_its_tenants_entity_key_sealed_where_it_is_kept() {
     let f = fixture().await;
     let mut keys = Vec::new();
-    for tenant in [A, A, B] {
+    for tenant in [A, A] {
         let job = f.job(tenant, "w1/0", 60).await;
         let uri = format!("/internal/jobs/{tenant}/{job}");
         let (status, body) = f.call("GET", &uri, "token-w1", None).await;
@@ -412,9 +410,8 @@ async fn an_evaluation_gets_its_tenants_entity_key_sealed_where_it_is_kept() {
         )));
         keys.push(key);
     }
-    // The same for a tenant every time, another for another tenant.
+    // The same every time.
     assert_eq!(keys[0], keys[1]);
-    assert_ne!(keys[0], keys[2]);
     assert_eq!(keys[0].len(), 64);
     let sealed: String =
         sqlx::query_scalar("SELECT sealed FROM quality.entity_keys WHERE tenant_id = $1::uuid")

@@ -1,6 +1,6 @@
 //! What the workers' routes' tests share (decisions 0018, 0035 to 0038):
-//! an ephemeral PostgreSQL connected as the application's role with row
-//! security per tenant, the module's worker routes over it, and fakes for
+//! an ephemeral PostgreSQL connected as the application's role, whose row
+//! security leaves it the main tenant's rows, the module's worker routes over it, and fakes for
 //! the services they use. Synthetic values only.
 
 use std::sync::{Arc, Mutex};
@@ -30,8 +30,11 @@ use sqlx::PgPool;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-pub const A: &str = "00000000-0000-0000-0000-00000000000a";
-pub const B: &str = "00000000-0000-0000-0000-00000000000b";
+/// The installation's tenant, the main one (decision 0076): the one the
+/// application's role sees. `B` is the same, for the tests written with
+/// two tenants.
+pub const A: &str = "00000000-0000-0000-0000-000000000001";
+pub const B: &str = A;
 
 /// `token-<client>` belongs to `<client>`; `token-<client>@<machine>` to a
 /// role's client, for that machine (a token with a `machine` claim).
@@ -274,7 +277,7 @@ pub async fn fixture() -> Fixture {
     ] {
         sqlx::query(sql).execute(&db.pool).await.unwrap();
     }
-    let app = infrastructure::db::with_tenancy(PgPoolOptions::new(), tenancy::Mode::Multiple)
+    let app = PgPoolOptions::new()
         .max_connections(4)
         .connect_with(options)
         .await

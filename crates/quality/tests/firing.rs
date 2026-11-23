@@ -1,11 +1,11 @@
-//! Firing schedules on an ephemeral PostgreSQL, as the application's role
-//! with row security per tenant (decision 0035): a due schedule opens one
-//! cut with its extraction, or queues its job, once even with two
-//! schedulers; a date that has its cut blocks or replaces it; after an
-//! absence only the latest fire runs; another tenant's schedules wait;
-//! only the VM holding the scheduler's lock fires, and another takes over.
+//! Firing schedules on an ephemeral PostgreSQL, as the application's role,
+//! whose row security leaves it the main tenant's rows (decision 0035): a
+//! due schedule opens one cut with its extraction, or queues its job, once
+//! even with two schedulers; a date that has its cut blocks or replaces it;
+//! after an absence only the latest fire runs; only the VM holding the
+//! scheduler's lock fires, and another takes over.
 
-use chrono::{DateTime, Duration, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use contracts::ModuleRegistry;
 use infrastructure::module_migrations::PgModuleMigrator;
 use quality::firing::{self, Outcome};
@@ -15,8 +15,8 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-const A: &str = "00000000-0000-0000-0000-00000000000a";
-const B: &str = "00000000-0000-0000-0000-00000000000b";
+/// The installation's tenant, the main one (decision 0076).
+const A: &str = "00000000-0000-0000-0000-000000000001";
 
 /// 06:00 in Bogotá on 16 October 2026.
 fn six_am() -> DateTime<Utc> {
@@ -49,7 +49,7 @@ async fn fixture() -> Fixture {
     ] {
         sqlx::query(sql).execute(&db.pool).await.unwrap();
     }
-    let app = infrastructure::db::with_tenancy(PgPoolOptions::new(), tenancy::Mode::Multiple)
+    let app = PgPoolOptions::new()
         .max_connections(4)
         .connect_with(options)
         .await
@@ -228,25 +228,6 @@ async fn a_job_without_a_cut_is_queued_and_after_an_absence_runs_once() {
             .await
             .len(),
         1
-    );
-}
-
-#[tokio::test]
-async fn another_tenants_schedules_wait_for_their_own_round() {
-    let f = fixture().await;
-    f.schedule(B, "'0 6 * * *', 'cut', 'clientes', 'block', NULL", six_am())
-        .await;
-    assert!(f.fire(A, six_am(), 24).await.is_empty());
-    assert!(f
-        .as_tenant(A, "SELECT id::text FROM quality.cuts")
-        .await
-        .is_empty());
-    let fired = f.fire(B, six_am(), 24).await;
-    assert_eq!(fired.len(), 1);
-    let date: Vec<String> = f.as_tenant(B, "SELECT cut::text FROM quality.cuts").await;
-    assert_eq!(
-        date,
-        [NaiveDate::from_ymd_opt(2026, 10, 16).unwrap().to_string()]
     );
 }
 
