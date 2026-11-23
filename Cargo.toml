@@ -39,7 +39,6 @@ http-kit = { path = "crates/http-kit" }
 # redaction layer in every service. A leaf, depending on no crate here.
 logging = { path = "crates/logging" }
 sigv4 = { path = "crates/sigv4" }
-trino-client = { path = "crates/trino-client" }
 application = { path = "crates/application" }
 infrastructure = { path = "crates/infrastructure" }
 api = { path = "crates/api" }
