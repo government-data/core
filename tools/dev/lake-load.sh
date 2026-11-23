@@ -9,7 +9,7 @@
 # It writes as its own RustFS user, `qd-loader-dev`, limited to the dev
 # warehouse (tools/dev/lake-loader-policy.json): never as root. The first
 # time it creates the user with the root credentials of .env, through
-# RustFS's admin API, as infra/trino/lake-user.sh does, and appends its keys
+# RustFS's admin API, and appends its keys
 # to .env (LAKE_LOADER_ACCESS_KEY, LAKE_LOADER_SECRET_KEY) without printing
 # them. Needs uv, and RustFS up.
 set -eu

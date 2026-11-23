@@ -5,14 +5,15 @@
 """The dev SQL Server source (decision 0048, Implementation step 6): the
 stack of infra/sqlserver up, the database `qd_dev` with a read-only login,
 each Parquet file of tmp/datos loaded into a table of `dbo` named after it,
-and the source `sqlserver_dev` pointed at it, read through Trino.
+and the source `sqlserver_dev` pointed at it, which the worker reads
+through DuckDB (decision 0077) on 127.0.0.1, where the stack publishes it.
 
 tmp/datos holds a cooperative's data and stays on this machine: it is read
 by DuckDB and SQL Server only; this prints names, types and counts, never a
 value. The passwords are made the first time and kept in .env, never
 printed. Loading again replaces the tables.
 
-From the repository root, with the dev stack, Trino and the API up:
+From the repository root, with the dev stack and the API up:
 
     uv run tools/dev/sqlserver_source.py
 """
@@ -35,7 +36,7 @@ DATA = ROOT / "tmp" / "datos"
 STACK = ["docker", "compose", "--project-directory", str(ROOT), "--env-file", str(ROOT / ".env"),
          "-p", "data-quality-sqlserver", "-f", str(ROOT / "infra/sqlserver/docker-compose.yml")]
 CONTAINER, HOST, DATABASE, READER, SOURCE = (
-    "data-quality-sqlserver-sqlserver-1", "qd-dev-sqlserver", "qd_dev", "qd_reader", "sqlserver_dev")
+    "data-quality-sqlserver-sqlserver-1", "127.0.0.1", "qd_dev", "qd_reader", "sqlserver_dev")
 API = "https://localhost/api"
 
 
@@ -156,7 +157,7 @@ def register(reader: str) -> None:
                        "options": "encrypt=false"},
             "secrets": {"user": READER, "password": reader}}
     r = s.put(f"{API}/quality/sources/{SOURCE}", json=body, headers=csrf)
-    print(f"source {SOURCE}: HTTP {r.status_code} (201 created, 204 saved again; its catalog made in Trino)")
+    print(f"source {SOURCE}: HTTP {r.status_code} (201 created, 204 saved again)")
     if r.status_code not in (201, 204):
         sys.exit(r.text[:200])
 

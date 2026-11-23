@@ -1,8 +1,8 @@
-# Development only (decision 0048): a SQL Server source, read through Trino.
-# It joins the edge network, where Trino's coordinator (in Traefik's network
-# namespace) reaches it as `qd-dev-sqlserver:1433`. It is also published on
-# 127.0.0.1:1433 only, for a client on this machine (SSMS or DBeaver on
-# Windows reach it through WSL's localhost forwarding as `127.0.0.1,1433`).
+# Development only: a SQL Server source, which the dev worker (on the host's
+# network) reads through DuckDB (decision 0077). It is published on
+# 127.0.0.1:1433 only, for the worker and a client on this machine (SSMS or
+# DBeaver on Windows reach it through WSL's localhost forwarding as
+# `127.0.0.1,1433`).
 # Its passwords come from .env, written there by tools/dev/sqlserver_source.py
 # the first time, never printed. Its data stays in its volume.
 #
@@ -16,9 +16,6 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
       MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?run tools/dev/sqlserver_source.py once}
-    networks:
-      edge:
-        aliases: [qd-dev-sqlserver]
     ports:
       # From Windows connect to `127.0.0.1,1433`, not `localhost`: Windows
       # tries ::1 first, which WSL does not forward, and the client times out.
@@ -26,11 +23,6 @@ services:
     volumes:
       - sqlserver-data:/var/opt/mssql
     restart: unless-stopped
-
-networks:
-  edge:
-    external: true
-    name: data-quality-edge
 
 volumes:
   sqlserver-data:

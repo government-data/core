@@ -14,11 +14,9 @@ services:
       # The sign-in gate of the applications (orq-auth, orq-auth-admin)
       # calls http://api:8080: here the API is this machine's.
       - "api:host-gateway"
-    # The route Trino reads its rules from (dynamic/apps-trino.yml) goes to
+    # The machines' routes on the internal entry point (internal.yml) go to
     # this machine's API too, not to the container's.
-    # The machines' routes on the internal entry point (internal.yml), too.
     environment:
-      TRINO_RULES_SERVICE: api-host@file
       INTERNAL_API_SERVICE: api-host@file
     # Its dynamic configuration: the shared middlewares and TLS plus
     # watch.yml, copied by `task dev:watch` into .dev/traefik (it replaces

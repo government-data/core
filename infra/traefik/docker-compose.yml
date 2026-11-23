@@ -134,7 +134,7 @@ services:
       OIDC_SIGNING_KEY: ${OIDC_SIGNING_KEY:-}
       OIDC_SIGNING_KEY_PREVIOUS: ${OIDC_SIGNING_KEY_PREVIOUS:-}
       # ES256 (`server oidc-keygen --es256`), for the clients that read only
-      # RSA or EC keys, such as Trino: empty, those clients get no token.
+      # RSA or EC keys: empty, those clients get no token.
       OIDC_SIGNING_KEY_ES256: ${OIDC_SIGNING_KEY_ES256:-}
       OIDC_SIGNING_KEY_ES256_PREVIOUS: ${OIDC_SIGNING_KEY_ES256_PREVIOUS:-}
       OIDC_ISSUER: ${OIDC_ISSUER:-}

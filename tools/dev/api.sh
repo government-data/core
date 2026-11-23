@@ -33,9 +33,6 @@ export SETTINGS_KEY_FILE="$PWD/.dev/settings.key"
 export DOLT_URL="mysql://qd_app:${DOLT_APP_PASSWORD}@127.0.0.1:${DOLT_PORT:-3307}"
 # The lake through Traefik, for the jobs' credentials (infra/rustfs/sts-issuer.sh).
 export LAKE_ENDPOINT=https://localhost LAKE_CA_FILE="$PWD/infra/traefik/certs/dev-ca.crt"
-# Trino's protocol, published on 127.0.0.1 (compose.watch.yml): a source on
-# Trino keeps its catalog there, as the machine client qd-api (.env.example).
-export QUALITY_TRINO_URL=https://127.0.0.1:8490 QUALITY_TRINO_CA_FILE="$PWD/infra/traefik/certs/dev-ca.crt"
 # The installation's CA, once infra/traefik/gen-dev-internal.sh made it: machines
 # can join and renew. INTERNAL_CLIENT_CERT_HEADER stays off: here the API is
 # reachable on :8080 without Traefik (set it in .env only to try renewing).

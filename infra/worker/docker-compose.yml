@@ -1,12 +1,12 @@
 # The DuckDB workers (decision 0018): stateless, on their own servers,
-# never on the application's. This file is its own stack, like Trino's: in
+# never on the application's. This file is its own stack: in
 # production each worker VM runs it; in development it stands for them
 # (with compose.dev.yml, which keeps the worker on its secret).
 #
 # A worker reaches the application only by URL: the queue on PostgreSQL as
 # the queue's role, the API (`/api`) for a job's details and its report,
-# and the lake with the credentials each job brings. It holds no lake or
-# Trino user (decision 0030), and here no secret at all (decision 0066,
+# and the lake with the credentials each job brings. It holds no lake
+# user (decision 0030), and here no secret at all (decision 0066,
 # step 7): the node agent (`node`, `qd-node`, from the same image) joins
 # once with its token and keeps the machine's certificate renewed in the
 # volume `machine`, which the worker reads (read-only) as its identity for
