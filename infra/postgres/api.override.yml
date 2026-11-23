@@ -28,7 +28,7 @@ services:
       # Connect as the least-privilege application role (NOT the superuser) over
       # the private back-end network. sslmode=disable is appropriate for the
       # in-cluster hop; a remote database should use sslmode=require.
-      DATABASE_URL: postgres://${APP_DB_USER:-knime_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@postgres:5432/${POSTGRES_DB:-knime}?sslmode=disable
+      DATABASE_URL: postgres://${APP_DB_USER:-quality_data_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}@postgres:5432/${POSTGRES_DB:-quality_data}?sslmode=disable
     networks:
       # Added to the API's existing edge network so it can reach `postgres`.
       - backend

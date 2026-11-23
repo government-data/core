@@ -24,7 +24,7 @@ if [ ! -s .dev/settings.key ]; then
   [ -s .dev/settings.key ] && chmod 600 .dev/settings.key
 fi
 
-export DATABASE_URL="postgres://${APP_DB_USER:-knime_app}:${APP_DB_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=disable"
+export DATABASE_URL="postgres://${APP_DB_USER:-quality_data_app}:${APP_DB_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:-quality_data}?sslmode=disable"
 # JSON lines, as in a container, so Alloy can read them (below).
 export APP_HOST=0.0.0.0 APP_PORT=8080 LOG_FORMAT=json
 export APP_PUBLIC_URL=https://localhost OAUTH_REDIRECT_BASE=https://localhost/api

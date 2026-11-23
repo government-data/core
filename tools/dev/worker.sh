@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 set -a; . ./.env; set +a
 : "${QD_QUEUE_PASSWORD:?run tools/dev/queue-role.sh first}"
 : "${QD_WORKER_DEV_CLIENT_SECRET:?register qd-worker-dev (see .env.example)}"
-export QD_QUEUE_DATABASE_URL="postgres://qd_queue:${QD_QUEUE_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:-knime}?sslmode=disable"
+export QD_QUEUE_DATABASE_URL="postgres://qd_queue:${QD_QUEUE_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:-quality_data}?sslmode=disable"
 export QD_API_URL=https://localhost/api QD_CA_FILE="$PWD/infra/traefik/certs/dev-ca.crt"
 export QD_WORKER_CLIENT_ID=qd-worker-dev QD_WORKER_CLIENT_SECRET="$QD_WORKER_DEV_CLIENT_SECRET"
 # In release, as its image is built: a debug DuckDB asserts on the memory of

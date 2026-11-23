@@ -226,7 +226,7 @@ psql_as() { # CERT DB: qd_metrics over TLS through the VM's port, the first line
 expect "PostgreSQL: qd_metrics with the machine's certificate" 1 "$(psql_as 'sslcert=/tmp/app.crt sslkey=/tmp/app.key' postgres)"
 expect "qd_metrics without a certificate: refused" yes "$(psql_as '' postgres | grep -q 'FATAL\|certificate' && echo yes || echo no)"
 expect "qd_metrics with a worker's certificate: refused" yes "$(psql_as 'sslcert=/tmp/worker.crt sslkey=/tmp/worker.key' postgres | grep -q FATAL && echo yes || echo no)"
-r=$(psql_as 'sslcert=/tmp/app.crt sslkey=/tmp/app.key' knime)
+r=$(psql_as 'sslcert=/tmp/app.crt sslkey=/tmp/app.key' quality_data)
 expect "qd_metrics to the application's database: refused" yes "$(echo "$r" | grep -q 'FATAL\|no password' && echo yes || echo "no: $r")"
 
 . "$ROOT/tools/verify/metrics_app_series.sh"

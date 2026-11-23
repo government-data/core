@@ -115,7 +115,7 @@ asroot "chown 65532:65532 '$MOD/ca' '$NODE' '$UPD'"
 SUPER=$(openssl rand -hex 16)
 APPPW=$(openssl rand -hex 16)
 printf '%s' "$SUPER" >"$MOD/secrets/postgres_superuser_password"
-printf 'postgres://knime_app:%s@%s:5432/knime?sslmode=verify-full&sslrootcert=/run/qd-ca/ca.crt' \
+printf 'postgres://quality_data_app:%s@%s:5432/quality_data?sslmode=verify-full&sslrootcert=/run/qd-ca/ca.crt' \
   "$APPPW" "$NAME" >"$MOD/secrets/database_url"
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 1 \
   -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" \
@@ -185,9 +185,9 @@ else
 fi
 expect "4. running" "api node postgres traefik web" \
   "$(dc ps --services --status running 2>/dev/null | sort | tr '\n' ' ' | sed 's/ $//')"
-expect "4. PostgreSQL's first init made every role" "knime_app,qd_metrics,qd_queue" \
-  "$(docker exec "$(dc ps -q postgres)" psql -U postgres -d knime -XAtc \
-    "SELECT string_agg(rolname, ',' ORDER BY rolname) FROM pg_roles WHERE rolname IN ('knime_app','qd_queue','qd_metrics')" 2>&1)"
+expect "4. PostgreSQL's first init made every role" "qd_metrics,qd_queue,quality_data_app" \
+  "$(docker exec "$(dc ps -q postgres)" psql -U postgres -d quality_data -XAtc \
+    "SELECT string_agg(rolname, ',' ORDER BY rolname) FROM pg_roles WHERE rolname IN ('quality_data_app','qd_queue','qd_metrics')" 2>&1)"
 expect "4. PostgreSQL never restarted" 0 "$(docker inspect --format '{{.RestartCount}}' "$(dc ps -q postgres)")"
 for _ in $(seq 15); do [ -s "$MOD/internal/app-machine.pem" ] && break; sleep 1; done
 expect "4. Traefik's copy of machine.pem in internal/" yes "$([ -s "$MOD/internal/app-machine.pem" ] && echo yes || echo no)"

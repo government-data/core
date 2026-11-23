@@ -15,7 +15,7 @@
 #   QD_QUEUE_PASSWORD            password for the queue's role (the workers),
 #                                in development; with tls.yml it has none
 # Optional (shown with their defaults):
-#   POSTGRES_SUPERUSER=postgres  POSTGRES_DB=knime  APP_DB_USER=knime_app
+#   POSTGRES_SUPERUSER=postgres  POSTGRES_DB=quality_data  APP_DB_USER=quality_data_app
 #   BACKUP_INTERVAL_SECONDS=86400  BACKUP_RETENTION=7
 name: data-quality-postgres
 
@@ -43,10 +43,10 @@ services:
       # in api.override.yml, which connects as the app role).
       POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in your environment}
-      POSTGRES_DB: ${POSTGRES_DB:-knime}
+      POSTGRES_DB: ${POSTGRES_DB:-quality_data}
       # Passed through to the init script (initdb/10-app-role.sh), which creates
       # the least-privilege application role on first initialisation.
-      APP_DB_USER: ${APP_DB_USER:-knime_app}
+      APP_DB_USER: ${APP_DB_USER:-quality_data_app}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in your environment}
       # The queue's role for the workers (initdb/20-queue-role.sh, decision 0023):
       # with a password, which the script requires; tls.yml makes it one
@@ -89,7 +89,7 @@ services:
       PGHOST: postgres
       PGUSER: ${POSTGRES_SUPERUSER:-postgres}
       PGPASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in your environment}
-      PGDATABASE: ${POSTGRES_DB:-knime}
+      PGDATABASE: ${POSTGRES_DB:-quality_data}
       BACKUP_DIR: /backups
       BACKUP_RETENTION: ${BACKUP_RETENTION:-7}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}

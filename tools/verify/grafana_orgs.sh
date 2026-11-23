@@ -29,7 +29,7 @@ quality_files
 SRC=$ROOT/infra/observability/grafana/provisioning/datasources
 for f in postgres loki mimir; do install -m 644 "$SRC/$f.yml" "$D/prov/datasources/"; done
 printf 'throwaway' >"$D/c/pg_password" && chmod 644 "$D/c/pg_password"
-FIRST=(-e GRAFANA_PG_HOST=api -e GRAFANA_PG_PORT=8080 -e GRAFANA_PG_DATABASE=knime -e GRAFANA_PG_SSLMODE=disable
+FIRST=(-e GRAFANA_PG_HOST=api -e GRAFANA_PG_PORT=8080 -e GRAFANA_PG_DATABASE=quality_data -e GRAFANA_PG_SSLMODE=disable
   -e LOKI_URL=http://api:8080 -e MIMIR_URL=http://api:8080 -e MIMIR_SERVER_NAME= -v "$D/c/pg_password:/run/secrets/grafana_pg_password:ro")
 cat >"$D/quality-ds.yml" <<YML
 apiVersion: 1

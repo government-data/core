@@ -13,7 +13,7 @@ health:
 data:
   databases:
     # POSTGRES_DB in the .env (infra/package/env.example).
-    - name: knime
+    - name: quality_data
       critical: true
   volumes:
     # The key of the Settings secrets (LDAP, mail, OAuth).

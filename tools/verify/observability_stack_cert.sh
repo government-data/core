@@ -101,7 +101,7 @@ LOKI_HTTP_PORT=$PORT
 LOKI_BIND=127.0.0.1
 LOKI_ADDRESS=$NET.10
 GRAFANA_PG_HOST=qd-pg
-GRAFANA_PG_DATABASE=knime
+GRAFANA_PG_DATABASE=quality_data
 OBS_VM=verify
 OBS_LOG_PROJECTS=$PROBE
 ENV
@@ -220,7 +220,7 @@ services:
     command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/pg/pg.crt", "-c", "ssl_key_file=/pg/pg.key"]
     environment:
       POSTGRES_USER: qd_grafana
-      POSTGRES_DB: knime
+      POSTGRES_DB: quality_data
       POSTGRES_PASSWORD_FILE: /run/secrets/grafana_pg_password
     secrets:
       - grafana_pg_password

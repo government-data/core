@@ -98,8 +98,8 @@ psql_as() {
   docker run --rm --network "$P-backend" -u "$(id -u):$(id -g)" -v "$D/client:/client:ro" \
     postgres:16-alpine psql -XAtq "$1" -c "${2:-select current_user}" 2>&1
 }
-APP="dbname=knime user=knime_app password=$APP_DB_PASSWORD"
-admin() { compose exec -T -u postgres postgres psql -XAtq -d knime -c "$1" 2>&1; }
+APP="dbname=quality_data user=quality_data_app password=$APP_DB_PASSWORD"
+admin() { compose exec -T -u postgres postgres psql -XAtq -d quality_data -c "$1" 2>&1; }
 health() { docker inspect -f '{{.State.Health.Status}}' "$(compose ps -q postgres)"; }
 # The addresses listening on 5432, as /proc/net/tcp writes them.
 listening() {
@@ -118,10 +118,10 @@ echo "== Without machine.pem: the loopback alone, without TLS"
 like "the entrypoint says why" "on its loopback alone" "$(compose logs postgres 2>&1 | grep postgres-tls)"
 expect "listening on 5432 (127.0.0.1 only)" 0100007F:1538 "$(listening)"
 expect "TLS" off "$(admin "show ssl")"
-expect "the application's role on the loopback, in PostgreSQL's namespace" "knime_app" \
+expect "the application's role on the loopback, in PostgreSQL's namespace" "quality_data_app" \
   "$(compose exec -T postgres psql -XAtq "host=127.0.0.1 $APP" -c "select current_user" 2>&1)"
 like "the loopback without a password" "no password supplied" \
-  "$(compose exec -T postgres psql -XAtqw "host=127.0.0.1 dbname=knime user=postgres" -c "select 1" 2>&1)"
+  "$(compose exec -T postgres psql -XAtqw "host=127.0.0.1 dbname=quality_data user=postgres" -c "select 1" 2>&1)"
 like "another container, without TLS" "Connection refused" "$(psql_as "host=$NAME sslmode=disable $APP")"
 like "another container, asking for TLS" "Connection refused" "$(psql_as "host=$NAME sslmode=require $APP")"
 h=$(health)
@@ -146,11 +146,11 @@ like "listening on 5432 (every address)" "00000000:1538" "$(listening)"
 like "the certificate served" "O=qd, OU=app, CN=$NAME" \
   "$(echo | openssl s_client -connect "127.0.0.1:$PORT" -starttls postgres -servername "$NAME" 2>/dev/null |
     openssl x509 -noout -subject 2>/dev/null)"
-expect "the API's role over TLS, the name verified" "knime_app|t" \
+expect "the API's role over TLS, the name verified" "quality_data_app|t" \
   "$(psql_as "host=$NAME sslmode=verify-full sslrootcert=/client/ca.crt $APP" \
     "select current_user, ssl from pg_stat_ssl where pid = pg_backend_pid()")"
 expect "a worker's certificate (the queue, step 8)" qd_queue \
-  "$(psql_as "host=$NAME dbname=knime user=qd_queue sslmode=verify-full sslrootcert=/client/ca.crt sslcert=/client/worker.pem sslkey=/client/worker.pem")"
+  "$(psql_as "host=$NAME dbname=quality_data user=qd_queue sslmode=verify-full sslrootcert=/client/ca.crt sslcert=/client/worker.pem sslkey=/client/worker.pem")"
 like "another container, without TLS" "no encryption" "$(psql_as "host=$NAME sslmode=disable $APP")"
 like "the loopback, without TLS" "no encryption" \
   "$(compose exec -T postgres psql -XAtq "host=127.0.0.1 sslmode=disable $APP" -c "select 1" 2>&1)"

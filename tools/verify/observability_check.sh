@@ -113,7 +113,7 @@ made=$(inside -o /dev/null -w '%{http_code}' -X PUT --aws-sigv4 "aws:amz:us-east
 [ "$made" = 403 ] && ok "loki's user denied a new bucket" || ko "loki's user, new bucket: HTTP $made"
 
 # 7. Grafana listed in the avatar's «Aplicaciones» (a row with home and detail).
-row=$(docker exec "${APP_STACK:-data-quality}-postgres-1" psql -U "${POSTGRES_SUPERUSER:-postgres}" -d "${POSTGRES_DB:-knime}" -tA \
+row=$(docker exec "${APP_STACK:-data-quality}-postgres-1" psql -U "${POSTGRES_SUPERUSER:-postgres}" -d "${POSTGRES_DB:-quality_data}" -tA \
   -c "SELECT name || ' | ' || detail || ' | ' || home_url FROM oidc_clients WHERE client_id = 'grafana'")
 [ -n "$row" ] && ok "oidc client grafana: $row" || ko "oidc client grafana not registered"
 
@@ -200,7 +200,7 @@ esac
 # the file in the environment of `docker exec`, never on a command line.
 # Prints counts and errors only, never a row.
 pg=${POSTGRES_CONTAINER:-${APP_STACK:-data-quality}-postgres-1}
-db=${POSTGRES_DB:-knime}
+db=${POSTGRES_DB:-quality_data}
 as_grafana_pg() {
   PGPASSWORD=$(cat "$secrets/grafana_pg_password") docker exec -i -e PGPASSWORD "$pg" \
     psql -X -qAt -v ON_ERROR_STOP=1 -h 127.0.0.1 -U qd_grafana -d "$db" 2>&1
