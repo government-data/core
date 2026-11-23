@@ -317,7 +317,7 @@ impl LoginService {
         if locks_now && self.mail.configured() {
             let lock = self.policy.retry_after(&next, now).unwrap_or_default();
             let (repo, mail, account) = (self.repo.clone(), self.mail.clone(), account.clone());
-            tenancy::spawn(async move {
+            tokio::spawn(async move {
                 let lang = language(repo.as_ref(), &mail, &account.id).await;
                 let notice = texts::within(lang, async {
                     locked_mail(

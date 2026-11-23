@@ -83,7 +83,7 @@ pub(crate) fn spawn_reconcile(machines: MachinesService) {
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             tick.tick().await;
-            tenancy::within(tenancy::Tenant::main(), reconcile(&machines)).await;
+            reconcile(&machines).await;
         }
     });
 }

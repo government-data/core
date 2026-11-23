@@ -181,7 +181,7 @@ async fn set(
 /// them; it does nothing until both lakes are known and both keys kept.
 fn replicate_after(machines: &MachinesService, by: &AdminId, from: &application::Origin) {
     let (machines, by, from) = (machines.clone(), by.clone(), from.clone());
-    tenancy::spawn(async move {
+    tokio::spawn(async move {
         match machines.replicate(Some((&by, &from))).await {
             Ok(_) | Err(LakeAdminError::Unavailable) => {}
             Err(e) => tracing::warn!(error = ?e, "lake replication after the keys were kept"),
