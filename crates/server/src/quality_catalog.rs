@@ -1,10 +1,10 @@
 //! `server quality catalog import` (decision 0021): a dataset's mapping
-//! and its rules files, from YAML in git, into the tenant's catalog on
-//! Dolt as one commit on `main`. Importing the same files again makes no
-//! commit. The tenant's database must exist (`infra/dolt/tenant.sh add`).
+//! and its rules files, from YAML in git, into the catalog on Dolt as one
+//! commit on `main`. Importing the same files again makes no commit. The
+//! catalog's database must exist (`infra/dolt/tenant.sh add`).
 //!
 //! ```text
-//! server quality catalog import --mapping FILE RULES... [--tenant ID] [--author "Name <email>"]
+//! server quality catalog import --mapping FILE RULES... [--author "Name <email>"]
 //! ```
 
 use std::path::Path;
@@ -12,7 +12,6 @@ use std::path::Path;
 use infrastructure::catalog_dolt::{DatasetImport, DoltCatalog};
 use quality::mapping::Mapping;
 use texts::{text_in, Language};
-use uuid::Uuid;
 
 type Failure = Box<dyn std::error::Error>;
 
@@ -26,20 +25,17 @@ pub(crate) async fn run() -> Result<(), Failure> {
         return Err(usage());
     }
     let (mut mapping, mut files) = (None, Vec::new());
-    let mut tenant = tenancy::MAIN_ID.to_string();
     let mut author = AUTHOR.to_string();
     while let Some(arg) = args.next() {
         let mut value = || args.next().ok_or_else(usage);
         match arg.as_str() {
             "--mapping" => mapping = Some(value()?),
-            "--tenant" => tenant = value()?,
             "--author" => author = value()?,
             _ if arg.starts_with("--") => return Err(usage()),
             _ => files.push(arg),
         }
     }
     let path = mapping.ok_or_else(usage)?;
-    let tenant = Uuid::parse_str(&tenant).map_err(|_| usage())?;
     let mapping_yaml = std::fs::read_to_string(&path)?;
     let parsed = Mapping::parse(&mapping_yaml)
         .map_err(|e| crate::quality::mapping_error(lang, &path, &e))?;
@@ -54,7 +50,7 @@ pub(crate) async fn run() -> Result<(), Failure> {
         rules: &rules,
     };
     let commit = catalog
-        .import(&quality::catalog::database(tenant), &import, &author)
+        .import(quality::catalog::DATABASE, &import, &author)
         .await?;
     let count = rules.len().to_string();
     println!(

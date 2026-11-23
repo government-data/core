@@ -5,17 +5,10 @@
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 /// The catalog's database: one installation is one organisation (decision
 /// 0076, point 5), so it is a fixed name, the one the main tenant's had.
 pub const DATABASE: &str = "tenant_00000000000000000000000000000001";
-
-/// The tenant's catalog database: `tenant_<id>`, the id without hyphens
-/// (as the lake's warehouse, [`crate::lake::WAREHOUSE`]).
-pub fn database(tenant: Uuid) -> String {
-    format!("tenant_{}", tenant.simple())
-}
 
 /// A dataset's mapping and rules files at one commit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,9 +52,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_tenants_catalog_database() {
-        let main = Uuid::parse_str(tenancy::MAIN_ID).unwrap();
-        assert_eq!(database(main), "tenant_00000000000000000000000000000001");
-        assert_eq!(database(main), DATABASE);
+    fn the_catalog_keeps_the_main_tenants_database() {
+        assert_eq!(
+            DATABASE,
+            format!("tenant_{}", tenancy::MAIN_ID.replace('-', ""))
+        );
     }
 }

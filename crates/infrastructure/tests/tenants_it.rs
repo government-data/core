@@ -28,6 +28,15 @@ async fn en(pool: &PgPool, tenant: &str) -> Transaction<'static, Postgres> {
     tx
 }
 
+/// A second tenant, for the policies' tests; returns its id.
+async fn new_tenant(db: &testkit::TestDb, slug: &str) -> String {
+    sqlx::query_scalar("INSERT INTO tenants (slug, name) VALUES ($1, $1) RETURNING id::text")
+        .bind(slug)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap()
+}
+
 async fn iam_groups(tx: &mut Transaction<'static, Postgres>) -> Vec<String> {
     sqlx::query_scalar("SELECT name FROM iam_groups ORDER BY name")
         .fetch_all(&mut **tx)
@@ -39,7 +48,7 @@ async fn iam_groups(tx: &mut Transaction<'static, Postgres>) -> Vec<String> {
 async fn each_tenant_only_sees_and_writes_its_own_rows() {
     let db = testkit::spawn_test_db().await;
     let app = pool_de_la_app(&db).await;
-    let acme = testkit::new_tenant(&db, "acme").await;
+    let acme = new_tenant(&db, "acme").await;
 
     // Without a tenant set (on-premise) everything goes to the main one.
     sqlx::query("INSERT INTO iam_groups (name) VALUES ('finance'), ('sales')")
@@ -79,7 +88,7 @@ async fn each_tenant_only_sees_and_writes_its_own_rows() {
 async fn a_tenant_cannot_write_rows_for_another() {
     let db = testkit::spawn_test_db().await;
     let app = pool_de_la_app(&db).await;
-    let acme = testkit::new_tenant(&db, "acme").await;
+    let acme = new_tenant(&db, "acme").await;
 
     let mut tx = en(&app, &acme).await;
     let error =

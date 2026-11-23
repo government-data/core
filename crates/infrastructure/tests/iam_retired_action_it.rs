@@ -34,17 +34,15 @@ fn allow(actions: &[&str], resources: &[&str]) -> Value {
 }
 
 #[tokio::test]
-async fn the_retired_action_leaves_every_tenants_policies() {
+async fn the_retired_action_leaves_the_policies() {
     let db = testkit::spawn_test_db().await;
     let main = "00000000-0000-0000-0000-000000000001";
-    let other = testkit::new_tenant(&db, "other").await;
-    let both = json!([
+    let ops = json!([
         allow(&["admin:ViewAudit", "admin:ManageLicense"], &["*"]),
         allow(&["admin:ManageLicense"], &["*"]),
         allow(&["quality:ViewRules"], &["catalog/*"]),
     ]);
-    insert(&db.pool, main, "ops", both.clone()).await;
-    insert(&db.pool, &other, "ops", both).await;
+    insert(&db.pool, main, "ops", ops).await;
     let untouched = json!([allow(&["admin:*"], &["*"])]);
     insert(&db.pool, main, "admins", untouched.clone()).await;
 
@@ -60,7 +58,6 @@ async fn the_retired_action_leaves_every_tenants_policies() {
         allow(&["quality:ViewRules"], &["catalog/*"]),
     ]);
     assert_eq!(statements(&db.pool, main, "ops").await, kept);
-    assert_eq!(statements(&db.pool, &other, "ops").await, kept);
     assert_eq!(statements(&db.pool, main, "admins").await, untouched);
 
     let forced: bool = sqlx::query_scalar(
