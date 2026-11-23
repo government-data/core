@@ -1,0 +1,28 @@
+[package]
+name = "lake-contract"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# The contract suite of the capability `lake` (decision 0078, point 6):
+# the same cases against any lake. Test-only: no crate depends on it but
+# for its tests. Against the in-memory fake run the cases over the two
+# ports and every lake-admin/1 case at the wire; the S3, Iceberg REST and
+# STS cases run against a real lake only (step 14). It moves to
+# quality-sdk's module-testkit when that exists.
+[dependencies]
+application.workspace = true
+contracts.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true
+tokio.workspace = true
