@@ -250,9 +250,9 @@ pub(crate) async fn recent_cuts(
                 CASE WHEN c.state = 'failed' THEN COALESCE(v.error, e.error) END AS error
            FROM quality.cuts c
            LEFT JOIN quality.run_summary s
-             ON s.tenant_id = c.tenant_id AND s.dataset = c.dataset AND s.cut = c.cut
-           LEFT JOIN quality.jobs e ON e.tenant_id = c.tenant_id AND e.id = c.extract_job
-           LEFT JOIN quality.jobs v ON v.tenant_id = c.tenant_id AND v.id = c.evaluate_job
+             ON s.dataset = c.dataset AND s.cut = c.cut
+           LEFT JOIN quality.jobs e ON e.id = c.extract_job
+           LEFT JOIN quality.jobs v ON v.id = c.evaluate_job
           WHERE c.dataset = $1
           ORDER BY c.cut DESC
           LIMIT $2",
