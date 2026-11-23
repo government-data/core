@@ -12,7 +12,8 @@
 # module's), it applies them and checks: the row count of every table that
 # stays is unchanged (but audit_chain_checks, which gains a row per
 # verification), every table that had a primary key still has one, as
-# many foreign keys as before not counting those to `public.tenants`, no
+# many foreign keys as before not counting those to `public.tenants` and
+# those of `login_handoffs` (both dropped, decision 0076 point 7), no
 # `tenant_id` left but the audit chain's (decision 0076, point 6), no
 # row-level security left, the chain still verifies, and a second run of the
 # contraction changes nothing. Without arguments, only the first part runs.
@@ -53,7 +54,8 @@ with_key() {
 foreign_keys() {
   psql_ -c "SELECT count(*) FROM pg_constraint WHERE contype = 'f'
     AND connamespace::regnamespace::text IN ('public', 'quality')
-    AND confrelid <> coalesce(to_regclass('public.tenants'), 0)"
+    AND confrelid <> coalesce(to_regclass('public.tenants'), 0)
+    AND conrelid <> coalesce(to_regclass('public.login_handoffs'), 0)"
 }
 
 # 1. The schema as an installation has it: the queue's role first, as
@@ -91,9 +93,9 @@ else
     tables >"$D/after_$run"
     expect "$run run: the tables that stay keep their rows" "" \
       "$(join "$D/before" "$D/after_$run" | awk '$2 != $3 && $1 != "public.audit_chain_checks" {print $1}' | tr '\n' ' ')"
-    expect "$run run: the tables dropped" "public.tenants " \
+    expect "$run run: the tables dropped" "public.login_handoffs public.tenants " \
       "$(join -v1 "$D/before" "$D/after_$run" | awk '{print $1}' | tr '\n' ' ')"
-    expect "$run run: the tables that had a primary key still have one" "public.tenants " \
+    expect "$run run: the tables that had a primary key still have one" "public.login_handoffs public.tenants " \
       "$(comm -23 "$D/keys_before" <(with_key) | tr '\n' ' ')"
     expect "$run run: the foreign keys rebuilt" "$fks_before" "$(foreign_keys)"
     expect "$run run: tenant_id only in the audit chain" "admin_audit_events audit_chain_heads " \
