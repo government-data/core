@@ -207,6 +207,8 @@ mod tests {
             name: name.into(),
             version: "1.0.0".into(),
             drain_path: drain_path.map(Into::into),
+            route_path: None,
+            menu: None,
         }
     }
 

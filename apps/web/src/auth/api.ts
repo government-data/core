@@ -73,8 +73,11 @@ export async function accountUrl(): Promise<string | null> {
  * names come in Spanish; `kind` lets the menu translate the platform panel.
  */
 export interface AccountApp {
-  /** `app`: one that signs in with this installation (RustFS…). */
-  kind?: "management" | "instance" | "app";
+  /**
+   * `app`: one that signs in with this installation (RustFS…); `module`: an
+   * installed module's page on this site (the user guide…), `url` a path.
+   */
+  kind?: "management" | "instance" | "app" | "module";
   /** Of an `app`: its client id, for its page (`/apps/<id>`). */
   id?: string;
   name: string;
@@ -94,7 +97,14 @@ export async function accountApps(): Promise<AccountApp[]> {
   const r = await fetch("/api/settings/account/apps", { credentials: "same-origin" });
   if (!r.ok) throw new Error(String(r.status));
   const { apps } = (await r.json()) as { apps: AccountApp[] };
-  return apps.filter((a) => a.url.startsWith("https://"));
+  return apps.filter((a) => a.url.startsWith("https://") || isModulePage(a));
+}
+
+/** A module's page: a path of this site, never another one. */
+export function isModulePage(a: AccountApp): boolean {
+  return (
+    a.kind === "module" && a.url.startsWith("/") && !a.url.startsWith("//") && !a.url.includes("\\")
+  );
 }
 
 /** The authenticated admin, or a thrown `ApiError(401)` when no session holds. */

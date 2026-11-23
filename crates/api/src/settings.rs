@@ -28,8 +28,8 @@ use crate::session::{require_session, CurrentSession};
 
 mod account;
 
-pub use account::LocalApps;
 use account::{account_apps, account_url};
+pub use account::{InstalledModules, LocalApps};
 
 type ApiResult<T> = Result<T, ApiError>;
 

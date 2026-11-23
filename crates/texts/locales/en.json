@@ -187,8 +187,11 @@
       "maintenanceReasonMissing": "the maintenance reason is missing",
       "modules": {
         "badDrainPath": "module {{name}}: the drain path must start with «/» and stay under the module",
+        "badMenu": "module {{name}}: the menu entry needs a label in each language and paths under its route",
         "badName": "a module's name is lower-case letters, digits and «-»",
+        "badRoutePath": "module {{name}}: the route path is «/» and one segment of lower-case letters, digits and «-»",
         "badVersion": "module {{name}}: the version is missing",
+        "menuWithoutRoute": "module {{name}}: a menu entry needs a route",
         "repeated": "module {{name}} is named twice"
       },
       "noUpdateService": "this installation does not have the update service: repeat the installation or run «orquestador actualizar» on the server",
