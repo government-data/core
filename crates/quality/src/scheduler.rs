@@ -60,33 +60,27 @@ impl Scheduler {
         }
     }
 
-    /// One round: if this VM leads, marks failed each tenant's cuts whose
-    /// job failed and fires its due schedules, each inside its tenant; `None` if another VM leads. A tenant that
-    /// fails does not stop the others.
-    pub async fn round(
-        &mut self,
-        tenants: Vec<tenancy::Tenant>,
-        now: DateTime<Utc>,
-    ) -> Option<Vec<Fired>> {
+    /// One round: if this VM leads, marks failed the cuts whose job failed
+    /// and fires the due schedules; `None` if another VM leads. A failure is
+    /// logged and fires nothing this round.
+    pub async fn round(&mut self, now: DateTime<Utc>) -> Option<Vec<Fired>> {
         if !self.lead().await {
             return None;
         }
-        let mut fired = Vec::new();
-        for tenant in tenants {
-            let slug = tenant.slug.clone();
-            let pool = &self.pool;
-            let round = async {
-                let failed = firing::fail_cuts(pool).await?;
-                if failed > 0 {
-                    tracing::info!(failed, "scheduler: cuts whose job failed marked failed");
-                }
-                firing::fire_due(pool, now, self.missed_max_hours).await
-            };
-            match tenancy::within(tenant, round).await {
-                Ok(f) => fired.extend(f),
-                Err(e) => tracing::error!(%slug, "scheduler: {e}"),
+        let pool = &self.pool;
+        let round = async {
+            let failed = firing::fail_cuts(pool).await?;
+            if failed > 0 {
+                tracing::info!(failed, "scheduler: cuts whose job failed marked failed");
+            }
+            firing::fire_due(pool, now, self.missed_max_hours).await
+        };
+        match round.await {
+            Ok(fired) => Some(fired),
+            Err(e) => {
+                tracing::error!("scheduler: {e}");
+                Some(Vec::new())
             }
         }
-        Some(fired)
     }
 }

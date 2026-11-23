@@ -48,7 +48,7 @@ pub(crate) fn spawn_scheduler(pool: infrastructure::PgPool) {
         loop {
             interval.tick().await;
             for fired in scheduler
-                .round(vec![tenancy::Tenant::main()], chrono::Utc::now())
+                .round(chrono::Utc::now())
                 .await
                 .unwrap_or_default()
             {

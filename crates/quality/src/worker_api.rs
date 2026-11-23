@@ -4,9 +4,8 @@
 //! with a live lease, held by a worker of the machine whose token comes
 //! (workers are named `<client id>/<slot>`, or `<client id>/<machine>/<slot>`
 //! when the client is a role's and the token names the machine, decision
-//! 0066 step 7). Everything else runs inside
-//! that tenant ([`tenancy::within`]), so row security applies as for any
-//! request. A job that does not match answers 404, whatever the reason.
+//! 0066 step 7). A job that does not match answers 404, whatever the
+//! reason.
 
 use std::sync::Arc;
 
@@ -18,7 +17,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use tenancy::Tenant;
 use uuid::Uuid;
 
 use crate::catalog::{Catalog, CatalogSnapshot};
@@ -214,13 +212,6 @@ async fn report_of(
     worker_report::report(api, Path((main_tenant(), id)), headers, body).await
 }
 
-pub(crate) fn job_tenant(tenant: Uuid) -> Tenant {
-    Tenant {
-        id: tenant.to_string(),
-        slug: String::new(),
-    }
-}
-
 impl WorkerApi {
     /// The caller, as [`MachineCaller::worker_prefix`]: what [`Self::held`]
     /// matches and what the credentials given are recorded to.
@@ -318,7 +309,7 @@ async fn details(
     headers: HeaderMap,
 ) -> Result<Json<JobDetails>, StatusCode> {
     let client = api.caller(&headers)?;
-    tenancy::within(job_tenant(tenant), async {
+    async {
         let job = api.held(tenant, id, &client).await?;
         // A rule's test reads a cut as an evaluation does (decision 0043).
         // A console statement reads the whole lake as one too (0054).
@@ -349,7 +340,7 @@ async fn details(
             source,
             entity_key,
         }))
-    })
+    }
     .await
 }
 

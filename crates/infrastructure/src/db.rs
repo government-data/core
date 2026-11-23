@@ -128,35 +128,6 @@ pub async fn connect(config: &PgConfig) -> Result<PgPool, sqlx::Error> {
         .await
 }
 
-/// With several tenants, each connection leaves the pool with the tenant of
-/// the task asking for it in `app.tenant_id` (or with none, which sees
-/// nothing). sqlx's two hooks do it, and they run in that same task: one for
-/// reused connections and one for new ones.
-pub fn with_tenancy(options: PgPoolOptions, mode: tenancy::Mode) -> PgPoolOptions {
-    if mode == tenancy::Mode::Single {
-        return options;
-    }
-    options
-        .after_connect(|conn, _| Box::pin(set_tenant(conn)))
-        .before_acquire(|conn, _| {
-            Box::pin(async move {
-                set_tenant(conn).await?;
-                Ok(true)
-            })
-        })
-}
-
-async fn set_tenant(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
-    let id = tenancy::current()
-        .map(|t| t.id)
-        .unwrap_or_else(|| tenancy::NONE_ID.into());
-    sqlx::query("SELECT set_config('app.tenant_id', $1, false)")
-        .bind(id)
-        .execute(conn)
-        .await?;
-    Ok(())
-}
-
 /// Apply pending migrations and verify the recorded schema at startup.
 ///
 /// [`Migrator::run`] applies any not-yet-applied migrations and validates the

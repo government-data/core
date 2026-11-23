@@ -13,7 +13,7 @@ use crate::job_sources;
 use crate::lake::{self, LakeAccess, TableCatalog};
 use crate::layers::{bronze, silver};
 use crate::mapping::Mapping;
-use crate::worker_api::{job_tenant, WorkerApi};
+use crate::worker_api::WorkerApi;
 
 /// `namespace`, made if missing, and its table's prefix if it is there.
 async fn place(
@@ -112,7 +112,7 @@ pub(crate) async fn lake_again(
     headers: HeaderMap,
 ) -> Result<Json<LakeAccess>, StatusCode> {
     let client = api.caller(&headers)?;
-    tenancy::within(job_tenant(tenant), async {
+    async {
         let job = api.held(tenant, id, &client).await?;
         let (Some(catalog), Some(dataset), "extract") =
             (&api.services.catalog, &job.dataset, job.kind.as_str())
@@ -131,6 +131,6 @@ pub(crate) async fn lake_again(
             .await?
             .map(Json)
             .ok_or(StatusCode::SERVICE_UNAVAILABLE)
-    })
+    }
     .await
 }

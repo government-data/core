@@ -238,16 +238,16 @@ async fn only_the_vm_holding_the_lock_fires_and_another_takes_over() {
         .await;
     let mut one = Scheduler::new(f.app.clone(), 24);
     let mut two = Scheduler::new(f.app.clone(), 24);
-    let fired = one.round(vec![tenant(A)], six_am()).await.unwrap();
+    let fired = one.round(six_am()).await.unwrap();
     assert_eq!(fired.len(), 1);
-    assert!(two.round(vec![tenant(A)], six_am()).await.is_none());
+    assert!(two.round(six_am()).await.is_none());
 
     // The first VM goes: its lock goes with its connection.
     drop(one);
     let tomorrow = six_am() + Duration::days(1);
     let mut taken = None;
     for _ in 0..50 {
-        taken = two.round(vec![tenant(A)], tomorrow).await;
+        taken = two.round(tomorrow).await;
         if taken.is_some() {
             break;
         }
