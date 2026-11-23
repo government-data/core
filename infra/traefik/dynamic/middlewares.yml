@@ -151,6 +151,36 @@ http:
       forwardAuth:
         address: "http://api:8080/auth/verify?role=admin"
         authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role"]
+    # The modules' routes (quality-sdk decision 0002): the update agent
+    # writes each application module's router into Traefik's
+    # dynamic/modules/<module>.yml, from its manifest, naming these two by
+    # name: `module-chain@file` on every module route, and
+    # `module-forward-auth@file` after it for `auth: forward` (a static
+    # site that does not sign in itself). The gate is /auth/verify's: a
+    # page without a session goes to sign in and comes back; anything else
+    # gets 401; with one, the identity in the X-Auth-* headers. No CSP
+    # here: the module sends its own.
+    module-forward-auth:
+      forwardAuth:
+        address: "http://api:8080/auth/verify"
+        authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role", "X-Auth-Org"]
+    module-headers:
+      headers:
+        customFrameOptionsValue: "SAMEORIGIN"
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        forceSTSHeader: true
+        customResponseHeaders:
+          Server: ""
+          X-Powered-By: ""
+    module-chain:
+      chain:
+        middlewares:
+          - web-ratelimit
+          - module-headers
+          - compression
     # Starlight puts inline scripts and styles (the light or dark theme) and
     # the search runs on WebAssembly: the web's CSP does not allow them. They
     # are static pages, with nothing a user writes.
