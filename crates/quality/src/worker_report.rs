@@ -72,16 +72,9 @@ pub(crate) async fn report(
                     }
                     None => None,
                 };
-                results::store(
-                    &api.pool,
-                    tenant,
-                    id,
-                    &dataset,
-                    &report,
-                    manifest.as_deref(),
-                )
-                .await
-                .map_err(rejected)?;
+                results::store(&api.pool, id, &dataset, &report, manifest.as_deref())
+                    .await
+                    .map_err(rejected)?;
             }
             "maintain" => job_maintain::report(&api, id, &dataset, body).await?,
             "test_rule" => {

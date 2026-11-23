@@ -20,27 +20,22 @@ use crate::worker_api::{band, cell, Report, RuleCounts};
 /// done, in one transaction.
 pub(crate) async fn store(
     pool: &PgPool,
-    tenant: Uuid,
     job: Uuid,
     dataset: &str,
     report: &Report,
     manifest: Option<&str>,
 ) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
-    sqlx::query(
-        "DELETE FROM quality.run_summary WHERE tenant_id = $1 AND dataset = $2 AND cut = $3::date",
-    )
-    .bind(tenant)
-    .bind(dataset)
-    .bind(&report.cut)
-    .execute(&mut *tx)
-    .await?;
+    sqlx::query("DELETE FROM quality.run_summary WHERE dataset = $1 AND cut = $2::date")
+        .bind(dataset)
+        .bind(&report.cut)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query(
         "INSERT INTO quality.run_summary
-             (tenant_id, dataset, cut, job_id, records, duration_ms, rules_commit, manifest, igcd)
-         VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9)",
+             (dataset, cut, job_id, records, duration_ms, rules_commit, manifest, igcd)
+         VALUES ($1, $2::date, $3, $4, $5, $6, $7, $8)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(job)
@@ -55,13 +50,12 @@ pub(crate) async fn store(
     let column = |f: fn(&RuleCounts) -> Option<&str>| rules.iter().map(f).collect::<Vec<_>>();
     sqlx::query(
         "INSERT INTO quality.rule_results
-             (tenant_id, dataset, cut, rule, applies, failures, field, pattern, dimension, severity)
-         SELECT $1, $2, $3::date, r.*
-           FROM unnest($4::text[], $5::bigint[], $6::bigint[],
-                       $7::text[], $8::text[], $9::text[], $10::text[])
+             (dataset, cut, rule, applies, failures, field, pattern, dimension, severity)
+         SELECT $1, $2::date, r.*
+           FROM unnest($3::text[], $4::bigint[], $5::bigint[],
+                       $6::text[], $7::text[], $8::text[], $9::text[])
              AS r (rule, applies, failures, field, pattern, dimension, severity)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(rules.iter().map(|r| r.rule.as_str()).collect::<Vec<_>>())
@@ -76,14 +70,13 @@ pub(crate) async fn store(
     let fields = &report.fields;
     sqlx::query(
         "INSERT INTO quality.field_quality
-             (tenant_id, dataset, cut, field, empty, distinct_values, pattern, pattern_count,
+             (dataset, cut, field, empty, distinct_values, pattern, pattern_count,
               mean_icd)
-         SELECT $1, $2, $3::date, f.*
-           FROM unnest($4::text[], $5::bigint[], $6::bigint[], $7::text[], $8::bigint[],
-                       $9::float8[])
+         SELECT $1, $2::date, f.*
+           FROM unnest($3::text[], $4::bigint[], $5::bigint[], $6::text[], $7::bigint[],
+                       $8::float8[])
              AS f (field, empty, distinct_values, pattern, pattern_count, mean_icd)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(fields.iter().map(|f| f.field.as_str()).collect::<Vec<_>>())
@@ -99,13 +92,13 @@ pub(crate) async fn store(
     .bind(fields.iter().map(|f| f.icd).collect::<Vec<_>>())
     .execute(&mut *tx)
     .await?;
-    recency(&mut tx, tenant, dataset, report).await?;
-    groups(&mut tx, tenant, dataset, report).await?;
-    cells(&mut tx, tenant, dataset, report).await?;
-    distributions(&mut tx, tenant, dataset, report).await?;
-    entities(&mut tx, tenant, dataset, report).await?;
-    stages(&mut tx, tenant, dataset, report).await?;
-    queues(&mut tx, tenant, dataset, report).await?;
+    recency(&mut tx, dataset, report).await?;
+    groups(&mut tx, dataset, report).await?;
+    cells(&mut tx, dataset, report).await?;
+    distributions(&mut tx, dataset, report).await?;
+    entities(&mut tx, dataset, report).await?;
+    stages(&mut tx, dataset, report).await?;
+    queues(&mut tx, dataset, report).await?;
     cuts::finish_evaluation(&mut tx, job).await?;
     tx.commit().await
 }
@@ -113,16 +106,14 @@ pub(crate) async fn store(
 /// The `updated` field's records by age, on its row.
 async fn recency(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant: Uuid,
     dataset: &str,
     report: &Report,
 ) -> Result<(), sqlx::Error> {
     for f in report.fields.iter().filter(|f| f.recency.is_some()) {
         sqlx::query(
-            "UPDATE quality.field_quality SET recency = $5
-              WHERE tenant_id = $1 AND dataset = $2 AND cut = $3::date AND field = $4",
+            "UPDATE quality.field_quality SET recency = $4
+              WHERE dataset = $1 AND cut = $2::date AND field = $3",
         )
-        .bind(tenant)
         .bind(dataset)
         .bind(&report.cut)
         .bind(&f.field)
@@ -136,19 +127,17 @@ async fn recency(
 /// Each group of each dimension, an empty group as ''.
 async fn groups(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant: Uuid,
     dataset: &str,
     report: &Report,
 ) -> Result<(), sqlx::Error> {
     let rows = &report.groups;
     sqlx::query(
         "INSERT INTO quality.group_metrics
-             (tenant_id, dataset, cut, dimension, grp, records, serious, mean_icd)
-         SELECT $1, $2, $3::date, g.*
-           FROM unnest($4::text[], $5::text[], $6::bigint[], $7::bigint[], $8::float8[])
+             (dataset, cut, dimension, grp, records, serious, mean_icd)
+         SELECT $1, $2::date, g.*
+           FROM unnest($3::text[], $4::text[], $5::bigint[], $6::bigint[], $7::float8[])
              AS g (dimension, grp, records, serious, mean_icd)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(
@@ -172,7 +161,6 @@ async fn groups(
 /// Each SFC cell, with what the guide derives from its counts.
 async fn cells(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant: Uuid,
     dataset: &str,
     report: &Report,
 ) -> Result<(), sqlx::Error> {
@@ -180,13 +168,12 @@ async fn cells(
     let states: Vec<_> = rows.iter().map(|c| cell(c.ok, c.total)).collect();
     sqlx::query(
         "INSERT INTO quality.cells
-             (tenant_id, dataset, cut, cell, ok, total, passes, missing, margin)
-         SELECT $1, $2, $3::date, c.*
-           FROM unnest($4::text[], $5::bigint[], $6::bigint[], $7::bool[], $8::bigint[],
-                       $9::bigint[])
+             (dataset, cut, cell, ok, total, passes, missing, margin)
+         SELECT $1, $2::date, c.*
+           FROM unnest($3::text[], $4::bigint[], $5::bigint[], $6::bool[], $7::bigint[],
+                       $8::bigint[])
              AS c (cell, ok, total, passes, missing, margin)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(rows.iter().map(|c| c.field.as_str()).collect::<Vec<_>>())
@@ -203,17 +190,15 @@ async fn cells(
 /// Each drift variable's percentiles, then each outlier group.
 async fn distributions(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant: Uuid,
     dataset: &str,
     report: &Report,
 ) -> Result<(), sqlx::Error> {
     for d in &report.distributions {
         sqlx::query(
             "INSERT INTO quality.distribution_checks
-                 (tenant_id, dataset, cut, variable, dimension, grp, percentiles)
-             VALUES ($1, $2, $3::date, $4, '', '', $5)",
+                 (dataset, cut, variable, dimension, grp, percentiles)
+             VALUES ($1, $2::date, $3, '', '', $4)",
         )
-        .bind(tenant)
         .bind(dataset)
         .bind(&report.cut)
         .bind(&d.variable)
@@ -224,13 +209,12 @@ async fn distributions(
     let rows = &report.outliers;
     sqlx::query(
         "INSERT INTO quality.distribution_checks
-             (tenant_id, dataset, cut, variable, dimension, grp, records, low, high)
-         SELECT $1, $2, $3::date, o.*
-           FROM unnest($4::text[], $5::text[], $6::text[], $7::bigint[], $8::bigint[],
-                       $9::bigint[])
+             (dataset, cut, variable, dimension, grp, records, low, high)
+         SELECT $1, $2::date, o.*
+           FROM unnest($3::text[], $4::text[], $5::text[], $6::bigint[], $7::bigint[],
+                       $8::bigint[])
              AS o (variable, dimension, grp, records, low, high)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(rows.iter().map(|o| o.variable.as_str()).collect::<Vec<_>>())
@@ -255,21 +239,19 @@ async fn distributions(
 /// Each queue's findings by since, an empty group as ''.
 async fn queues(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant: Uuid,
     dataset: &str,
     report: &Report,
 ) -> Result<(), sqlx::Error> {
     let rows = &report.queues;
     sqlx::query(
         "INSERT INTO quality.queue_findings
-             (tenant_id, dataset, cut, dimension, grp, since, open, resolved, priority)
-         SELECT $1, $2, $3::date, q.dimension, q.grp, q.since::date, q.open, q.resolved,
+             (dataset, cut, dimension, grp, since, open, resolved, priority)
+         SELECT $1, $2::date, q.dimension, q.grp, q.since::date, q.open, q.resolved,
                 q.priority
-           FROM unnest($4::text[], $5::text[], $6::text[], $7::bigint[], $8::bigint[],
-                       $9::float8[])
+           FROM unnest($3::text[], $4::text[], $5::text[], $6::bigint[], $7::bigint[],
+                       $8::float8[])
              AS q (dimension, grp, since, open, resolved, priority)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(
@@ -295,7 +277,6 @@ async fn queues(
 /// each band; none without entities.
 async fn entities(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant: Uuid,
     dataset: &str,
     report: &Report,
 ) -> Result<(), sqlx::Error> {
@@ -304,12 +285,11 @@ async fn entities(
         return Ok(());
     }
     sqlx::query(
-        "INSERT INTO quality.entity_icd (tenant_id, dataset, cut, entity, icd, band, segment)
-         SELECT $1, $2, $3::date, e.*
-           FROM unnest($4::text[], $5::float8[], $6::text[], $7::text[])
+        "INSERT INTO quality.entity_icd (dataset, cut, entity, icd, band, segment)
+         SELECT $1, $2::date, e.*
+           FROM unnest($3::text[], $4::float8[], $5::text[], $6::text[])
              AS e (entity, icd, band, segment)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(rows.iter().map(|e| e.0.as_str()).collect::<Vec<_>>())
@@ -326,10 +306,9 @@ async fn entities(
                         count(*) FILTER (WHERE band = 'medium') AS medium,
                         count(*) FILTER (WHERE band = 'low') AS low
                    FROM quality.entity_icd
-                  WHERE tenant_id = $1 AND dataset = $2 AND cut = $3::date) e
-          WHERE s.tenant_id = $1 AND s.dataset = $2 AND s.cut = $3::date",
+                  WHERE dataset = $1 AND cut = $2::date) e
+          WHERE s.dataset = $1 AND s.cut = $2::date",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .execute(&mut **tx)
@@ -340,17 +319,15 @@ async fn entities(
 /// Each stage's milliseconds, in the order it ran.
 async fn stages(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-    tenant: Uuid,
     dataset: &str,
     report: &Report,
 ) -> Result<(), sqlx::Error> {
     let rows = &report.stages;
     sqlx::query(
-        "INSERT INTO quality.job_stats (tenant_id, dataset, cut, stage, position, ms)
-         SELECT $1, $2, $3::date, s.stage, s.position::integer, s.ms
-           FROM unnest($4::text[], $5::bigint[]) WITH ORDINALITY AS s (stage, ms, position)",
+        "INSERT INTO quality.job_stats (dataset, cut, stage, position, ms)
+         SELECT $1, $2::date, s.stage, s.position::integer, s.ms
+           FROM unnest($3::text[], $4::bigint[]) WITH ORDINALITY AS s (stage, ms, position)",
     )
-    .bind(tenant)
     .bind(dataset)
     .bind(&report.cut)
     .bind(rows.iter().map(|s| s.stage.as_str()).collect::<Vec<_>>())
