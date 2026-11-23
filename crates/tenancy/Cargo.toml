@@ -15,7 +15,6 @@ workspace = true
 # pool (for RLS) and the application (background tasks, URLs) read it. It only
 # depends on tokio, so domain stays runtime-free and the layers do not cross.
 [dependencies]
-async-trait.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]

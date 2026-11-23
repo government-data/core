@@ -120,20 +120,12 @@ where
 /// The pool opens a connection immediately, so a misconfigured or unreachable
 /// database is caught here at startup rather than on the first request.
 pub async fn connect(config: &PgConfig) -> Result<PgPool, sqlx::Error> {
-    connect_for(config, tenancy::Mode::Single).await
-}
-
-/// [`connect`] for an installation with one or several tenants.
-pub async fn connect_for(config: &PgConfig, mode: tenancy::Mode) -> Result<PgPool, sqlx::Error> {
-    with_tenancy(
-        PgPoolOptions::new()
-            .max_connections(config.max_connections)
-            .min_connections(config.min_connections)
-            .acquire_timeout(config.acquire_timeout),
-        mode,
-    )
-    .connect(&config.url)
-    .await
+    PgPoolOptions::new()
+        .max_connections(config.max_connections)
+        .min_connections(config.min_connections)
+        .acquire_timeout(config.acquire_timeout)
+        .connect(&config.url)
+        .await
 }
 
 /// With several tenants, each connection leaves the pool with the tenant of

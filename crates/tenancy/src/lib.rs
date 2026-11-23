@@ -1,30 +1,22 @@
 //! The tenant of the current task.
 //!
-//! In the online edition each company is a tenant. The API resolves it from
-//! the subdomain and runs the request inside [`within`]; the Postgres pool
+//! One installation is one organisation, the main tenant (decision 0076):
+//! the API runs each request inside it ([`within`]) and the Postgres pool
 //! reads it with [`current`] when it lends each connection and sets it in
-//! `app.tenant_id`, which is what the RLS policies filter on. A task launched
-//! with [`spawn`] inherits the tenant of whoever launched it.
-//!
-//! On-premise has a single tenant, the main one, and needs none of this.
+//! `app.tenant_id`, which the RLS policies still filter on until the
+//! schema's contraction. A task launched with [`spawn`] inherits the tenant
+//! of whoever launched it.
 
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, RwLock};
 
-use async_trait::async_trait;
-
 /// The on-premise tenant, and the one of the data from before tenants.
 pub const MAIN_ID: &str = "00000000-0000-0000-0000-000000000001";
 
-/// What is set when there is no tenant in the online edition: it matches
-/// none, so nothing is seen or written.
+/// What is set when a pool with several tenants has none: it matches none,
+/// so nothing is seen or written.
 pub const NONE_ID: &str = "00000000-0000-0000-0000-000000000000";
-
-/// The subdomain of the shared entry (online edition): one types the email
-/// and gets into their companies without knowing their address. It belongs
-/// to none.
-pub const ENTRY: &str = "entrar";
 
 /// How many tenants the installation serves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,52 +41,6 @@ impl Tenant {
             id: MAIN_ID.into(),
             slug: "main".into(),
         }
-    }
-}
-
-/// Whether the company can use the service.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Status {
-    Active,
-    /// Unpaid or with the license revoked: read-only.
-    Suspended,
-    /// Deregistered: as if it did not exist.
-    Closed,
-}
-
-impl Status {
-    /// From its persisted name.
-    pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "active" => Some(Self::Active),
-            "suspended" => Some(Self::Suspended),
-            "closed" => Some(Self::Closed),
-            _ => None,
-        }
-    }
-}
-
-/// A tenant of the registry.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TenantRecord {
-    pub tenant: Tenant,
-    pub name: String,
-    pub status: Status,
-    /// The database (and the API replicas) where its data lives.
-    pub cell: String,
-}
-
-/// The tenant registry.
-#[async_trait]
-pub trait Directory: Send + Sync {
-    /// The tenant of a subdomain.
-    async fn by_slug(&self, slug: &str) -> Result<Option<TenantRecord>, String>;
-    /// The ones of a cell that are not deregistered (for background tasks).
-    async fn in_cell(&self, cell: &str) -> Result<Vec<TenantRecord>, String>;
-    /// The ones of a cell (not deregistered) with an account for that email
-    /// that already chose its password: the shared entry (`entrar.<domain>`).
-    async fn with_email(&self, _email: &str, _cell: &str) -> Result<Vec<TenantRecord>, String> {
-        Ok(Vec::new())
     }
 }
 

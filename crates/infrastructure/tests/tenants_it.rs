@@ -212,28 +212,3 @@ async fn reused_connections_never_carry_the_previous_tenant() {
         assert_eq!(total, 20);
     }
 }
-
-#[tokio::test]
-async fn the_directory_finds_tenants_by_subdomain_and_cell() {
-    use tenancy::Directory;
-    let db = testkit::spawn_test_db().await;
-    testkit::new_tenant(&db, "acme").await;
-    sqlx::query("INSERT INTO tenants (slug, name, status) VALUES ('old', 'Old', 'closed')")
-        .execute(&db.pool)
-        .await
-        .unwrap();
-    let directory = infrastructure::PgTenantDirectory::new(db.pool.clone());
-
-    let acme = directory.by_slug("acme").await.unwrap().unwrap();
-    assert_eq!(acme.status, tenancy::Status::Active);
-    assert_eq!(acme.cell, "main");
-    assert!(directory.by_slug("nadie").await.unwrap().is_none());
-    let slugs: Vec<String> = directory
-        .in_cell("main")
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|r| r.tenant.slug)
-        .collect();
-    assert_eq!(slugs, ["acme", "main"]);
-}
