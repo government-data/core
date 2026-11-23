@@ -11,7 +11,6 @@ import { AppsMenu } from "./AppsMenu";
 import { LangSwitch } from "./LangSwitch";
 import { AccountIcon, MENU_ICON, MenuIcon } from "./MenuIcon";
 import { ThemeSwitch } from "./ThemeSwitch";
-import { afterSignOut } from "./signOut";
 
 /** The initial shown in the avatar, derived from the admin's role. */
 function avatarInitial(role: string): string {
@@ -203,7 +202,7 @@ export function ProfileMenu() {
     signedOut();
     await logout().catch(() => undefined);
     const base = account() ?? (await accountUrl().catch(() => null));
-    window.location.assign(base ? `${base}/signout` : afterSignOut(window.location.hostname));
+    window.location.assign(base ? `${base}/signout` : "/login");
   };
 
   // Close profile popover on click-outside or ESC.

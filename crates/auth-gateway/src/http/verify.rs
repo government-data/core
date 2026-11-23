@@ -28,8 +28,6 @@ pub const AUTH_USER_HEADER: &str = "x-auth-user";
 pub const AUTH_EMAIL_HEADER: &str = "x-auth-email";
 /// The session's role.
 pub const AUTH_ROLE_HEADER: &str = "x-auth-role";
-/// The company's subdomain (online edition); empty on-premise.
-pub const AUTH_ORG_HEADER: &str = "x-auth-org";
 
 #[derive(Clone)]
 pub struct VerifyState {
@@ -104,14 +102,12 @@ async fn identity(state: &VerifyState, session: &AuthenticatedSession) -> Respon
         Ok(Some(account)) => account.email.to_string(),
         _ => String::new(),
     };
-    let org = tenancy::current().map(|t| t.slug).unwrap_or_default();
     let mut response = no_store(StatusCode::NO_CONTENT.into_response());
     let h = response.headers_mut();
     for (name, value) in [
         (AUTH_USER_HEADER, session.admin_id.as_str()),
         (AUTH_EMAIL_HEADER, email.as_str()),
         (AUTH_ROLE_HEADER, session.role.as_str()),
-        (AUTH_ORG_HEADER, org.as_str()),
     ] {
         h.insert(
             name,
@@ -273,11 +269,11 @@ mod tests {
         assert_eq!(public_origin(&headers), None);
         headers.insert(
             "x-forwarded-host",
-            HeaderValue::from_static("admin.orquestador.app"),
+            HeaderValue::from_static("quality.example.com"),
         );
         assert_eq!(
             public_origin(&headers).as_deref(),
-            Some("https://admin.orquestador.app")
+            Some("https://quality.example.com")
         );
         headers.insert(
             "x-forwarded-host",
@@ -293,7 +289,7 @@ mod tests {
         }
         headers.insert(
             "x-forwarded-host",
-            HeaderValue::from_static("admin.orquestador.app"),
+            HeaderValue::from_static("quality.example.com"),
         );
         headers.insert("x-forwarded-proto", HeaderValue::from_static("javascript"));
         assert_eq!(public_origin(&headers), None);

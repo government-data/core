@@ -138,19 +138,19 @@ http:
         address: "http://api:8080/auth/docs"
     # The gate of an application that does not speak OAuth (put on its
     # router): Traefik asks the API on each request. With a session, the
-    # identity reaches the application in X-Auth-User, X-Auth-Email,
-    # X-Auth-Role and X-Auth-Org (the API always sends the four, so a client
-    # cannot slip in its own); without one, a page goes to sign in and comes
+    # identity reaches the application in X-Auth-User, X-Auth-Email and
+    # X-Auth-Role (the API always sends the three, so a client cannot slip in
+    # its own); without one, a page goes to sign in and comes
     # back, the rest gets a 401.
     orq-auth:
       forwardAuth:
         address: "http://api:8080/auth/verify"
-        authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role", "X-Auth-Org"]
+        authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role"]
     # The same, for administrators only (403 for the rest).
     orq-auth-admin:
       forwardAuth:
         address: "http://api:8080/auth/verify?role=admin"
-        authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role", "X-Auth-Org"]
+        authResponseHeaders: ["X-Auth-User", "X-Auth-Email", "X-Auth-Role"]
     # Starlight puts inline scripts and styles (the light or dark theme) and
     # the search runs on WebAssembly: the web's CSP does not allow them. They
     # are static pages, with nothing a user writes.

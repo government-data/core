@@ -4,7 +4,7 @@
 use serde_json::{json, Map, Value};
 
 use super::{
-    epoch, identity_claims, meets_policy, org, AuthorizationServer, TokenError, TokenRequest,
+    epoch, identity_claims, meets_policy, AuthorizationServer, TokenError, TokenRequest,
     TokenResponse, TOKEN_TTL,
 };
 use crate::domain::{AdminAccount, AuthorizationCode, OidcClient};
@@ -118,9 +118,6 @@ impl AuthorizationServer {
         claims.insert("jti".into(), json!(self.code_tokens.generate()));
         claims.insert("scope".into(), json!(record.scopes.join(" ")));
         claims.insert("role".into(), json!(admin.role.as_str()));
-        if let Some(org) = org() {
-            claims.insert("org".into(), json!(org));
-        }
         if let Some(policies) = policies {
             claims.insert("policy".into(), policies);
         }

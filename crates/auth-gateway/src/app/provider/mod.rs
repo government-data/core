@@ -229,7 +229,7 @@ impl AuthorizationServer {
                 ["client_secret_basic", "client_secret_post", "none", "tls_client_auth"],
             "code_challenge_methods_supported": ["S256"],
             "claims_supported":
-                ["sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "email", "name", "role", "org", "policy"],
+                ["sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "email", "name", "role", "policy"],
             "authorization_response_iss_parameter_supported": true,
         })
     }
@@ -452,7 +452,7 @@ fn granted_scopes(scope: Option<&str>) -> Vec<String> {
 }
 
 /// The claims about the person: `email` and `name` as the scopes allow, and
-/// always the role and, in the online edition, the company.
+/// always the role.
 fn identity_claims(claims: &mut Map<String, Value>, admin: &AdminAccount, scopes: &[String]) {
     if scopes.iter().any(|s| s == "email") {
         claims.insert("email".into(), json!(admin.email.as_str()));
@@ -466,14 +466,6 @@ fn identity_claims(claims: &mut Map<String, Value>, admin: &AdminAccount, scopes
         }
     }
     claims.insert("role".into(), json!(admin.role.as_str()));
-    if let Some(org) = org() {
-        claims.insert("org".into(), json!(org));
-    }
-}
-
-/// The company of the request in course (online edition), by its subdomain.
-fn org() -> Option<String> {
-    tenancy::current().map(|t| t.slug)
 }
 
 fn epoch(t: SystemTime) -> u64 {
