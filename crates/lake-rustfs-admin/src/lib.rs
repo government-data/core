@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use tokio::net::TcpListener;
 
+pub mod policy;
 pub mod routes;
 pub mod tls;
 
