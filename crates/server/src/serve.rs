@@ -230,12 +230,7 @@ fn machines_and_modules(
     secret_box: &SecretBox,
 ) -> Result<(MachinesService, ModuleRegistry), Failure> {
     let dolt = crate::catalog_wiring::DoltSnapshots::from_env()?;
-    let machines = machines_wiring::service(
-        &tenancy.pool,
-        provider.clone(),
-        tenancy.into(),
-        secret_box.clone(),
-    )?;
+    let machines = machines_wiring::service(&tenancy.pool, tenancy.into(), secret_box.clone())?;
     let machines = match &dolt {
         Some(d) => machines.with_dolt(d.clone()),
         None => machines,

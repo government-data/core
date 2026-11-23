@@ -66,18 +66,14 @@ pub(crate) async fn report(
         &Patterns::of_job(parameters),
         alerts,
     );
-    let published = drafts
+    drafts
         .publish(tenant, dataset, &proposal.mapping, &proposal.rules)
         .await
         .map_err(|e| {
             tracing::error!("map publish: {e}");
             StatusCode::SERVICE_UNAVAILABLE
         })?;
-    // Published, `main`'s mapping is the proposal's, which reads the source
-    // the job profiled; one already there is not known here (decision
-    // 0066, point 9: its extraction then waits while Trino is held).
-    let from = published.and(asked("source"));
-    first_cut(&api.pool, dataset, asked("requested_by"), from)
+    first_cut(&api.pool, dataset, asked("requested_by"))
         .await
         .map_err(|e| {
             tracing::error!("map cut: {e}");
@@ -85,14 +81,9 @@ pub(crate) async fn report(
         })
 }
 
-/// Today's cut of `dataset`, as _Run now_ opens it, its mapping reading
-/// `from` if known; one already there is left as it is.
-async fn first_cut(
-    pool: &PgPool,
-    dataset: &str,
-    by: Option<&str>,
-    from: Option<&str>,
-) -> Result<(), sqlx::Error> {
+/// Today's cut of `dataset`, as _Run now_ opens it; one already there is
+/// left as it is.
+async fn first_cut(pool: &PgPool, dataset: &str, by: Option<&str>) -> Result<(), sqlx::Error> {
     let now = Utc::now();
     let date = schedule::cut_date(now, DEFAULT_TIMEZONE)
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
@@ -103,7 +94,6 @@ async fn first_cut(
         schedule: None,
         requested_by: by.and_then(|b| Uuid::parse_str(b).ok()),
         due_at: now,
-        from,
     };
     let mut tx = pool.begin().await?;
     open_cut(&mut tx, &request).await?;

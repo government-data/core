@@ -47,7 +47,6 @@ mod settings_wiring;
 mod startup;
 mod tenants;
 mod timezone;
-mod trino_wiring;
 mod updater_certificate;
 mod updates_wiring;
 

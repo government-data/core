@@ -27,7 +27,6 @@ mod lake_warehouse;
 mod lifecycle;
 mod renew;
 mod series;
-mod trino;
 
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -56,7 +55,6 @@ pub use lake_replication::{Lakes, ReplicationReadiness, ReplicationStatus, RECON
 use lifecycle::done;
 pub use renew::{RenewError, Renewed};
 pub use series::MachineMetrics;
-pub use trino::{TrinoGate, TrinoHold, TrinoHoldError, TrinoJobs, TrinoQueries, TRINO_HOLD_TTL};
 
 /// How long a join token can be used (0029).
 pub const JOIN_TOKEN_TTL: Duration = Duration::from_secs(3600);
@@ -127,8 +125,6 @@ pub struct MachinesService {
     signer: Option<Arc<dyn CertificateSigner>>,
     /// The machines' sessions on the queue's PostgreSQL, ended at retiring.
     sessions: Option<Arc<dyn MachineSessions>>,
-    /// Trino's jobs and queries, for its coordinator's restart.
-    trino: Option<TrinoGate>,
     /// The catalog's Dolt, for its restart.
     dolt: Option<Arc<dyn DoltStore>>,
     /// The lake's gate's passes, shared by every clone.
@@ -175,7 +171,6 @@ impl MachinesService {
             clock,
             signer: None,
             sessions: None,
-            trino: None,
             dolt: None,
             lake: Arc::default(),
             lake_gates: Arc::default(),

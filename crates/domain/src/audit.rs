@@ -114,12 +114,15 @@ pub enum AuditEventType {
     /// A machine's certificate was refused at renewal (unknown, replaced,
     /// retired, of another role) or its request was bad: why in `action`.
     CertificateRefused,
-    /// Trino's coordinator asked whether it may restart (decision 0066,
-    /// point 9): the jobs that use Trino held (`trino:held`), or not, as
-    /// jobs or queries were running (`trino:busy`).
+    /// Retired (decision 0077): never written again, kept so the rows
+    /// already stored still read and their chain still hashes. Trino's
+    /// coordinator asked whether it may restart (decision 0066, point 9):
+    /// the jobs that use Trino held (`trino:held`), or not, as jobs or
+    /// queries were running (`trino:busy`).
     TrinoHeld,
-    /// The hold of Trino's jobs ended by its coordinator (`trino:released`),
-    /// or found already expired by itself (`trino:expired`).
+    /// Retired (decision 0077), as [`Self::TrinoHeld`]. The hold of Trino's
+    /// jobs ended by its coordinator (`trino:released`), or found already
+    /// expired by itself (`trino:expired`).
     TrinoReleased,
     /// The application VM's agent asked whether Dolt may restart (decision
     /// 0066, point 11): the catalog held (`dolt:held`), or not, as an
@@ -392,6 +395,19 @@ mod tests {
                 event_type
             );
         }
+    }
+
+    #[test]
+    fn the_retired_trino_events_still_parse() {
+        // Stored rows of Trino's hold, which nothing writes since 0077.
+        assert_eq!(
+            AuditEventType::parse("trino_held").unwrap(),
+            AuditEventType::TrinoHeld
+        );
+        assert_eq!(
+            AuditEventType::parse("trino_released").unwrap(),
+            AuditEventType::TrinoReleased
+        );
     }
 
     #[test]

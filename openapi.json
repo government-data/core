@@ -971,60 +971,6 @@
         }
       }
     },
-    "/internal/machines/trino/hold": {
-      "post": {
-        "tags": [
-          "machines"
-        ],
-        "summary": "`POST /internal/machines/trino/hold`: may Trino's coordinator restart?",
-        "operationId": "trino_hold_handler",
-        "responses": {
-          "200": {
-            "description": "Whether Trino is free; if so its jobs are held",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HoldOut"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not an approved or draining Trino coordinator's certificate"
-          },
-          "503": {
-            "description": "No Trino or queue here, or the client certificate header is not trusted"
-          }
-        }
-      }
-    },
-    "/internal/machines/trino/release": {
-      "post": {
-        "tags": [
-          "machines"
-        ],
-        "summary": "`POST /internal/machines/trino/release`: Trino answers again.",
-        "operationId": "trino_release_handler",
-        "responses": {
-          "200": {
-            "description": "The hold ended",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReleaseOut"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not an approved or draining Trino coordinator's certificate"
-          },
-          "503": {
-            "description": "No Trino or queue here, or the client certificate header is not trusted"
-          }
-        }
-      }
-    },
     "/lake/main/admin-keys": {
       "get": {
         "tags": [
@@ -5270,35 +5216,6 @@
           }
         }
       },
-      "HoldOut": {
-        "type": "object",
-        "description": "Whether Trino is free, and if so its jobs held.",
-        "required": [
-          "free",
-          "running_jobs"
-        ],
-        "properties": {
-          "free": {
-            "type": "boolean",
-            "description": "No job that uses Trino running and Trino running no query: the jobs\nthat use it are held until released or 15 minutes. Otherwise nothing\nis held: ask again later."
-          },
-          "running_jobs": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The jobs that use Trino running now.",
-            "minimum": 0
-          },
-          "running_queries": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64",
-            "description": "The queries Trino runs or queues now; `null` if it did not answer.",
-            "minimum": 0
-          }
-        }
-      },
       "IdentitiesOut": {
         "type": "object",
         "description": "The identities linked to the signed-in admin.",
@@ -6496,19 +6413,6 @@
             "items": {
               "$ref": "#/components/schemas/Refusal"
             }
-          }
-        }
-      },
-      "ReleaseOut": {
-        "type": "object",
-        "description": "Whether a hold was ended.",
-        "required": [
-          "released"
-        ],
-        "properties": {
-          "released": {
-            "type": "boolean",
-            "description": "`false` when there was none in force (it had expired by itself)."
           }
         }
       },

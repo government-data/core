@@ -20,9 +20,8 @@ pub use admins::{AdminContacts, PlatformAdmins};
 pub use machines::{
     Acceptance, DoltHold, DoltHoldError, DoltStore, InstallError, InstallFileError, Installed,
     IssuedJoinToken, JoinCommand, JoinError, Joined, LakeAdminError, LakeCheckError, MachinesError,
-    MachinesService, MainLakeState, Origin, RenewError, Renewed, ReplicaState, TrinoGate,
-    TrinoHold, TrinoHoldError, TrinoJobs, TrinoQueries, DOLT_HOLD_TTL, JOIN_TOKEN_TTL,
-    LAKE_CHECK_TTL, LAKE_GATE_ROLES, LAKE_ROLES, TRINO_HOLD_TTL,
+    MachinesService, MainLakeState, Origin, RenewError, Renewed, ReplicaState, DOLT_HOLD_TTL,
+    JOIN_TOKEN_TTL, LAKE_CHECK_TTL, LAKE_GATE_ROLES, LAKE_ROLES,
 };
 pub use machines::{AlertsApplied, AlertsError, DeliveredAlert, MachineMetrics};
 pub use machines::{Drives, DrivesError, MAX_DRIVES};

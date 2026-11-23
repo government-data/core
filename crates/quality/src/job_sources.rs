@@ -47,14 +47,6 @@ pub struct SourceAccess {
     pub previous: Option<BTreeMap<String, String>>,
 }
 
-impl SourceAccess {
-    /// Read through a catalog on Trino: never since decision 0077, every
-    /// driver is DuckDB's. Kept for the API's Trino paths until they go.
-    pub fn on_trino(&self) -> bool {
-        false
-    }
-}
-
 impl fmt::Debug for SourceAccess {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SourceAccess")

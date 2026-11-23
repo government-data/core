@@ -1,6 +1,6 @@
 //! Which machine calls a route that is not for renewing: known by the
 //! certificate Traefik's internal entry point verified (0066, point 5), for
-//! a route that serves one role (Trino's rules, its hold: point 9), and
+//! a route that serves one role (Dolt's hold, the lake's gate), and
 //! whether a certificate is the one its machine uses (point 14).
 
 use auth_gateway::app::machines::accept_certificate;

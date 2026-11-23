@@ -505,40 +505,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/internal/machines/trino/hold": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** `POST /internal/machines/trino/hold`: may Trino's coordinator restart? */
-        post: operations["trino_hold_handler"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/machines/trino/release": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** `POST /internal/machines/trino/release`: Trino answers again. */
-        post: operations["trino_release_handler"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/lake/main/admin-keys": {
         parameters: {
             query?: never;
@@ -2089,25 +2055,6 @@ export interface components {
         GrafanaDeliveryIn: {
             alerts: components["schemas"]["GrafanaAlertIn"][];
         };
-        /** @description Whether Trino is free, and if so its jobs held. */
-        HoldOut: {
-            /**
-             * @description No job that uses Trino running and Trino running no query: the jobs
-             *     that use it are held until released or 15 minutes. Otherwise nothing
-             *     is held: ask again later.
-             */
-            free: boolean;
-            /**
-             * Format: int64
-             * @description The jobs that use Trino running now.
-             */
-            running_jobs: number;
-            /**
-             * Format: int64
-             * @description The queries Trino runs or queues now; `null` if it did not answer.
-             */
-            running_queries?: number | null;
-        };
         /** @description The identities linked to the signed-in admin. */
         IdentitiesOut: {
             identities: components["schemas"]["IdentityOut"][];
@@ -2616,11 +2563,6 @@ export interface components {
         /** @description Every reason a source is refused. */
         Refusals: {
             errors: components["schemas"]["Refusal"][];
-        };
-        /** @description Whether a hold was ended. */
-        ReleaseOut: {
-            /** @description `false` when there was none in force (it had expired by itself). */
-            released: boolean;
         };
         /** @description A machine asks for a new certificate. */
         RenewIn: {
@@ -4142,74 +4084,6 @@ export interface operations {
                 content?: never;
             };
             /** @description No CA, or the client certificate header is not trusted here */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    trino_hold_handler: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Whether Trino is free; if so its jobs are held */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HoldOut"];
-                };
-            };
-            /** @description Not an approved or draining Trino coordinator's certificate */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No Trino or queue here, or the client certificate header is not trusted */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    trino_release_handler: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The hold ended */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReleaseOut"];
-                };
-            };
-            /** @description Not an approved or draining Trino coordinator's certificate */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No Trino or queue here, or the client certificate header is not trusted */
             503: {
                 headers: {
                     [name: string]: unknown;

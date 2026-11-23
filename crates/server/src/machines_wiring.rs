@@ -1,7 +1,7 @@
 //! The installation's machines (decisions 0029 and 0066): their use cases
 //! over PostgreSQL, the administrators' routes, the route a machine joins
-//! with, the one it renews its certificate with, Trino's coordinator's
-//! hold before it restarts, Dolt's, the lake's gate, and Grafana's alerts
+//! with, the one it renews its certificate with, Dolt's hold before it
+//! restarts, the lake's gate, and Grafana's alerts
 //! about the machines (0072); and what a new machine is installed with
 //! (`/install/…`: `join.sh`, the CA, and its role's compose file, its
 //! entrypoints and a lake's root keys for a usable join token), the join
@@ -11,7 +11,7 @@
 //! it does not start.
 //!
 //! `INTERNAL_CLIENT_CERT_HEADER=trusted` lets the renew route, the OIDC
-//! provider's token endpoint, Trino's hold, Dolt's, the lake's gate and the
+//! provider's token endpoint, Dolt's hold, the lake's gate and the
 //! alerts route read the client certificate Traefik's internal entry point
 //! passes. Set it only where the API cannot be reached but through Traefik:
 //! anyone who reaches the API directly could write that header. Unset, the
@@ -20,9 +20,9 @@
 use std::sync::Arc;
 
 use api::rate_limit::RateLimitConfig;
-use application::{MachinesService, TrinoGate};
+use application::MachinesService;
 use auth_gateway::http::client_cert::ClientCertificates;
-use auth_gateway::{AuthorizationServer, SessionService};
+use auth_gateway::SessionService;
 use infrastructure::ca::{Ca, X509CertificateReader};
 use infrastructure::mimir_series::MimirSeries;
 use infrastructure::rustfs_admin::RustfsLakeAdmin;
@@ -35,7 +35,6 @@ use infrastructure::{
 use crate::config::{env_value, public_url_from_env};
 use crate::replication_wiring;
 use crate::tenants::CellTenants;
-use crate::trino_wiring::{ApiTrino, QueueTrinoJobs};
 
 /// The machines' routes, both for people (a session and
 /// `admin:ManageMachines`) and for machines: the install routes that check
@@ -62,10 +61,6 @@ pub(crate) fn routes(
             machines.clone(),
             certificates.clone(),
         ))
-        .merge(api::machines::trino::routes(
-            machines.clone(),
-            certificates.clone(),
-        ))
         .merge(api::machines::dolt::routes(
             machines.clone(),
             certificates.clone(),
@@ -79,27 +74,15 @@ pub(crate) fn routes(
 }
 
 /// The machines' use cases over PostgreSQL, with the installation's CA if
-/// it has one, with Trino (`QUALITY_TRINO_URL`) its coordinator's hold
-/// over the queue of the cell's `tenants` (0066, point 9), and the lakes'
-/// root keys and admin keys sealed with the settings' key (`sealer`, 0066
-/// step 11).
+/// it has one, the replication of the cell's tenants' `warehouses`, and the
+/// lakes' root keys and admin keys sealed with the settings' key (`sealer`,
+/// 0066 step 11).
 pub(crate) fn service(
     pool: &PgPool,
-    provider: Option<AuthorizationServer>,
-    tenants: CellTenants,
+    warehouses: CellTenants,
     sealer: SecretBox,
 ) -> Result<MachinesService, Box<dyn std::error::Error>> {
-    let warehouses = tenants.clone();
-    let machines = match ApiTrino::from_env(provider)? {
-        Some(trino) => base(pool).with_trino(TrinoGate {
-            jobs: Arc::new(QueueTrinoJobs {
-                pool: pool.clone(),
-                tenants,
-            }),
-            queries: Arc::new(trino),
-        }),
-        None => base(pool),
-    };
+    let machines = base(pool);
     let ca = Ca::from_env()?;
     let files = EmbeddedInstallFiles::new(ca.as_ref().map(Ca::cert_pem))?;
     let tokens = Arc::new(PgMachines::new(pool.clone()));

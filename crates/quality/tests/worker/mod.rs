@@ -574,7 +574,6 @@ impl Fixture {
                 schedule: None,
                 requested_by: None,
                 due_at: chrono::Utc::now(),
-                from: None,
             };
             let (_, _, job) = open_cut(&mut tx, &request).await.unwrap();
             tx.commit().await.unwrap();

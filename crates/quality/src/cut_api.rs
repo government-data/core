@@ -106,10 +106,9 @@ async fn run_now(
     if !caller.can(RUN, &resource) {
         return status(StatusCode::FORBIDDEN, "forbidden");
     }
-    let from = match source_of(&api, &dataset).await {
-        Ok(from) => from,
-        Err((code, why)) => return status(code, why),
-    };
+    if let Err((code, why)) = source_of(&api, &dataset).await {
+        return status(code, why);
+    }
     let now = Utc::now();
     let Ok(date) = schedule::cut_date(now, DEFAULT_TIMEZONE) else {
         return status(StatusCode::INTERNAL_SERVER_ERROR, "timezone");
@@ -121,8 +120,6 @@ async fn run_now(
         schedule: None,
         requested_by: Uuid::parse_str(&caller.account).ok(),
         due_at: now,
-        // Its extraction is known to use Trino or not (decision 0066).
-        from: Some(&from),
     };
     let opened = async {
         let mut tx = api.pool.begin().await?;
