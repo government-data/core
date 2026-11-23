@@ -153,9 +153,18 @@ pub(crate) struct WorkerApi {
     pub(crate) services: WorkerServices,
 }
 
-/// `GET /internal/jobs/{tenant}/{id}`, `GET …/lake` and `POST …/report`.
+/// `GET /internal/jobs/{id}`, `GET …/lake` and `POST …/report` (decision
+/// 0076: the job is the installation's, the main tenant's), and the same
+/// under `/internal/jobs/{tenant}/{id}` for workers not yet updated, until
+/// the tenants' contraction.
 pub fn routes(pool: PgPool, services: WorkerServices) -> Router {
     Router::new()
+        .route("/internal/jobs/{id}", get(details_of))
+        .route("/internal/jobs/{id}/lake", get(lake_again_of))
+        .route(
+            "/internal/jobs/{id}/report",
+            post(report_of).layer(DefaultBodyLimit::max(REPORT_MAX)),
+        )
         .route("/internal/jobs/{tenant}/{id}", get(details))
         .route(
             "/internal/jobs/{tenant}/{id}/lake",
@@ -170,6 +179,39 @@ pub fn routes(pool: PgPool, services: WorkerServices) -> Router {
         // Each call runs in its job's span (decision 0026, point 1).
         .route_layer(axum::middleware::from_fn(job_span::enter))
         .with_state(WorkerApi { pool, services })
+}
+
+/// The tenant of every job of the installation (decision 0076).
+fn main_tenant() -> Uuid {
+    Uuid::parse_str(tenancy::MAIN_ID).unwrap_or_default()
+}
+
+/// `GET /internal/jobs/{id}`.
+async fn details_of(
+    api: State<WorkerApi>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<JobDetails>, StatusCode> {
+    details(api, Path((main_tenant(), id)), headers).await
+}
+
+/// `GET /internal/jobs/{id}/lake`.
+async fn lake_again_of(
+    api: State<WorkerApi>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+) -> Result<Json<LakeAccess>, StatusCode> {
+    job_lake::lake_again(api, Path((main_tenant(), id)), headers).await
+}
+
+/// `POST /internal/jobs/{id}/report`.
+async fn report_of(
+    api: State<WorkerApi>,
+    Path(id): Path<Uuid>,
+    headers: HeaderMap,
+    body: Json<serde_json::Value>,
+) -> Result<StatusCode, StatusCode> {
+    worker_report::report(api, Path((main_tenant(), id)), headers, body).await
 }
 
 pub(crate) fn job_tenant(tenant: Uuid) -> Tenant {

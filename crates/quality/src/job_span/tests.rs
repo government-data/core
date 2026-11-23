@@ -25,7 +25,8 @@ fn lines(uri: &str, parameters: Value) -> Vec<Map<String, Value>> {
         StatusCode::NO_CONTENT
     };
     let app = Router::new()
-        .route("/internal/jobs/{tenant}/{id}/report", post(handler))
+        .route("/internal/jobs/{tenant}/{id}/report", post(handler.clone()))
+        .route("/internal/jobs/{id}/report", post(handler))
         .route_layer(axum::middleware::from_fn(enter));
     let request = Request::post(uri).body(Body::empty()).unwrap();
     logging::json_lines("server", || {
@@ -67,6 +68,15 @@ fn a_job_of_no_cut_has_its_job_id_and_tenant_only() {
     assert!(!line.contains_key("run_id"), "{line:?}");
     assert!(!line.contains_key("run"), "{line:?}");
     assert!(!line.contains_key("source"), "{line:?}");
+}
+
+#[test]
+fn a_route_without_the_tenant_has_the_job_id_only() {
+    let uri = format!("/internal/jobs/{JOB}/report");
+    let lines = lines(&uri, json!({ "source": "ledger" }));
+    let line = &lines[0];
+    assert_eq!(line["job_id"], JOB.to_string());
+    assert!(!line.contains_key("tenant"), "{line:?}");
 }
 
 #[test]

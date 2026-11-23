@@ -197,7 +197,7 @@ async fn slot_loop(
 }
 
 async fn run_job(api: &api::Api, ca: Option<&str>, job: &ClaimedJob) -> Result<(), Failure> {
-    let details = match api.details(job.tenant_id, job.id).await {
+    let details = match api.details(job.id).await {
         Ok(details) => details,
         Err(e) if e.is::<api::NotNow>() => return Err(e),
         Err(e) => return Err(format!("job details: {e}").into()),
@@ -283,7 +283,7 @@ async fn send_report(
     job: &ClaimedJob,
     report: &impl serde::Serialize,
 ) -> Result<(), Failure> {
-    api.report(job.tenant_id, job.id, report)
+    api.report(job.id, report)
         .await
         .map_err(|e| format!("report: {e}").into())
 }
@@ -301,7 +301,7 @@ async fn run_extract(
     let plan = job_span::blocking(move || extract::prepare(&d, c.as_deref())).await??;
     let lake = match (&details.lake, plan.created) {
         (Some(_), true) => api
-            .lake_again(job.tenant_id, job.id)
+            .lake_again(job.id)
             .await
             .map_err(|e| format!("lake credentials: {e}"))?,
         (Some(lake), false) => lake.clone(),

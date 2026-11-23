@@ -6,8 +6,8 @@
 //! job is loaded ([`record`]). Only ids: never another value of the
 //! parameters.
 
-use axum::extract::rejection::PathRejection;
-use axum::extract::{Path, Request};
+use axum::extract::rejection::RawPathParamsRejection;
+use axum::extract::{RawPathParams, Request};
 use axum::middleware::Next;
 use axum::response::Response;
 use tracing::field::Empty;
@@ -26,27 +26,47 @@ pub fn cut_of(parameters: &serde_json::Value) -> (Option<Uuid>, Option<i64>) {
     (id, run)
 }
 
-/// Middleware of `/internal/jobs/{tenant}/{id}/…`: the rest of the request
-/// runs inside the job's span. A path that does not parse is left to the
-/// handler, which refuses it as before.
+/// Middleware of `/internal/jobs/{id}/…` (and of `/internal/jobs/{tenant}/{id}/…`,
+/// whose tenant it records too): the rest of the request runs inside the
+/// job's span. A path that does not parse is left to the handler, which
+/// refuses it as before.
 pub(crate) async fn enter(
-    path: Result<Path<(Uuid, Uuid)>, PathRejection>,
+    params: Result<RawPathParams, RawPathParamsRejection>,
     request: Request,
     next: Next,
 ) -> Response {
-    let Ok(Path((tenant, id))) = path else {
+    let Some((tenant, id)) = params.ok().and_then(|p| ids(&p)) else {
         return next.run(request).await;
     };
     let span = tracing::info_span!(
         "job",
         job_id = %id,
-        tenant = %tenant,
+        tenant = Empty,
         run_id = Empty,
         run = Empty,
         kind = Empty,
         dataset = Empty,
     );
+    if let Some(tenant) = tenant {
+        span.record("tenant", tracing::field::display(tenant));
+    }
     next.run(request).instrument(span).await
+}
+
+/// The job's id and, on a tenant-qualified route, its tenant: `None` if
+/// one of them is not an id.
+fn ids(params: &RawPathParams) -> Option<(Option<Uuid>, Uuid)> {
+    let mut tenant = None;
+    let mut id = None;
+    for (name, value) in params {
+        let value = value.parse::<Uuid>().ok()?;
+        match name {
+            "tenant" => tenant = Some(value),
+            "id" => id = Some(value),
+            _ => {}
+        }
+    }
+    Some((tenant, id?))
 }
 
 /// Records on the current job span what the loaded job adds to its path.

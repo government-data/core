@@ -209,17 +209,16 @@ impl Api {
         Ok(request.send().await?)
     }
 
-    /// `GET` a route of a job this worker holds: `/internal/jobs/<tenant>/<id><tail>`.
+    /// `GET` a route of a job this worker holds: `/internal/jobs/<id><tail>`.
     async fn job_get<T: serde::de::DeserializeOwned>(
         &self,
-        tenant: Uuid,
         id: Uuid,
         tail: &str,
     ) -> Result<T, Failure> {
         let token = self.token().await?;
         Ok(self
             .api()?
-            .get(format!("{}/internal/jobs/{tenant}/{id}{tail}", self.base))
+            .get(format!("{}/internal/jobs/{id}{tail}", self.base))
             .header(REQUEST_ID, request_id(id))
             .bearer_auth(token)
             .send()
@@ -229,8 +228,8 @@ impl Api {
             .await?)
     }
 
-    pub(crate) async fn details(&self, tenant: Uuid, id: Uuid) -> Result<JobDetails, Failure> {
-        let got: Result<JobDetails, Failure> = self.job_get(tenant, id, "").await;
+    pub(crate) async fn details(&self, id: Uuid) -> Result<JobDetails, Failure> {
+        let got: Result<JobDetails, Failure> = self.job_get(id, "").await;
         let mut details = got.map_err(|e| match e.downcast_ref::<reqwest::Error>() {
             Some(http) if http.status() == Some(StatusCode::SERVICE_UNAVAILABLE) => NotNow.into(),
             _ => e,
@@ -242,21 +241,16 @@ impl Api {
     }
 
     /// An extraction's credentials, asked again once it created its table.
-    pub(crate) async fn lake_again(&self, tenant: Uuid, id: Uuid) -> Result<LakeAccess, Failure> {
-        let lake = self.job_get(tenant, id, "/lake").await?;
+    pub(crate) async fn lake_again(&self, id: Uuid) -> Result<LakeAccess, Failure> {
+        let lake = self.job_get(id, "/lake").await?;
         Ok(reached_at(self.lake_url.as_deref(), lake))
     }
 
     /// A job's report: an evaluation's or an extraction's.
-    pub(crate) async fn report(
-        &self,
-        tenant: Uuid,
-        id: Uuid,
-        report: &impl Serialize,
-    ) -> Result<(), Failure> {
+    pub(crate) async fn report(&self, id: Uuid, report: &impl Serialize) -> Result<(), Failure> {
         let token = self.token().await?;
         self.api()?
-            .post(format!("{}/internal/jobs/{tenant}/{id}/report", self.base))
+            .post(format!("{}/internal/jobs/{id}/report", self.base))
             .header(REQUEST_ID, request_id(id))
             .bearer_auth(token)
             .json(report)
