@@ -2,10 +2,8 @@
 //!
 //! The tests connect as in production: a role without superuser or BYPASSRLS
 //! that **owns** the tables (the owner skips RLS if the table has no FORCE).
-//! The container's superuser only sets the scene. Needs Docker.
-//!
-//! The last tests cover the online edition's pool, which sets each task's
-//! tenant on the connection it lends.
+//! The container's superuser only sets the scene. Needs Docker. The
+//! policies stay until the tenants' contraction (decision 0076).
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
@@ -116,99 +114,4 @@ async fn every_tenant_table_has_forced_row_level_security() {
         without_rls.is_empty(),
         "tables with tenant_id and no forced RLS: {without_rls:?}"
     );
-}
-
-async fn pool_en_linea(db: &testkit::TestDb, conexiones: u32) -> PgPool {
-    infrastructure::db::with_tenancy(
-        PgPoolOptions::new().max_connections(conexiones),
-        tenancy::Mode::Multiple,
-    )
-    .connect_with(testkit::app_role(db).await)
-    .await
-    .unwrap()
-}
-
-fn tenant(id: &str, slug: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: slug.into(),
-    }
-}
-
-async fn count_roles(pool: &PgPool) -> i64 {
-    sqlx::query_scalar("SELECT count(*) FROM iam_groups")
-        .fetch_one(pool)
-        .await
-        .unwrap()
-}
-
-#[tokio::test]
-async fn the_online_pool_works_inside_the_tenant_of_each_task() {
-    let db = testkit::spawn_test_db().await;
-    let acme = testkit::new_tenant(&db, "acme").await;
-    let pool = pool_en_linea(&db, 4).await;
-
-    tenancy::within(tenant(&acme, "acme"), async {
-        sqlx::query("INSERT INTO iam_groups (name) VALUES ('finance')")
-            .execute(&pool)
-            .await
-            .unwrap();
-        assert_eq!(count_roles(&pool).await, 1);
-    })
-    .await;
-    tenancy::within(tenant(MAIN, "main"), async {
-        assert_eq!(count_roles(&pool).await, 0);
-    })
-    .await;
-
-    // Without a tenant nothing is seen or written: it never falls into the main one.
-    assert_eq!(count_roles(&pool).await, 0);
-    let error = sqlx::query("INSERT INTO iam_groups (name) VALUES ('orphan')")
-        .execute(&pool)
-        .await
-        .unwrap_err();
-    assert!(error.as_database_error().is_some(), "{error}");
-}
-
-/// Many tasks of two tenants over a pool of 2 connections: each connection is
-/// reused with one tenant and the other, and nobody sees the other's rows.
-#[tokio::test]
-async fn reused_connections_never_carry_the_previous_tenant() {
-    let db = testkit::spawn_test_db().await;
-    let a = testkit::new_tenant(&db, "a").await;
-    let b = testkit::new_tenant(&db, "b").await;
-    let pool = pool_en_linea(&db, 2).await;
-
-    let mut tasks = Vec::new();
-    for i in 0..40 {
-        let (id, slug) = if i % 2 == 0 { (&a, "a") } else { (&b, "b") };
-        let pool = pool.clone();
-        let tenant = tenant(id, slug);
-        tasks.push(tokio::spawn(tenancy::within(tenant, async move {
-            sqlx::query("INSERT INTO iam_groups (name) VALUES ($1)")
-                .bind(format!("role-{i}"))
-                .execute(&pool)
-                .await
-                .unwrap();
-            let names: Vec<String> = sqlx::query_scalar("SELECT name FROM iam_groups")
-                .fetch_all(&pool)
-                .await
-                .unwrap();
-            // Only its own: all with the same parity as its own.
-            assert!(
-                names.iter().all(|n| {
-                    let j: usize = n.trim_start_matches("role-").parse().unwrap();
-                    j % 2 == i % 2
-                }),
-                "task {i} saw {names:?}"
-            );
-        })));
-    }
-    for task in tasks {
-        task.await.unwrap();
-    }
-    for (id, slug) in [(&a, "a"), (&b, "b")] {
-        let total = tenancy::within(tenant(id, slug), count_roles(&pool)).await;
-        assert_eq!(total, 20);
-    }
 }

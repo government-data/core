@@ -28,8 +28,9 @@ mod machines {
         SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000)
     }
 
-    async fn app_pool(db: &testkit::TestDb, mode: tenancy::Mode) -> PgPool {
-        infrastructure::db::with_tenancy(PgPoolOptions::new().max_connections(4), mode)
+    async fn app_pool(db: &testkit::TestDb) -> PgPool {
+        PgPoolOptions::new()
+            .max_connections(4)
             .connect_with(testkit::app_role(db).await)
             .await
             .unwrap()
@@ -65,7 +66,7 @@ mod machines {
     #[tokio::test]
     async fn machines_join_and_live_their_whole_life() {
         let db = testkit::spawn_test_db().await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Single).await);
+        let reg = PgMachines::new(app_pool(&db).await);
         let mint = RingJoinTokenMint::new();
         let token = mint.mint().unwrap();
         assert!(is_join_token(&token));
@@ -121,7 +122,7 @@ mod machines {
     #[tokio::test]
     async fn machines_tokens_work_once_and_within_their_hour() {
         let db = testkit::spawn_test_db().await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Single).await);
+        let reg = PgMachines::new(app_pool(&db).await);
         let refused = Err(RedeemRefusal::Token);
 
         let hash = issue(&reg, None, t0() + HOUR).await;
@@ -148,7 +149,7 @@ mod machines {
     #[tokio::test]
     async fn machines_of_two_redemptions_of_one_token_one_wins() {
         let db = testkit::spawn_test_db().await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Single).await);
+        let reg = PgMachines::new(app_pool(&db).await);
         for round in 0..10 {
             let hash = issue(&reg, None, t0() + HOUR).await;
             let (a, b) = (format!("a-{round}"), format!("b-{round}"));
@@ -164,7 +165,7 @@ mod machines {
     #[tokio::test]
     async fn machines_names_belong_to_one_live_machine() {
         let db = testkit::spawn_test_db().await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Single).await);
+        let reg = PgMachines::new(app_pool(&db).await);
         let first = join(&reg, "worker-01").await;
 
         let hash = issue(&reg, None, t0() + HOUR).await;
@@ -212,7 +213,7 @@ mod machines {
     #[tokio::test]
     async fn machines_move_only_as_allowed() {
         let db = testkit::spawn_test_db().await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Single).await);
+        let reg = PgMachines::new(app_pool(&db).await);
         let mut n = 0;
         for from in MachineState::ALL {
             for target in MachineState::ALL {
@@ -243,7 +244,7 @@ mod machines {
     #[tokio::test]
     async fn machines_keep_the_serial_in_use_until_retired() {
         let db = testkit::spawn_test_db().await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Single).await);
+        let reg = PgMachines::new(app_pool(&db).await);
         let m = join(&reg, "worker-01").await;
         let serial = |reg: &PgMachines| {
             let reg = reg.clone();
@@ -273,54 +274,11 @@ mod machines {
     }
 
     #[tokio::test]
-    async fn machines_of_another_tenant_are_not_seen() {
-        let db = testkit::spawn_test_db().await;
-        let acme = testkit::new_tenant(&db, "acme").await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Multiple).await);
-        let in_tenant = |id: &str| tenancy::Tenant {
-            id: id.into(),
-            slug: "t".into(),
-        };
-
-        let (theirs, unused) = tenancy::within(in_tenant(&acme), async {
-            let m = join(&reg, "worker-01").await;
-            (m, issue(&reg, None, t0() + HOUR).await)
-        })
-        .await;
-
-        tenancy::within(in_tenant(MAIN), async {
-            assert!(reg.list().await.unwrap().is_empty());
-            assert_eq!(reg.find_live("worker-01").await.unwrap(), None);
-            assert_eq!(reg.find(&theirs.id).await.unwrap(), None);
-            let change = reg.transition(&theirs.id, Approved, &admin(), t0()).await;
-            assert_eq!(change.unwrap(), MachineChange::NotFound);
-            let cert = reg.record_certificate(&theirs.id, "ab", t0()).await;
-            assert_eq!(cert.unwrap(), MachineChange::NotFound);
-            let redeemed = reg.redeem(&unused, "worker-02", t0()).await;
-            assert_eq!(redeemed.unwrap(), Err(RedeemRefusal::Token));
-            // Its own machine may have the other tenant's name.
-            join(&reg, "worker-01").await;
-        })
-        .await;
-
-        tenancy::within(in_tenant(&acme), async {
-            let mine = reg.list().await.unwrap();
-            assert_eq!(mine.len(), 1);
-            assert_eq!(mine[0].state, Pending);
-        })
-        .await;
-    }
-
-    /// Ending a machine's sessions takes privileges the application's role
-    /// has only when machines have certificates (initdb/20-queue-role.sh):
-    /// without them it is a failure, not "none". The sessions ended for real
-    /// are the worker's TLS tests (`queue_conn/machines_tests.rs`).
-    #[tokio::test]
     async fn ending_a_machines_sessions_needs_its_privileges() {
         use auth_gateway::MachineSessions;
         use infrastructure::PgMachineSessions;
         let db = testkit::spawn_test_db().await;
-        let app = app_pool(&db, tenancy::Mode::Single).await;
+        let app = app_pool(&db).await;
         let refused = PgMachineSessions::new(app.clone()).end("worker-01").await;
         assert!(refused
             .unwrap_err()
@@ -340,7 +298,7 @@ mod machines {
     #[tokio::test]
     async fn the_application_vm_is_a_machine_that_never_joins() {
         let db = testkit::spawn_test_db().await;
-        let reg = PgMachines::new(app_pool(&db, tenancy::Mode::Single).await);
+        let reg = PgMachines::new(app_pool(&db).await);
         sqlx::query(
             "INSERT INTO machines (tenant_id, name, role, state) \
              VALUES ($1::uuid, 'qd-app', 'app', 'approved')",

@@ -29,16 +29,13 @@ fn layout(nodes: &[&str], drives: u16) -> PoolLayout {
 }
 
 #[tokio::test]
-async fn a_pool_is_kept_in_order_defined_again_in_place_and_seen_by_its_tenant_alone() {
+async fn a_pool_is_kept_in_order_and_defined_again_in_place() {
     let db = testkit::spawn_test_db().await;
-    let acme = testkit::new_tenant(&db, "acme").await;
-    let pool = infrastructure::db::with_tenancy(
-        PgPoolOptions::new().max_connections(4),
-        tenancy::Mode::Multiple,
-    )
-    .connect_with(testkit::app_role(&db).await)
-    .await
-    .unwrap();
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect_with(testkit::app_role(&db).await)
+        .await
+        .unwrap();
     let store = PgLakePools::new(pool.clone());
     let first = layout(&["lake-d", "lake-a", "lake-c", "lake-b"], 2);
     let second = layout(&["lake-a", "lake-b", "lake-c", "lake-d", "lake-e"], 1);
@@ -59,10 +56,6 @@ async fn a_pool_is_kept_in_order_defined_again_in_place_and_seen_by_its_tenant_a
             (second.clone(), OTHER)
         );
         assert_eq!(store.all().await.unwrap().len(), 1, "one row per pool");
-    })
-    .await;
-    tenancy::within(tenant(&acme), async {
-        assert!(store.all().await.unwrap().is_empty(), "another tenant's");
     })
     .await;
     let three: Result<(i64,), _> = tenancy::within(tenant(MAIN), async {

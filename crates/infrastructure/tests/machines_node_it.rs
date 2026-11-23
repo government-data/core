@@ -19,13 +19,11 @@ fn t0() -> SystemTime {
 #[tokio::test]
 async fn a_node_token_makes_only_the_machine_it_names() {
     let db = testkit::spawn_test_db().await;
-    let pool = infrastructure::db::with_tenancy(
-        PgPoolOptions::new().max_connections(4),
-        tenancy::Mode::Multiple,
-    )
-    .connect_with(testkit::app_role(&db).await)
-    .await
-    .unwrap();
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect_with(testkit::app_role(&db).await)
+        .await
+        .unwrap();
     let reg = PgMachines::new(pool);
     let mint = RingJoinTokenMint::new();
     let token = NewJoinToken {

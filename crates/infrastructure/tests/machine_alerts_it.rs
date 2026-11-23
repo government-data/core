@@ -84,13 +84,11 @@ async fn rows(pool: &PgPool) -> Vec<Row> {
 
 async fn world() -> (testkit::TestDb, PgPool, PgMachineAlerts, String) {
     let db = testkit::spawn_test_db().await;
-    let pool = infrastructure::db::with_tenancy(
-        PgPoolOptions::new().max_connections(4),
-        tenancy::Mode::Multiple,
-    )
-    .connect_with(testkit::app_role(&db).await)
-    .await
-    .unwrap();
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect_with(testkit::app_role(&db).await)
+        .await
+        .unwrap();
     let machine: (String,) = tenancy::within(tenant(MAIN), async {
         sqlx::query_as(
             "INSERT INTO machines (name, role, state) VALUES ('lake-a', 'lake', 'approved') \
@@ -192,9 +190,8 @@ async fn machineless_rows_and_the_heartbeat_are_kept_by_their_names() {
 }
 
 #[tokio::test]
-async fn a_delivery_is_one_transaction_and_its_tenants_alone() {
-    let (db, pool, store, machine) = world().await;
-    let acme = testkit::new_tenant(&db, "acme").await;
+async fn a_delivery_is_one_transaction() {
+    let (_db, pool, store, machine) = world().await;
     let unknown = disk("00000000-0000-0000-0000-00000000dead", 0.07);
     let changes = [
         AlertChange::Firing(disk(&machine, 0.07)),
@@ -203,14 +200,4 @@ async fn a_delivery_is_one_transaction_and_its_tenants_alone() {
     let failed = tenancy::within(tenant(MAIN), store.apply(&changes, at(10))).await;
     assert!(failed.is_err(), "no such machine");
     assert!(rows(&pool).await.is_empty(), "nothing of it kept");
-
-    apply(&store, &[AlertChange::Firing(disk(&machine, 0.07))], 10).await;
-    let seen: Vec<(String,)> = tenancy::within(tenant(&acme), async {
-        sqlx::query_as("SELECT fingerprint FROM machine_alerts")
-            .fetch_all(&pool)
-            .await
-            .unwrap()
-    })
-    .await;
-    assert!(seen.is_empty(), "another tenant sees none");
 }
