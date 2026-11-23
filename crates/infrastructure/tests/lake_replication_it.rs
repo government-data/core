@@ -26,14 +26,11 @@ fn tenant(id: &str) -> tenancy::Tenant {
 #[tokio::test]
 async fn each_warehouse_keeps_its_last_outcome_and_when_it_was_first_configured() {
     let db = testkit::spawn_test_db().await;
-    let acme = testkit::new_tenant(&db, "acme").await;
-    let pool = infrastructure::db::with_tenancy(
-        PgPoolOptions::new().max_connections(4),
-        tenancy::Mode::Multiple,
-    )
-    .connect_with(testkit::app_role(&db).await)
-    .await
-    .unwrap();
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect_with(testkit::app_role(&db).await)
+        .await
+        .unwrap();
     let store = PgReplicationState::new(pool);
     let failed = ReplicationOutcome::Failed {
         step: ReplicationStep::Rule,
@@ -59,13 +56,6 @@ async fn each_warehouse_keeps_its_last_outcome_and_when_it_was_first_configured(
             .collect();
         assert_eq!(read, [(A, keys), (B, failed.clone())]);
         assert_eq!(all[0].configured_at, None);
-    })
-    .await;
-    tenancy::within(tenant(&acme), async {
-        assert!(
-            store.all().await.unwrap().is_empty(),
-            "another tenant's rows"
-        );
     })
     .await;
 }

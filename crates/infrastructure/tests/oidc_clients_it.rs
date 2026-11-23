@@ -13,13 +13,11 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
 async fn app_pool(db: &testkit::TestDb) -> PgPool {
-    infrastructure::db::with_tenancy(
-        PgPoolOptions::new().max_connections(2),
-        tenancy::Mode::Single,
-    )
-    .connect_with(testkit::app_role(db).await)
-    .await
-    .unwrap()
+    PgPoolOptions::new()
+        .max_connections(2)
+        .connect_with(testkit::app_role(db).await)
+        .await
+        .unwrap()
 }
 
 fn machine_settings() -> ClientSettings {
