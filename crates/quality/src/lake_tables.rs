@@ -120,7 +120,6 @@ pub(crate) async fn store(
 /// no data file; none without an issuer.
 pub(crate) async fn access(
     api: &WorkerApi,
-    tenant: Uuid,
     job: Uuid,
     client: &str,
     headers: &HeaderMap,
@@ -128,7 +127,7 @@ pub(crate) async fn access(
     let Some(issuer) = &api.services.lake else {
         return Ok(None);
     };
-    let warehouse = lake::warehouse(tenant);
+    let warehouse = lake::WAREHOUSE.to_string();
     job_sources::record(
         api.services.issues.as_deref(),
         job,

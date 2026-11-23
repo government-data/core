@@ -39,7 +39,6 @@ async fn place(
 /// reading its tenant's warehouse, recorded first. None without an issuer.
 pub(crate) async fn read_access(
     api: &WorkerApi,
-    tenant: Uuid,
     job: Uuid,
     kind: &str,
     client: &str,
@@ -48,20 +47,17 @@ pub(crate) async fn read_access(
     let Some(issuer) = &api.services.lake else {
         return Ok(None);
     };
-    let warehouse = lake::warehouse(tenant);
+    let warehouse = lake::WAREHOUSE.to_string();
     let resource = format!("warehouse/{warehouse}");
     let log = api.services.issues.as_deref();
     job_sources::record(log, job, kind, client, headers, &resource).await?;
-    Ok(Some(
-        job_sources::read_access(issuer.as_ref(), tenant, job).await?,
-    ))
+    Ok(Some(job_sources::read_access(issuer.as_ref(), job).await?))
 }
 
 /// The extraction's credentials for `mapping`'s bronze and silver tables,
 /// each recorded first.
 pub(crate) async fn extract_access(
     api: &WorkerApi,
-    tenant: Uuid,
     job: Uuid,
     client: &str,
     headers: &HeaderMap,
@@ -73,7 +69,7 @@ pub(crate) async fn extract_access(
     let Ok(mapping) = Mapping::parse(mapping) else {
         return Ok(None);
     };
-    let warehouse = lake::warehouse(tenant);
+    let warehouse = lake::WAREHOUSE.to_string();
     let mut placed = Vec::new();
     for at in std::iter::once(bronze(&mapping)).chain(silver(&mapping)) {
         let prefix = place(tables.as_ref(), &warehouse, &at).await?;
@@ -127,7 +123,7 @@ pub(crate) async fn lake_again(
                 StatusCode::SERVICE_UNAVAILABLE
             })?
             .ok_or(StatusCode::NOT_FOUND)?;
-        extract_access(&api, tenant, id, &client, &headers, &snapshot.mapping)
+        extract_access(&api, id, &client, &headers, &snapshot.mapping)
             .await?
             .map(Json)
             .ok_or(StatusCode::SERVICE_UNAVAILABLE)

@@ -120,10 +120,9 @@ pub async fn source_for(
 /// Read-only credentials for the tenant's warehouse, named after the job.
 pub(crate) async fn read_access(
     issuer: &dyn LakeIssuer,
-    tenant: Uuid,
     job: Uuid,
 ) -> Result<LakeAccess, StatusCode> {
-    let warehouse = lake::warehouse(tenant);
+    let warehouse = lake::WAREHOUSE.to_string();
     issuer
         .issue(
             &warehouse,

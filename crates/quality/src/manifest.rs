@@ -156,14 +156,13 @@ pub trait ManifestStore: Send + Sync {
 /// report finds it written; its key either way.
 pub(crate) async fn write(
     store: &dyn ManifestStore,
-    tenant: Uuid,
     key: String,
     manifest: &impl Serialize,
 ) -> Result<String, StatusCode> {
     let body =
         serde_json::to_vec_pretty(manifest).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     store
-        .put_once(&crate::lake::warehouse(tenant), &key, body)
+        .put_once(crate::lake::WAREHOUSE, &key, body)
         .await
         .map_err(|e| {
             tracing::error!("manifest: {e}");

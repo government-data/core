@@ -1,14 +1,13 @@
 //! The replication of the main lake into the replica (decision 0066 step
-//! 11, the user's rulings of 2026-11-13): the tenants' warehouses the
-//! application configures it for, and its periodic reconcile.
+//! 11, the user's rulings of 2026-11-13): the warehouse the application
+//! configures it for, and its periodic reconcile.
 //!
 //! The reconcile runs every `LAKE_REPLICATION_INTERVAL_SECS` (3600 by
-//! default) and once soon after start, under the main tenant, whose rows
-//! keep the installation's lake keys and state. Once the main lake is
-//! known and its keys pasted it makes every tenant's warehouse that is
-//! missing there (the user's ruling of 2026-11-13: the safety net of the
-//! warehouse made where the tenant is provisioned, which this application
-//! has no step for); once the replica and its keys are too, it configures
+//! default) and once soon after start. Once the main lake is known and its
+//! keys pasted it makes the warehouse if it is missing there (the user's
+//! ruling of 2026-11-13: the safety net of the warehouse made where the
+//! installation is provisioned, which this application has no step for);
+//! once the replica and its keys are too, it configures
 //! their replication. Each run is idempotent, so every API replica may
 //! run it.
 
@@ -19,22 +18,14 @@ use application::{MachinesService, ReplicationReadiness};
 use auth_gateway::{ReplicationOutcome, Warehouses};
 use domain::RepositoryError;
 
-use crate::tenants::CellTenants;
-use ::quality::tenants::Tenants;
-
-/// The cell's tenants' warehouses: `qd-tenant-<id>`, as the quality module
-/// names them.
-pub(crate) struct TenantWarehouses(pub(crate) CellTenants);
+/// The installation's one warehouse, as the quality module names it
+/// (decision 0076, point 5).
+pub(crate) struct TheWarehouse;
 
 #[async_trait::async_trait]
-impl Warehouses for TenantWarehouses {
+impl Warehouses for TheWarehouse {
     async fn warehouses(&self) -> Result<Vec<String>, RepositoryError> {
-        let tenants = self.0.tenants().await.map_err(RepositoryError::Backend)?;
-        Ok(tenants
-            .iter()
-            .filter_map(|t| uuid::Uuid::parse_str(&t.id).ok())
-            .map(::quality::lake::warehouse)
-            .collect())
+        Ok(vec![::quality::lake::WAREHOUSE.to_string()])
     }
 }
 
@@ -89,18 +80,16 @@ pub(crate) fn spawn_reconcile(machines: MachinesService) {
 }
 
 /// With the replication: the lake's adapter (`api`), which also makes a
-/// missing warehouse on the main lake, its state and the cell's
-/// warehouses.
+/// missing warehouse on the main lake, its state and the warehouse.
 pub(crate) fn with_replication(
     machines: MachinesService,
     api: Arc<infrastructure::rustfs_admin::RustfsLakeAdmin>,
     pool: &infrastructure::PgPool,
-    tenants: CellTenants,
 ) -> MachinesService {
     machines.with_replication(
         api.clone(),
         api,
         Arc::new(infrastructure::PgReplicationState::new(pool.clone())),
-        Arc::new(TenantWarehouses(tenants)),
+        Arc::new(TheWarehouse),
     )
 }

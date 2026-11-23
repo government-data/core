@@ -34,7 +34,6 @@ use infrastructure::{
 
 use crate::config::{env_value, public_url_from_env};
 use crate::replication_wiring;
-use crate::tenants::CellTenants;
 
 /// The machines' routes, both for people (a session and
 /// `admin:ManageMachines`) and for machines: the install routes that check
@@ -74,12 +73,11 @@ pub(crate) fn routes(
 }
 
 /// The machines' use cases over PostgreSQL, with the installation's CA if
-/// it has one, the replication of the cell's tenants' `warehouses`, and the
+/// it has one, the replication of the warehouse, and the
 /// lakes' root keys and admin keys sealed with the settings' key (`sealer`,
 /// 0066 step 11).
 pub(crate) fn service(
     pool: &PgPool,
-    warehouses: CellTenants,
     sealer: SecretBox,
 ) -> Result<MachinesService, Box<dyn std::error::Error>> {
     let machines = base(pool);
@@ -106,7 +104,7 @@ pub(crate) fn service(
                 .with_lake_admin(api.clone())
                 // The main lake, where the application reaches it (0066 step 11).
                 .with_main_lake(std::env::var("LAKE_ENDPOINT").ok());
-            let machines = replication_wiring::with_replication(machines, api, pool, warehouses);
+            let machines = replication_wiring::with_replication(machines, api, pool);
             replication_wiring::spawn_reconcile(machines.clone());
             machines
         }

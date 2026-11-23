@@ -77,7 +77,6 @@ pub fn maintain_key(dataset: &str, job: Uuid) -> String {
 /// namespace recorded first.
 pub(crate) async fn access(
     api: &WorkerApi,
-    tenant: Uuid,
     job: Uuid,
     client: &str,
     headers: &HeaderMap,
@@ -86,7 +85,7 @@ pub(crate) async fn access(
     let (Some(issuer), Some(catalog)) = (&api.services.lake, &api.services.tables) else {
         return Ok(None);
     };
-    let warehouse = lake::warehouse(tenant);
+    let warehouse = lake::WAREHOUSE.to_string();
     let unavailable = |e: String| {
         tracing::error!("maintain: {e}");
         StatusCode::SERVICE_UNAVAILABLE
@@ -128,7 +127,6 @@ pub(crate) async fn access(
 /// Writes the run's manifest from its report.
 pub(crate) async fn report(
     api: &WorkerApi,
-    tenant: Uuid,
     id: Uuid,
     dataset: &str,
     body: serde_json::Value,
@@ -158,7 +156,7 @@ pub(crate) async fn report(
         reported_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         report,
     };
-    manifest::write(store.as_ref(), tenant, maintain_key(dataset, id), &m)
+    manifest::write(store.as_ref(), maintain_key(dataset, id), &m)
         .await
         .map(|_| ())
 }

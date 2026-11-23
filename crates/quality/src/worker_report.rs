@@ -68,7 +68,7 @@ pub(crate) async fn report(
                     Some(store) => {
                         let key = manifest::evaluate_key(&dataset, &report.cut, id);
                         let m = EvaluateManifest::new(id, &dataset, &report, now());
-                        Some(manifest::write(store.as_ref(), tenant, key, &m).await?)
+                        Some(manifest::write(store.as_ref(), key, &m).await?)
                     }
                     None => None,
                 };
@@ -83,7 +83,7 @@ pub(crate) async fn report(
                 .await
                 .map_err(rejected)?;
             }
-            "maintain" => job_maintain::report(&api, tenant, id, &dataset, body).await?,
+            "maintain" => job_maintain::report(&api, id, &dataset, body).await?,
             "test_rule" => {
                 let cut = job.parameters.get("cut").and_then(|c| c.as_str());
                 rule_test::report(&api.pool, id, cut, body).await?;
@@ -101,7 +101,7 @@ pub(crate) async fn report(
                 if let Some(store) = &api.services.manifests {
                     let key = manifest::extract_key(&dataset, &report.cut, id);
                     let m = ExtractManifest::new(id, &dataset, &report, now());
-                    manifest::write(store.as_ref(), tenant, key, &m).await?;
+                    manifest::write(store.as_ref(), key, &m).await?;
                 }
                 let published = cuts::publish(&api.pool, id, &report)
                     .await
