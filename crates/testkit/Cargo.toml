@@ -25,3 +25,7 @@ sqlx.workspace = true
 tokio.workspace = true
 testcontainers.workspace = true
 testcontainers-modules.workspace = true
+# A lake in memory behind `application`'s lake ports (src/lake.rs, decision
+# 0078).
+application.workspace = true
+async-trait.workspace = true

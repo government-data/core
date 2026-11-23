@@ -7,6 +7,8 @@
 //! test has ever touched — no manual `docker run`, no shared database, no
 //! cross-test bleed. Requires a running Docker daemon.
 
+pub mod lake;
+
 use sqlx::PgPool;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, ImageExt};

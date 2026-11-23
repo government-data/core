@@ -4270,6 +4270,8 @@ dependencies = [
 name = "testkit"
 version = "0.1.0"
 dependencies = [
+ "application",
+ "async-trait",
  "infrastructure",
  "sqlx",
  "testcontainers",
