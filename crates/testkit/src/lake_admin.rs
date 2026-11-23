@@ -33,8 +33,14 @@ pub struct LakeAdminServer {
     pools: Arc<Mutex<BTreeMap<String, wire::PoolLayout>>>,
 }
 
-/// Serves `lake` with a server certificate of `ca` for `localhost`.
+/// Serves `lake` with a server certificate of `ca` for `localhost`, of
+/// the adapter's role (`lake`).
 pub async fn serve(lake: Arc<InMemoryLake>, ca: &TestCa) -> LakeAdminServer {
+    serve_as(lake, ca, "lake").await
+}
+
+/// [`serve`], its own certificate of `role`: a server that is no adapter.
+pub async fn serve_as(lake: Arc<InMemoryLake>, ca: &TestCa, role: &str) -> LakeAdminServer {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let mut roots = rustls::RootCertStore::empty();
     roots
@@ -44,7 +50,7 @@ pub async fn serve(lake: Arc<InMemoryLake>, ca: &TestCa) -> LakeAdminServer {
         rustls::server::WebPkiClientVerifier::builder_with_provider(roots.into(), provider.clone())
             .build()
             .expect("a client verifier");
-    let own = ca.machine("lake", "localhost");
+    let own = ca.machine(role, "localhost");
     let config = rustls::ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
         .expect("TLS versions")
