@@ -1,8 +1,9 @@
 //! Postgres adapter for the audit chain's verifier (decision 0070, point
-//! 11): a tenant's sealed rows in `chain_seq` order, a page at a time by the
+//! 11): the chain's sealed rows in `chain_seq` order, a page at a time by the
 //! `(tenant_id, chain_seq)` index, its head, and each run kept in
-//! `audit_chain_checks`. Each read is its own transaction under the
-//! tenant's `app.tenant_id`, as row-level security asks.
+//! `audit_chain_checks`. One installation is one organisation (decision
+//! 0076): there is one chain, the main tenant's, which row-level security
+//! leaves the application's role without a session setting.
 
 use async_trait::async_trait;
 use domain::audit_chain::ChainRow;
@@ -12,6 +13,9 @@ use domain::audit_chain_check::{
 use domain::RepositoryError;
 use sqlx::postgres::{PgPool, PgRow, Postgres};
 use sqlx::{Row, Transaction};
+
+/// The main tenant, the only one (decision 0076, point 6).
+const MAIN: &str = "00000000-0000-0000-0000-000000000001";
 
 fn backend(err: sqlx::Error) -> RepositoryError {
     RepositoryError::Backend(err.to_string())
@@ -38,18 +42,9 @@ impl PgAuditChain {
         Self { pool }
     }
 
-    /// A transaction under `tenant`'s row-level security.
-    async fn within(
-        &self,
-        tenant: &str,
-    ) -> Result<Transaction<'static, Postgres>, RepositoryError> {
-        let mut tx = self.pool.begin().await.map_err(backend)?;
-        sqlx::query("SELECT set_config('app.tenant_id', $1, true)")
-            .bind(tenant)
-            .execute(&mut *tx)
-            .await
-            .map_err(backend)?;
-        Ok(tx)
+    /// A transaction: each read sees one snapshot.
+    async fn begin(&self) -> Result<Transaction<'static, Postgres>, RepositoryError> {
+        self.pool.begin().await.map_err(backend)
     }
 }
 
@@ -82,15 +77,12 @@ fn sealed(r: &PgRow) -> Result<SealedRow, sqlx::Error> {
 #[async_trait]
 impl AuditChainRows for PgAuditChain {
     async fn tenants(&self) -> Result<Vec<String>, RepositoryError> {
-        // `tenants` has no row-level security: it is read before a tenant is known.
-        sqlx::query_scalar("SELECT id::text FROM tenants ORDER BY id")
-            .fetch_all(&self.pool)
-            .await
-            .map_err(backend)
+        // The one chain: the main tenant's, whose id its rows still hash.
+        Ok(vec![MAIN.to_string()])
     }
 
     async fn tail(&self, tenant: &str) -> Result<ChainTail, RepositoryError> {
-        let mut tx = self.within(tenant).await?;
+        let mut tx = self.begin().await?;
         // One statement, one snapshot: the head and the last row agree
         // unless the chain was changed.
         let row = sqlx::query(
@@ -126,7 +118,7 @@ impl AuditChainRows for PgAuditChain {
         through: i64,
         limit: u32,
     ) -> Result<Vec<SealedRow>, RepositoryError> {
-        let mut tx = self.within(tenant).await?;
+        let mut tx = self.begin().await?;
         let rows = sqlx::query(ROWS)
             .bind(tenant)
             .bind(after)
@@ -146,7 +138,7 @@ impl AuditChainRows for PgAuditChain {
 #[async_trait]
 impl AuditChainChecks for PgAuditChain {
     async fn record(&self, report: &ChainReport) -> Result<(), RepositoryError> {
-        let mut tx = self.within(&report.tenant).await?;
+        let mut tx = self.begin().await?;
         let broken = report.first_break;
         sqlx::query(
             "INSERT INTO audit_chain_checks (tenant_id, checked_at, rows_checked, first_seq, \

@@ -10,12 +10,12 @@ use domain::audit_chain_check::{BreakKind, ChainBreak, ChainReport};
 use infrastructure::PgAuditChain;
 use sqlx::postgres::PgPool;
 
+/// The main tenant, the installation's one chain (decision 0076).
 const T1: &str = "00000000-0000-0000-0000-000000000001";
-const T2: &str = "00000000-0000-0000-0000-0000000000b2";
 
 /// The owner's pool and the superuser's, on a database migrated up to the
-/// one before the chain, with rows of two tenants written then, then
-/// migrated whole (adoption), then rows written after.
+/// one before the chain, with rows written then, then migrated whole
+/// (adoption), then rows written after.
 async fn adopted(db: &testkit::TestDb) -> (PgPool, PgPool) {
     for sql in [
         "CREATE ROLE chain_owner LOGIN PASSWORD 'owner' NOSUPERUSER NOBYPASSRLS",
@@ -48,16 +48,9 @@ async fn adopted(db: &testkit::TestDb) -> (PgPool, PgPool) {
         ..sqlx::migrate::Migrator::DEFAULT
     };
     before_the_chain.run(&owner).await.unwrap();
-    sqlx::query("INSERT INTO tenants (id, slug, name) VALUES ($1::uuid, 'otra', 'Otra')")
-        .bind(T2)
-        .execute(&su)
-        .await
-        .unwrap();
     write(&owner, T1, 0..5).await;
-    write(&owner, T2, 0..3).await;
     infrastructure::run_migrations(&owner).await.unwrap();
     write(&owner, T1, 5..9).await;
-    write(&owner, T2, 3..4).await;
     (owner, su)
 }
 
@@ -115,34 +108,30 @@ fn at(seq: i64, kind: BreakKind) -> Option<ChainBreak> {
 }
 
 #[tokio::test]
-async fn adopted_and_new_rows_of_two_tenants_verify_and_each_run_is_kept() {
+async fn adopted_and_new_rows_verify_and_each_run_is_kept() {
     let db = testkit::spawn_test_db().await;
     let (owner, su) = adopted(&db).await;
     let reports = verify(&owner, None).await;
-    for (tenant, rows, adopted) in [(T1, 9, 5), (T2, 4, 3)] {
-        let r = of(&reports, tenant);
-        assert_eq!(r.first_break, None, "{tenant}");
-        assert_eq!(
-            (r.rows_checked, r.first_seq, r.last_seq),
-            (rows, Some(1), Some(rows))
-        );
-        assert_eq!(r.adopted_seq, Some(adopted));
-        assert_eq!(r.head.as_ref().map(|(seq, _)| *seq), Some(rows));
-    }
+    assert_eq!(reports.len(), 1, "one chain");
+    let r = of(&reports, T1);
+    assert_eq!(r.first_break, None);
+    assert_eq!(
+        (r.rows_checked, r.first_seq, r.last_seq),
+        (9, Some(1), Some(9))
+    );
+    assert_eq!(r.adopted_seq, Some(5));
+    assert_eq!(r.head.as_ref().map(|(seq, _)| *seq), Some(9));
     let kept: Vec<(String, i64, String)> = sqlx::query_as(
         "SELECT tenant_id::text, rows_checked, result FROM audit_chain_checks ORDER BY tenant_id",
     )
     .fetch_all(&su)
     .await
     .unwrap();
-    assert_eq!(
-        kept,
-        vec![(T1.into(), 9, "ok".into()), (T2.into(), 4, "ok".into())]
-    );
+    assert_eq!(kept, vec![(T1.into(), 9, "ok".into())]);
 }
 
 #[tokio::test]
-async fn a_row_changed_by_the_owner_is_a_hash_break_and_a_removed_one_a_gap() {
+async fn a_row_changed_by_the_owner_is_a_hash_break() {
     let db = testkit::spawn_test_db().await;
     let (owner, su) = adopted(&db).await;
     unguarded(
@@ -152,22 +141,10 @@ async fn a_row_changed_by_the_owner_is_a_hash_break_and_a_removed_one_a_gap() {
         7,
     )
     .await;
-    unguarded(
-        &owner,
-        T2,
-        "DELETE FROM admin_audit_events WHERE chain_seq = $1",
-        2,
-    )
-    .await;
 
     let reports = verify(&owner, None).await;
     assert_eq!(of(&reports, T1).first_break, at(7, BreakKind::Hash));
     assert_eq!(of(&reports, T1).rows_checked, 6, "up to the break");
-    assert_eq!(of(&reports, T2).first_break, at(2, BreakKind::Gap));
-    let only = verify(&owner, Some(T2)).await;
-    assert_eq!(only.len(), 1);
-    assert_eq!(only[0].first_break, at(2, BreakKind::Gap));
-
     let kept: Vec<(String, Option<i64>, Option<String>)> = sqlx::query_as(
         "SELECT result, break_seq, break_kind FROM audit_chain_checks \
          WHERE tenant_id = $1::uuid",
@@ -177,4 +154,22 @@ async fn a_row_changed_by_the_owner_is_a_hash_break_and_a_removed_one_a_gap() {
     .await
     .unwrap();
     assert_eq!(kept, vec![("break".into(), Some(7), Some("hash".into()))]);
+    let only = verify(&owner, Some(T1)).await;
+    assert_eq!(only.len(), 1);
+    assert_eq!(only[0].first_break, at(7, BreakKind::Hash));
+}
+
+#[tokio::test]
+async fn a_row_removed_by_the_owner_is_a_gap() {
+    let db = testkit::spawn_test_db().await;
+    let (owner, _su) = adopted(&db).await;
+    unguarded(
+        &owner,
+        T1,
+        "DELETE FROM admin_audit_events WHERE chain_seq = $1",
+        2,
+    )
+    .await;
+    let reports = verify(&owner, None).await;
+    assert_eq!(of(&reports, T1).first_break, at(2, BreakKind::Gap));
 }
