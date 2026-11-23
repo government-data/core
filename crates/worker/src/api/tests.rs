@@ -222,9 +222,9 @@ async fn a_renewed_certificate_is_presented_without_a_restart() {
     let url = server(&ca, state.clone()).await;
     let api = machine_api(dir.path().into(), &url);
     let id = uuid::Uuid::nil();
-    api.report(id, id, &serde_json::json!({})).await.unwrap();
+    api.report(id, &serde_json::json!({})).await.unwrap();
     write_machine(dir.path(), &ca.pem, &new);
-    api.report(id, id, &serde_json::json!({})).await.unwrap();
+    api.report(id, &serde_json::json!({})).await.unwrap();
     let reports: Vec<_> = state
         .lock()
         .unwrap()

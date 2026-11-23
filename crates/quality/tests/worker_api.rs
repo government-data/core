@@ -77,6 +77,28 @@ async fn a_job_is_served_only_to_the_machine_holding_it_under_its_tenant() {
     );
 }
 
+/// The routes without the tenant (decision 0076) serve the installation's
+/// jobs, the main tenant's, and only those.
+#[tokio::test]
+async fn the_route_without_the_tenant_serves_the_main_tenants_job() {
+    let f = fixture().await;
+    let main = "00000000-0000-0000-0000-000000000001";
+    let job = f.job(main, "w1/0", 60).await;
+    let (status, body) = f
+        .call("GET", &format!("/internal/jobs/{job}"), "token-w1", None)
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    let details: JobDetails = serde_json::from_slice(&body).unwrap();
+    assert_eq!(details.catalog.unwrap().commit, format!("commit-of-{main}"));
+    let other = f.job(A, "w1/0", 60).await;
+    assert_eq!(
+        f.call("GET", &format!("/internal/jobs/{other}"), "token-w1", None)
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+}
+
 /// A role's client is shared by its machines (decision 0066): a token that
 /// names its machine is served only that machine's jobs, its report too.
 #[tokio::test]
