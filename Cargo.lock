@@ -4272,11 +4272,19 @@ version = "0.1.0"
 dependencies = [
  "application",
  "async-trait",
+ "contracts",
  "infrastructure",
+ "rcgen",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
  "sqlx",
  "testcontainers",
  "testcontainers-modules",
  "tokio",
+ "tokio-rustls",
+ "x509-parser",
 ]
 
 [[package]]
