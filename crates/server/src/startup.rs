@@ -25,21 +25,21 @@ pub(crate) fn oidc_provider(
 }
 
 /// The internal routes, for the host's update daemon: on their own port
-/// (`ORQ_INTERNAL_ADDR`, which Compose publishes only on 127.0.0.1) and with
+/// (`QD_INTERNAL_ADDR`, which Compose publishes only on 127.0.0.1) and with
 /// their token. Nothing without that variable.
 pub(crate) async fn internal_routes(
     updates: application::UpdatesService,
     admin_access: Option<api::internal::AdminAccessRoute>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(addr) = env_value("ORQ_INTERNAL_ADDR") else {
+    let Some(addr) = env_value("QD_INTERNAL_ADDR") else {
         return Ok(());
     };
-    let token_file = env_value("ORQ_INTERNAL_TOKEN_FILE")
-        .ok_or("ORQ_INTERNAL_ADDR needs ORQ_INTERNAL_TOKEN_FILE")?;
+    let token_file = env_value("QD_INTERNAL_TOKEN_FILE")
+        .ok_or("QD_INTERNAL_ADDR needs QD_INTERNAL_TOKEN_FILE")?;
     let token = api::internal::InternalToken::from_file(&token_file)?;
     let internal = tokio::net::TcpListener::bind(&addr)
         .await
-        .map_err(|e| format!("ORQ_INTERNAL_ADDR {addr}: {e}"))?;
+        .map_err(|e| format!("QD_INTERNAL_ADDR {addr}: {e}"))?;
     tracing::info!(addr = %internal.local_addr()?, "internal routes");
     let router = api::internal::router(updates, admin_access, token);
     tokio::spawn(async move {
