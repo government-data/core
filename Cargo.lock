@@ -2147,6 +2147,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lake-contract"
+version = "0.1.0"
+dependencies = [
+ "application",
+ "contracts",
+ "reqwest",
+ "serde_json",
+ "testkit",
+ "tokio",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
