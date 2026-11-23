@@ -15,12 +15,12 @@ secrets:
 services:
   api:
     environment:
-      ORQ_INTERNAL_ADDR: 0.0.0.0:9417
-      ORQ_INTERNAL_TOKEN_FILE: /run/secrets/internal_token
+      QD_INTERNAL_ADDR: 0.0.0.0:9417
+      QD_INTERNAL_TOKEN_FILE: /run/secrets/internal_token
     secrets:
       - internal_token
     ports:
-      - "127.0.0.1:${ORQ_INTERNAL_PORT:-9417}:9417"
+      - "127.0.0.1:${QD_INTERNAL_PORT:-9417}:9417"
 
   # The documentation (apps/docs, in the web image): only with a session.
   # Traefik asks the API (docs-chain in infra/traefik/dynamic/middlewares.yml).

@@ -5,9 +5,9 @@
 //! for the installer and the host's admin access command.
 //!
 //! They do not go through Traefik: they are served on their own port
-//! (`ORQ_INTERNAL_ADDR`), which Compose publishes only on the host's
+//! (`QD_INTERNAL_ADDR`), which Compose publishes only on the host's
 //! `127.0.0.1`, and every request carries the local token (`Authorization:
-//! Bearer …`, `ORQ_INTERNAL_TOKEN_FILE`). The API never gets `docker.sock`: the
+//! Bearer …`, `QD_INTERNAL_TOKEN_FILE`). The API never gets `docker.sock`: the
 //! host is the one that updates.
 //!
 //! The token is not fixed: the updater rewrites it every day in the same file,
@@ -135,12 +135,12 @@ impl InternalToken {
 fn read_token(path: &std::path::Path) -> Result<(Option<SystemTime>, String), String> {
     let modified = std::fs::metadata(path).and_then(|m| m.modified()).ok();
     let token = std::fs::read_to_string(path)
-        .map_err(|e| format!("ORQ_INTERNAL_TOKEN_FILE {}: {e}", path.display()))?
+        .map_err(|e| format!("QD_INTERNAL_TOKEN_FILE {}: {e}", path.display()))?
         .trim()
         .to_string();
     if token.len() < InternalToken::MIN_LEN {
         return Err(format!(
-            "ORQ_INTERNAL_TOKEN_FILE {}: the token is too short",
+            "QD_INTERNAL_TOKEN_FILE {}: the token is too short",
             path.display()
         ));
     }
