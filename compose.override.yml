@@ -67,16 +67,6 @@ services:
     build:
       args:
         APP_COMMIT: ${APP_COMMIT:-}
-    # The documentation through its own router, as in compose.local.yml: only
-    # with a session, and with docs-chain's CSP (Starlight's theme and
-    # language selectors are inline scripts the web's CSP blocks).
-    labels:
-      - "traefik.http.routers.docs.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/docs`)"
-      - "traefik.http.routers.docs.entrypoints=websecure"
-      - "traefik.http.routers.docs.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.docs.priority=50"
-      - "traefik.http.routers.docs.service=web"
-      - "traefik.http.routers.docs.middlewares=docs-chain@file"
 
   # One-shot: create the first administrator from env, then exit. Runs once the
   # database is healthy; `restart: no` so it does not loop after completing.
