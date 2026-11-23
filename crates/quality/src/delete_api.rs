@@ -208,7 +208,7 @@ async fn delete_dataset(
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "unavailable");
     }
     let author = format!("{0} <{0}@accounts.invalid>", caller.account);
-    if let Err(e) = api.drafts.remove_dataset(tenant, &dataset, &author).await {
+    if let Err(e) = api.drafts.remove_dataset(&dataset, &author).await {
         tracing::error!("delete: catalog: {e}");
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     }

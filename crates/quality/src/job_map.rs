@@ -1,6 +1,6 @@
 //! A map job on the application's side (decisions 0038 and 0053): its
 //! report, the table's profile (counts, never a value), becomes a proposal
-//! (`quality::proposal`) published on `main` of the tenant's catalog, and
+//! (`quality::proposal`) published on `main` of the catalog, and
 //! today's cut of the new dataset is opened with its extraction. A repeated
 //! report finds the dataset there and its cut opened.
 
@@ -22,14 +22,13 @@ pub struct MapReport {
     pub profile: TableProfile,
 }
 
-/// Where proposals are published: `main` of the tenant's catalog.
+/// Where proposals are published: `main` of the catalog.
 #[async_trait]
 pub trait Drafts: Send + Sync {
     /// Writes the dataset on `main` if it is not there; its commit, or
     /// `None` if it is: a dataset is never written over by a map.
     async fn publish(
         &self,
-        tenant: Uuid,
         dataset: &str,
         mapping: &str,
         rules: &[(String, String)],
@@ -39,7 +38,6 @@ pub trait Drafts: Send + Sync {
 /// Publishes a map job's report and opens the dataset's first cut.
 pub(crate) async fn report(
     api: &WorkerApi,
-    tenant: Uuid,
     parameters: &serde_json::Value,
     dataset: &str,
     body: serde_json::Value,
@@ -67,7 +65,7 @@ pub(crate) async fn report(
         alerts,
     );
     drafts
-        .publish(tenant, dataset, &proposal.mapping, &proposal.rules)
+        .publish(dataset, &proposal.mapping, &proposal.rules)
         .await
         .map_err(|e| {
             tracing::error!("map publish: {e}");

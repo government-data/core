@@ -14,7 +14,6 @@ use axum::{Extension, Json, Router};
 use contracts::Caller;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::draft_api::{self, DraftCatalog, Refused, VIEW};
 
@@ -97,11 +96,6 @@ pub fn routes(catalog: Arc<dyn DraftCatalog>) -> Router {
 )]
 pub struct HistoryDoc;
 
-fn tenant() -> Result<Uuid, Refused> {
-    Uuid::parse_str(&tenancy::key())
-        .map_err(|_| Refused(StatusCode::INTERNAL_SERVER_ERROR, "tenant"))
-}
-
 fn unavailable(e: String) -> Refused {
     tracing::error!("draft history: {e}");
     Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable")
@@ -119,7 +113,7 @@ async fn of(
     }
     let branch = draft_api::branch(dataset, id)?;
     let history = catalog
-        .history(tenant()?, &branch)
+        .history(&branch)
         .await
         .map_err(unavailable)?
         .ok_or(Refused(StatusCode::NOT_FOUND, "not_found"))?;
@@ -166,7 +160,7 @@ async fn changes(
         }
     };
     let files = catalog
-        .changes(tenant()?, &from, &to, &dataset)
+        .changes(&from, &to, &dataset)
         .await
         .map_err(unavailable)?;
     Ok(Json(ChangesOut { from, to, files }))
@@ -197,7 +191,7 @@ async fn file_history(
         return Err(Refused(StatusCode::UNPROCESSABLE_ENTITY, "file"));
     }
     let changes = catalog
-        .file_history(tenant()?, &dataset, query.file.as_deref(), HISTORY_LIMIT)
+        .file_history(&dataset, query.file.as_deref(), HISTORY_LIMIT)
         .await
         .map_err(unavailable)?;
     Ok(Json(changes))

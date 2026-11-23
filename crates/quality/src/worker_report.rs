@@ -89,7 +89,7 @@ pub(crate) async fn report(
                 rule_test::report(&api.pool, id, cut, body).await?;
             }
             "map" => {
-                job_map::report(&api, tenant, &job.parameters, &dataset, body).await?;
+                job_map::report(&api, &job.parameters, &dataset, body).await?;
             }
             "extract" => {
                 let report: ExtractReport = parse(body, |r: &ExtractReport| &r.cut)?;

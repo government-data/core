@@ -33,15 +33,10 @@ struct Memory {
 
 #[async_trait::async_trait]
 impl DraftCatalog for Memory {
-    async fn list(&self, _: Uuid, _: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, _: &str) -> Result<Vec<DraftInfo>, String> {
         Ok(Vec::new())
     }
-    async fn read(
-        &self,
-        _: Uuid,
-        branch: &str,
-        dataset: &str,
-    ) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, branch: &str, dataset: &str) -> Result<Option<DraftFiles>, String> {
         // Linted against main's mapping; a draft's own global rules are
         // asked for, and these drafts have none.
         if branch != "main" {
@@ -53,18 +48,13 @@ impl DraftCatalog for Memory {
             rules: vec![("basic.yaml".into(), GOOD.into())],
         }))
     }
-    async fn approve(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<Approval, String> {
+    async fn approve(&self, _: &str, _: &str, _: &str) -> Result<Approval, String> {
         unreachable!("not here")
     }
-    async fn discard(&self, _: Uuid, _: &str) -> Result<bool, String> {
+    async fn discard(&self, _: &str) -> Result<bool, String> {
         unreachable!("not here")
     }
-    async fn save_file(
-        &self,
-        _: Uuid,
-        edit: &FileEdit<'_>,
-        create: bool,
-    ) -> Result<FileSaved, String> {
+    async fn save_file(&self, edit: &FileEdit<'_>, create: bool) -> Result<FileSaved, String> {
         if edit.file != "basic.yaml" && !edit.adds {
             return Ok(FileSaved::NoFile);
         }
@@ -80,7 +70,7 @@ impl DraftCatalog for Memory {
         ));
         Ok(FileSaved::Saved(format!("c{}", saved.len() + 1)))
     }
-    async fn history(&self, _: Uuid, branch: &str) -> Result<Option<DraftHistory>, String> {
+    async fn history(&self, branch: &str) -> Result<Option<DraftHistory>, String> {
         let saved = self.saved.lock().unwrap();
         Ok(saved
             .iter()
@@ -91,13 +81,7 @@ impl DraftCatalog for Memory {
             }))
     }
     /// The files saved on the draft `to`, each once.
-    async fn changes(
-        &self,
-        _: Uuid,
-        _: &str,
-        to: &str,
-        _: &str,
-    ) -> Result<Vec<FileChange>, String> {
+    async fn changes(&self, _: &str, to: &str, _: &str) -> Result<Vec<FileChange>, String> {
         let saved = self.saved.lock().unwrap();
         let mut files: Vec<FileChange> = Vec::new();
         for (branch, file, body, _) in saved.iter() {

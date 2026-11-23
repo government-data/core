@@ -18,7 +18,6 @@ use contracts::{AuditEntry, Caller, Change};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::draft_api::{DraftCatalog, FileSaved, MappingEdit, MANAGE};
 use crate::mapping_field::{started, with_columns, NotAdded, Start};
@@ -160,9 +159,6 @@ async fn add(
     if !valid_columns(&body.columns) {
         return refuse(refusal(StatusCode::UNPROCESSABLE_ENTITY, "columns"));
     }
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return refuse(refusal(StatusCode::INTERNAL_SERVER_ERROR, "tenant"));
-    };
     let yaml = match rules_api::on_main(catalog.as_ref(), &dataset).await {
         Ok(files) => files.map(|f| f.mapping),
         Err((code, error)) => return refuse(refusal(code, error)),
@@ -179,7 +175,7 @@ async fn add(
         author: &author,
         starts,
     };
-    let commit = match catalog.save_mapping(tenant, &edit, false).await {
+    let commit = match catalog.save_mapping(&edit, false).await {
         Ok(FileSaved::Saved(commit)) => commit,
         Ok(_) => return refuse(refusal(StatusCode::NOT_FOUND, "not_found")),
         Err(e) => {

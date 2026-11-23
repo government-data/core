@@ -17,7 +17,6 @@ use contracts::{AuditEntry, Caller, Change};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::{OpenApi, ToSchema};
-use uuid::Uuid;
 
 use crate::draft_api::{DraftCatalog, FileEdit, FileSaved, Refused, APPROVE, MANAGE};
 use crate::edit_api::{check, valid_file};
@@ -96,9 +95,6 @@ async fn deploy(
     if now != body.expected {
         return refuse(StatusCode::CONFLICT, "stale");
     }
-    let Ok(tenant) = Uuid::parse_str(&tenancy::key()) else {
-        return refuse(StatusCode::INTERNAL_SERVER_ERROR, "tenant");
-    };
     let author = format!("{0} <{0}@accounts.invalid>", caller.account);
     let edit = FileEdit {
         branch: MAIN,
@@ -108,7 +104,7 @@ async fn deploy(
         author: &author,
         adds: checked.adds,
     };
-    let commit = match catalog.save_file(tenant, &edit, false).await {
+    let commit = match catalog.save_file(&edit, false).await {
         Ok(FileSaved::Saved(commit)) => commit,
         Ok(FileSaved::NoDraft | FileSaved::NoFile) => {
             return refuse(StatusCode::NOT_FOUND, "not_found")

@@ -10,7 +10,6 @@ use quality::draft_history::{DraftCommit, DraftHistory, FileChange, MainChange};
 use quality::job_map::Drafts;
 use quality::proposal::Alerts;
 use texts::{text_in, Language};
-use uuid::Uuid;
 
 /// A dataset's catalog on `main`, from the tenant's Dolt database. One
 /// for the whole API: its gate holds every module's operations while Dolt
@@ -90,21 +89,20 @@ pub(crate) fn proposal_alerts(language: Language) -> Alerts {
     }
 }
 
-/// A map job's proposal, published on `main` of the tenant's catalog
+/// A map job's proposal, published on `main` of the catalog
 /// (decision 0053), unless the dataset is there.
 #[async_trait::async_trait]
 impl Drafts for DoltSnapshots {
     async fn publish(
         &self,
-        tenant: Uuid,
         dataset: &str,
         mapping: &str,
         rules: &[(String, String)],
     ) -> Result<Option<String>, String> {
-        let database = quality::catalog::database(tenant);
+        let database = quality::catalog::DATABASE;
         let there = self
             .0
-            .files(&database, dataset)
+            .files(database, dataset)
             .await
             .map_err(|e| e.to_string())?;
         if there.is_some() {
@@ -118,7 +116,7 @@ impl Drafts for DoltSnapshots {
         };
         self.0
             .import(
-                &database,
+                database,
                 &import,
                 "Quality Data map <map@quality-data.invalid>",
             )
@@ -142,10 +140,10 @@ fn commit(c: infrastructure::catalog_dolt::DraftCommit) -> DraftCommit {
 /// The tenant's drafts, for people to review, approve or discard.
 #[async_trait::async_trait]
 impl DraftCatalog for DoltSnapshots {
-    async fn history(&self, tenant: Uuid, branch: &str) -> Result<Option<DraftHistory>, String> {
+    async fn history(&self, branch: &str) -> Result<Option<DraftHistory>, String> {
         let history = self
             .0
-            .history(&quality::catalog::database(tenant), branch)
+            .history(quality::catalog::DATABASE, branch)
             .await
             .map_err(|e| e.to_string())?;
         Ok(history.map(|h| DraftHistory {
@@ -154,28 +152,22 @@ impl DraftCatalog for DoltSnapshots {
         }))
     }
 
-    async fn remove_dataset(
-        &self,
-        tenant: Uuid,
-        dataset: &str,
-        author: &str,
-    ) -> Result<bool, String> {
+    async fn remove_dataset(&self, dataset: &str, author: &str) -> Result<bool, String> {
         self.0
-            .remove(&quality::catalog::database(tenant), dataset, author)
+            .remove(quality::catalog::DATABASE, dataset, author)
             .await
             .map_err(|e| e.to_string())
     }
 
     async fn file_history(
         &self,
-        tenant: Uuid,
         dataset: &str,
         file: Option<&str>,
         limit: usize,
     ) -> Result<Vec<MainChange>, String> {
         let changes = self
             .0
-            .file_history(&quality::catalog::database(tenant), dataset, file, limit)
+            .file_history(quality::catalog::DATABASE, dataset, file, limit)
             .await
             .map_err(|e| e.to_string())?;
         Ok(changes
@@ -190,14 +182,13 @@ impl DraftCatalog for DoltSnapshots {
 
     async fn changes(
         &self,
-        tenant: Uuid,
         from: &str,
         to: &str,
         dataset: &str,
     ) -> Result<Vec<FileChange>, String> {
         let changes = self
             .0
-            .changes(&quality::catalog::database(tenant), from, to, dataset)
+            .changes(quality::catalog::DATABASE, from, to, dataset)
             .await
             .map_err(|e| e.to_string())?;
         Ok(changes
@@ -210,10 +201,10 @@ impl DraftCatalog for DoltSnapshots {
             .collect())
     }
 
-    async fn list(&self, tenant: Uuid, prefix: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, prefix: &str) -> Result<Vec<DraftInfo>, String> {
         let drafts = self
             .0
-            .drafts(&quality::catalog::database(tenant), prefix)
+            .drafts(quality::catalog::DATABASE, prefix)
             .await
             .map_err(|e| e.to_string())?;
         Ok(drafts
@@ -227,15 +218,10 @@ impl DraftCatalog for DoltSnapshots {
             .collect())
     }
 
-    async fn read(
-        &self,
-        tenant: Uuid,
-        branch: &str,
-        dataset: &str,
-    ) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, branch: &str, dataset: &str) -> Result<Option<DraftFiles>, String> {
         let files = self
             .0
-            .files_at(&quality::catalog::database(tenant), branch, dataset)
+            .files_at(quality::catalog::DATABASE, branch, dataset)
             .await
             .map_err(|e| e.to_string())?;
         Ok(files.map(|f| DraftFiles {
@@ -245,17 +231,11 @@ impl DraftCatalog for DoltSnapshots {
         }))
     }
 
-    async fn approve(
-        &self,
-        tenant: Uuid,
-        branch: &str,
-        dataset: &str,
-        author: &str,
-    ) -> Result<Approval, String> {
+    async fn approve(&self, branch: &str, dataset: &str, author: &str) -> Result<Approval, String> {
         let merged = self
             .0
             .approve(
-                &quality::catalog::database(tenant),
+                quality::catalog::DATABASE,
                 branch,
                 dataset,
                 author,
@@ -271,18 +251,14 @@ impl DraftCatalog for DoltSnapshots {
         })
     }
 
-    async fn discard(&self, tenant: Uuid, branch: &str) -> Result<bool, String> {
+    async fn discard(&self, branch: &str) -> Result<bool, String> {
         self.0
-            .discard(&quality::catalog::database(tenant), branch)
+            .discard(quality::catalog::DATABASE, branch)
             .await
             .map_err(|e| e.to_string())
     }
 
-    async fn save_files(
-        &self,
-        tenant: Uuid,
-        edit: &quality::draft_api::FilesEdit<'_>,
-    ) -> Result<String, String> {
+    async fn save_files(&self, edit: &quality::draft_api::FilesEdit<'_>) -> Result<String, String> {
         let at = infrastructure::catalog_dolt::FilesEdit {
             branch: edit.branch,
             dataset: edit.dataset,
@@ -292,7 +268,7 @@ impl DraftCatalog for DoltSnapshots {
             message: edit.message,
         };
         self.0
-            .save_files(&quality::catalog::database(tenant), &at)
+            .save_files(quality::catalog::DATABASE, &at)
             .await
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("{} is already there", edit.branch))
@@ -300,7 +276,6 @@ impl DraftCatalog for DoltSnapshots {
 
     async fn save_mapping(
         &self,
-        tenant: Uuid,
         edit: &quality::draft_api::MappingEdit<'_>,
         create: bool,
     ) -> Result<quality::draft_api::FileSaved, String> {
@@ -314,7 +289,7 @@ impl DraftCatalog for DoltSnapshots {
         };
         let saved = self
             .0
-            .save_mapping(&quality::catalog::database(tenant), &at, create)
+            .save_mapping(quality::catalog::DATABASE, &at, create)
             .await
             .map_err(|e| e.to_string())?;
         Ok(match saved {
@@ -326,7 +301,6 @@ impl DraftCatalog for DoltSnapshots {
 
     async fn save_file(
         &self,
-        tenant: Uuid,
         edit: &quality::draft_api::FileEdit<'_>,
         create: bool,
     ) -> Result<quality::draft_api::FileSaved, String> {
@@ -341,7 +315,7 @@ impl DraftCatalog for DoltSnapshots {
         };
         let saved = self
             .0
-            .save_file(&quality::catalog::database(tenant), &at, create)
+            .save_file(quality::catalog::DATABASE, &at, create)
             .await
             .map_err(|e| e.to_string())?;
         Ok(match saved {

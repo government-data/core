@@ -15,7 +15,6 @@ use quality::draft_api::{Approval, DraftCatalog, DraftFiles, DraftInfo};
 use quality::module::QualityModule;
 use serde_json::Value;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 const MAPPING: &str =
     "dataset: loans\nsource: loans\nkey: [Id]\nfields:\n  Id: { column: id, type: text }\n";
@@ -32,7 +31,7 @@ struct Memory {
 
 #[async_trait::async_trait]
 impl DraftCatalog for Memory {
-    async fn list(&self, _: Uuid, prefix: &str) -> Result<Vec<DraftInfo>, String> {
+    async fn list(&self, prefix: &str) -> Result<Vec<DraftInfo>, String> {
         let drafts = self.drafts.lock().unwrap();
         Ok(drafts
             .iter()
@@ -45,7 +44,7 @@ impl DraftCatalog for Memory {
             })
             .collect())
     }
-    async fn read(&self, _: Uuid, branch: &str, _: &str) -> Result<Option<DraftFiles>, String> {
+    async fn read(&self, branch: &str, _: &str) -> Result<Option<DraftFiles>, String> {
         let drafts = self.drafts.lock().unwrap();
         Ok(drafts
             .iter()
@@ -56,13 +55,7 @@ impl DraftCatalog for Memory {
                 rules: vec![("ClientId.yaml".into(), rules.clone())],
             }))
     }
-    async fn approve(
-        &self,
-        _: Uuid,
-        branch: &str,
-        _: &str,
-        author: &str,
-    ) -> Result<Approval, String> {
+    async fn approve(&self, branch: &str, _: &str, author: &str) -> Result<Approval, String> {
         assert!(
             author.contains('<') && author.ends_with('>'),
             "Name <email>: {author}"
@@ -78,7 +71,7 @@ impl DraftCatalog for Memory {
         self.merged.lock().unwrap().push(branch.into());
         Ok(Approval::Merged("m1".into()))
     }
-    async fn discard(&self, _: Uuid, branch: &str) -> Result<bool, String> {
+    async fn discard(&self, branch: &str) -> Result<bool, String> {
         let mut drafts = self.drafts.lock().unwrap();
         let before = drafts.len();
         drafts.retain(|(b, _)| b != branch);
@@ -86,7 +79,6 @@ impl DraftCatalog for Memory {
     }
     async fn save_file(
         &self,
-        _: Uuid,
         _: &quality::draft_api::FileEdit<'_>,
         _: bool,
     ) -> Result<quality::draft_api::FileSaved, String> {
