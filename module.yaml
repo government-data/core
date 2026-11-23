@@ -29,9 +29,12 @@ data:
       service: api
       path: /run/qd-metrics
       critical: false
-  # Under /opt/quality-data/quality-data/: the installation's CA and the
-  # secrets (infra/package/compose.yml).
+  # Under /opt/quality-data/quality-data/: the installation's .env (its
+  # passwords, names and image digests; restored with the database it
+  # matches), its CA and the secrets (infra/package/compose.yml).
   keys:
+    - path: .env
+      critical: true
     - path: ca/ca.crt
       critical: true
     - path: ca/ca.key
