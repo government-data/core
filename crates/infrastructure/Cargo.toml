@@ -46,10 +46,13 @@ reqwest.workspace = true
 sha2.workspace = true
 # The modules' migration seam, filled here with PostgreSQL (module_migrations).
 contracts.workspace = true
+# The lake's ports and declared properties (decision 0078): the standard
+# clients are configured by them, and implement them.
+application.workspace = true
 base64.workspace = true
 # AWS Signature Version 4 for RustFS's STS, catalog and bucket.
 sigv4.workspace = true
-# RustFS STS answers (rustfs_sts.rs).
+# STS answers (lake_sts.rs).
 roxmltree.workspace = true
 serde.workspace = true
 serde_json.workspace = true

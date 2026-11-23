@@ -24,7 +24,7 @@ roxmltree = "0.21"
 # enforced by which of these each member opts into:
 #   api → application → auth-gateway → domain     (api, auth-gateway → http-kit)
 #   application → contracts                        (its pure types: a lake's grant)
-#   infrastructure → auth-gateway, domain
+#   infrastructure → auth-gateway, domain; application (the lake's ports, 0078)
 #   server (composition root) → api, application, infrastructure, contracts, modules
 #   lake-rustfs-admin → contracts                 (a binary of its own, never a
 #                                                   dependency of server: 0078)

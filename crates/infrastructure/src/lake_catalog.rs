@@ -1,25 +1,99 @@
 //! A table's place in its warehouse, from the lake's Iceberg REST catalog
-//! (decision 0037): `GET /iceberg/v1/<warehouse>/namespaces/<ns>/tables/<t>`,
-//! signed with credentials issued for that read by STS and limited by the
-//! caller's policy. Only the table's location is read; RustFS vends no
-//! credentials in its answer (`rustfs.credential-vending: unsupported`).
+//! (decisions 0037 and 0078): `GET <catalog>/v1/<prefix>/namespaces/<ns>/tables/<t>`,
+//! where the lake declares its catalog and prefix, signed with credentials
+//! issued for that read by STS and limited by the caller's policy. Only
+//! the table's location is read: the core asks for no vended credentials.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use application::lake::CatalogPrefix;
 use chrono::Utc;
 
-use crate::rustfs_sts::{StsIssuer, TemporaryCredentials};
+use crate::lake_sts::{StsIssuer, TemporaryCredentials};
 use sigv4::{encode, payload_hash};
 
 /// Looks tables up through the platform's STS issuer.
 #[derive(Debug, Clone)]
 pub struct TableLookup {
     issuer: StsIssuer,
+    /// Each warehouse's prefix, once `/v1/config` gave it.
+    prefixes: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl TableLookup {
     pub fn new(issuer: StsIssuer) -> Self {
-        Self { issuer }
+        Self {
+            issuer,
+            prefixes: Arc::default(),
+        }
+    }
+
+    /// The issuer, for the files of a table (the lake's objects).
+    pub(crate) fn issuer(&self) -> &StsIssuer {
+        &self.issuer
+    }
+
+    /// `<catalog>/v1/<prefix>` for `warehouse`: the declared prefix, or the
+    /// one `/v1/config?warehouse=` gives, asked once with `creds`.
+    pub(crate) async fn catalog_base(
+        &self,
+        creds: &TemporaryCredentials,
+        warehouse: &str,
+    ) -> Result<String, String> {
+        let catalog = self
+            .issuer
+            .properties()
+            .catalog_uri
+            .trim_end_matches('/')
+            .to_string();
+        let prefix = match &self.issuer.properties().catalog_prefix {
+            CatalogPrefix::Fixed(p) => p.clone(),
+            CatalogPrefix::FromConfig => {
+                let known = self
+                    .prefixes
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .get(warehouse)
+                    .cloned();
+                match known {
+                    Some(p) => p,
+                    None => self.prefix_from_config(creds, &catalog, warehouse).await?,
+                }
+            }
+        };
+        Ok(format!("{catalog}/v1/{}", encode(&prefix, false)))
+    }
+
+    async fn prefix_from_config(
+        &self,
+        creds: &TemporaryCredentials,
+        catalog: &str,
+        warehouse: &str,
+    ) -> Result<String, String> {
+        let url = format!("{catalog}/v1/config");
+        let query = [("warehouse", warehouse)];
+        let res = self
+            .send_as(creds, "GET", &url, &query, Vec::new(), true)
+            .await?;
+        if res.status().as_u16() != 200 {
+            return Err(format!(
+                "catalog config refused ({})",
+                res.status().as_u16()
+            ));
+        }
+        let config: serde_json::Value = res.json().await.map_err(|e| format!("catalog: {e}"))?;
+        let prefix = config["overrides"]["prefix"]
+            .as_str()
+            .or_else(|| config["defaults"]["prefix"].as_str())
+            .ok_or("catalog config: no prefix")?
+            .to_string();
+        self.prefixes
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(warehouse.to_string(), prefix.clone());
+        Ok(prefix)
     }
 
     /// The table's prefix in the bucket (`tables/<uuid>`), `None` if the
@@ -31,13 +105,16 @@ impl TableLookup {
         table: &str,
         policy: &str,
     ) -> Result<Option<String>, String> {
-        let path = format!(
-            "/iceberg/v1/{}/namespaces/{}/tables/{}",
-            encode(warehouse, false),
+        let creds = self.credentials("catalog", policy).await?;
+        let base = self.catalog_base(&creds, warehouse).await?;
+        let url = format!(
+            "{base}/namespaces/{}/tables/{}",
             encode(namespace, false),
             encode(table, false)
         );
-        let res = self.send("GET", &path, &[], Vec::new(), policy).await?;
+        let res = self
+            .send_as(&creds, "GET", &url, &[], Vec::new(), true)
+            .await?;
         match res.status().as_u16() {
             200 => {}
             404 => return Ok(None),
@@ -60,9 +137,10 @@ impl TableLookup {
         namespace: &str,
         policy: &str,
     ) -> Result<Vec<String>, String> {
+        let creds = self.credentials("catalog", policy).await?;
         let base = format!(
-            "/iceberg/v1/{}/namespaces/{}/tables",
-            encode(warehouse, false),
+            "{}/namespaces/{}/tables",
+            self.catalog_base(&creds, warehouse).await?,
             encode(namespace, false)
         );
         let mut names = Vec::new();
@@ -72,7 +150,9 @@ impl TableLookup {
                 Some(t) => vec![("pageToken", t.as_str())],
                 None => Vec::new(),
             };
-            let res = self.send("GET", &base, &query, Vec::new(), policy).await?;
+            let res = self
+                .send_as(&creds, "GET", &base, &query, Vec::new(), true)
+                .await?;
             match res.status().as_u16() {
                 200 => {}
                 404 => return Ok(names),
@@ -94,38 +174,25 @@ impl TableLookup {
 
     /// Creates the namespace unless it is there (409 is fine): the
     /// application's part, so a job needs no right to create namespaces,
-    /// which RustFS cannot narrow to one (decision 0037).
+    /// which a lake may not narrow to one (decision 0037).
     pub async fn ensure_namespace(
         &self,
         warehouse: &str,
         namespace: &str,
         policy: &str,
     ) -> Result<(), String> {
-        let path = format!("/iceberg/v1/{}/namespaces", encode(warehouse, false));
+        let creds = self.credentials("catalog", policy).await?;
+        let url = format!("{}/namespaces", self.catalog_base(&creds, warehouse).await?);
         let body = serde_json::to_vec(&serde_json::json!({
             "namespace": [namespace],
             "properties": {},
         }))
         .map_err(|e| e.to_string())?;
-        let res = self.send("POST", &path, &[], body, policy).await?;
+        let res = self.send_as(&creds, "POST", &url, &[], body, true).await?;
         match res.status().as_u16() {
             200 | 409 => Ok(()),
             status => Err(format!("catalog refused the namespace ({status})")),
         }
-    }
-
-    /// `method path?query` with `body`, signed with credentials issued
-    /// within `policy` for this call.
-    async fn send(
-        &self,
-        method: &str,
-        path: &str,
-        query: &[(&str, &str)],
-        body: Vec<u8>,
-        policy: &str,
-    ) -> Result<reqwest::Response, String> {
-        let creds = self.credentials("catalog", policy).await?;
-        self.send_as(&creds, method, path, query, body).await
     }
 
     /// Credentials issued within `policy`, for the calls of one task.
@@ -135,25 +202,28 @@ impl TableLookup {
         policy: &str,
     ) -> Result<TemporaryCredentials, String> {
         self.issuer
-            .assume_role(session, policy, Duration::from_secs(900))
+            .assume_role(session, policy, Duration::from_secs(0))
             .await
             .map_err(|e| e.to_string())
     }
 
-    /// `method path?query` with `body`, signed with `creds`.
+    /// `method url?query` with `body`, signed with `creds`: for the
+    /// catalog's service if `catalog`, else S3's.
     pub(crate) async fn send_as(
         &self,
         creds: &TemporaryCredentials,
         method: &str,
-        path: &str,
+        url: &str,
         query: &[(&str, &str)],
         body: Vec<u8>,
+        catalog: bool,
     ) -> Result<reqwest::Response, String> {
+        let path = path_of(url).ok_or_else(|| format!("bad URL {url}"))?;
         let query_string = sigv4::query_string(query);
         let url = if query_string.is_empty() {
-            format!("{}{path}", self.issuer.endpoint())
+            url.to_string()
         } else {
-            format!("{}{path}?{query_string}", self.issuer.endpoint())
+            format!("{url}?{query_string}")
         };
         let host = sigv4::host(&url).ok_or_else(|| format!("bad endpoint {url}"))?;
         let hash = payload_hash(&body);
@@ -165,12 +235,17 @@ impl TableLookup {
         ];
         let request = sigv4::Request {
             method,
-            path,
+            path: &path,
             query,
             headers: &headers,
         };
+        let service = if catalog {
+            self.issuer.properties().catalog_sigv4_service.as_str()
+        } else {
+            "s3"
+        };
         let signed = sigv4::sign_request(
-            "s3",
+            service,
             &creds.access_key,
             &creds.secret_key,
             &request,
@@ -189,6 +264,15 @@ impl TableLookup {
     }
 }
 
+/// The path of an absolute URL, as it is signed (`/` when it has none).
+fn path_of(url: &str) -> Option<String> {
+    let rest = url.split_once("://")?.1;
+    Some(match rest.find('/') {
+        Some(i) => rest[i..].to_string(),
+        None => "/".to_string(),
+    })
+}
+
 /// `tables/<uuid>` of `s3://<warehouse>/tables/<uuid>`, if it is there.
 fn prefix_of(warehouse: &str, location: &str) -> Option<String> {
     let prefix = location
@@ -205,6 +289,16 @@ fn prefix_of(warehouse: &str, location: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_urls_path_is_what_is_signed() {
+        assert_eq!(
+            path_of("https://lake.test/iceberg/v1/w").as_deref(),
+            Some("/iceberg/v1/w")
+        );
+        assert_eq!(path_of("https://lake.test").as_deref(), Some("/"));
+        assert_eq!(path_of("lake.test/x"), None);
+    }
 
     #[test]
     fn a_tables_prefix_is_inside_its_warehouse_or_none() {
