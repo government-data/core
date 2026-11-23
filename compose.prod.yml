@@ -11,7 +11,7 @@
 # superuser password natively via *_FILE; the API reads its connection string
 # via DATABASE_URL_FILE (see crates/infrastructure/src/db.rs), so no credential
 # is ever passed as a plain environment variable in production.
-name: knime-orchestador
+name: quality-data
 
 secrets:
   database_url:

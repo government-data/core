@@ -49,7 +49,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/server /usr/local/bin/server
 COPY --from=builder /app/target/release/qd-node /usr/local/bin/qd-node
 # The key that encrypts the Settings secrets (SETTINGS_KEY_FILE).
-COPY --from=builder --chown=nonroot:nonroot /out/settings /var/lib/orquestador/settings
+COPY --from=builder --chown=nonroot:nonroot /out/settings /var/lib/quality-data/settings
 COPY --from=builder --chown=nonroot:nonroot /out/qd-metrics /run/qd-metrics
 # The app binds APP_HOST:APP_PORT; the compose files set 0.0.0.0:8080.
 EXPOSE 8080

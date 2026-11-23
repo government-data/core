@@ -6,7 +6,7 @@
 # reached from outside the machine. Each request brings the token of
 # secrets/internal_token, which the installer generates. The API never gets
 # docker.sock: the host is the one that updates.
-name: knime-orchestador
+name: quality-data
 
 secrets:
   internal_token:

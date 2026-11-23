@@ -19,7 +19,7 @@ data:
     # The key of the Settings secrets (LDAP, mail, OAuth).
     - name: settings-key
       service: api
-      path: /var/lib/orquestador/settings
+      path: /var/lib/quality-data/settings
       critical: true
     - name: letsencrypt
       service: traefik
