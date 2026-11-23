@@ -19,6 +19,9 @@ schedule-core.workspace = true
 async-trait.workspace = true
 domain.workspace = true
 auth-gateway.workspace = true
+# The lake's grant (decision 0078; `application` may depend on `contracts`,
+# a pure crate: the user's ruling of 2026-11-23).
+contracts.workspace = true
 # Secrets, global roles and license usage.
 platform.workspace = true
 # Global capabilities and roles (ADR 0013).

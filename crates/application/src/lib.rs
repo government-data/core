@@ -11,6 +11,7 @@ use domain::{Health, HealthCheck};
 pub mod actors;
 pub mod admins;
 pub mod audit_chain;
+pub mod lake;
 pub mod machines;
 pub mod platform;
 pub mod settings;

@@ -23,6 +23,7 @@ roxmltree = "0.21"
 # Internal crates, wired as path dependencies. The dependency direction is
 # enforced by which of these each member opts into:
 #   api → application → auth-gateway → domain     (api, auth-gateway → http-kit)
+#   application → contracts                        (its pure types: a lake's grant)
 #   infrastructure → auth-gateway, domain
 #   server (composition root) → api, application, infrastructure, contracts, modules
 # `auth-gateway` is identity (signing in, sessions, OAuth, the directory); it
