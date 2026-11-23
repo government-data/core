@@ -207,7 +207,7 @@ async fn each_client_is_signed_with_its_algorithm_if_the_key_is_there() {
 fn machine_settings(service_account: Option<&str>) -> ClientSettings {
     ClientSettings {
         client_credentials: true,
-        audiences: vec!["trino".into(), "lake".into()],
+        audiences: vec!["sql-query".into(), "lake".into()],
         service_account: service_account.map(str::to_string),
         ..ClientSettings::default()
     }
@@ -233,7 +233,7 @@ async fn a_machine_gets_a_token_for_one_of_its_audiences() {
     assert!(tokens.scope.is_empty());
     assert_eq!(tokens.expires_in, 24 * 3600);
     let at = claims(&tokens.access_token);
-    assert_eq!(at["aud"], "trino");
+    assert_eq!(at["aud"], "sql-query");
     assert_eq!(at["sub"], "gestion");
     assert_eq!(at["client_id"], "gestion");
     assert_eq!(at["iss"], ISSUER);
@@ -282,21 +282,27 @@ async fn a_service_reads_which_machine_a_token_belongs_to() {
         .unwrap()
         .access_token;
     assert_eq!(
-        f.server.machine_client(&token, "trino").as_deref(),
+        f.server.machine_client(&token, "sql-query").as_deref(),
         Some("gestion")
     );
     // A client with a secret names no machine.
     assert_eq!(
-        f.server.machine_caller(&token, "trino"),
+        f.server.machine_caller(&token, "sql-query"),
         Some(("gestion".into(), None))
     );
     // For another audience, tampered, or a person's: none.
     assert_eq!(f.server.machine_client(&token, "lake"), None);
-    assert_eq!(f.server.machine_client(&format!("{token}x"), "trino"), None);
+    assert_eq!(
+        f.server.machine_client(&format!("{token}x"), "sql-query"),
+        None
+    );
     let f = fixture(ClientAuth::Public);
     f.server.authorize(&request(), Some(&f.session)).await;
     let person = f.server.token(&token_request("code-1")).await.unwrap();
-    assert_eq!(f.server.machine_client(&person.access_token, "trino"), None);
+    assert_eq!(
+        f.server.machine_client(&person.access_token, "sql-query"),
+        None
+    );
 }
 
 #[tokio::test]
@@ -319,7 +325,7 @@ async fn a_machine_token_needs_the_secret_an_allowed_audience_and_the_flag() {
         Err(TokenError::InvalidTarget)
     );
     let two_audiences = TokenRequest {
-        resource: Some("trino".into()),
+        resource: Some("sql-query".into()),
         audience: Some("lake".into()),
         ..machine_request()
     };

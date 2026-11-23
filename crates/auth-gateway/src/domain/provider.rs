@@ -129,7 +129,7 @@ impl OidcClient {
 
 /// The JWS algorithm an application's tokens are signed with: `EdDSA`
 /// (Ed25519, the default) or `ES256` (P-256), for relying parties that only
-/// verify RSA or EC keys (Trino).
+/// verify RSA or EC keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SigningAlg {
     #[default]

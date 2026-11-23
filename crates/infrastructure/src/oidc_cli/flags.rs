@@ -184,11 +184,13 @@ mod tests {
     #[test]
     fn the_flags_set_the_settings_and_leave_the_rest() {
         let f = Flags::parse(
-            &args("trino Trino https://t/cb --alg ES256 --no-pkce --require-policy quality-admin"),
+            &args(
+                "reports Reports https://t/cb --alg ES256 --no-pkce --require-policy quality-admin",
+            ),
             false,
         )
         .unwrap();
-        assert_eq!(f.positional, args("trino Trino https://t/cb"));
+        assert_eq!(f.positional, args("reports Reports https://t/cb"));
         let mut s = ClientSettings::default();
         f.apply(&mut s).unwrap();
         assert_eq!(s.token_alg, SigningAlg::ES256);
@@ -197,13 +199,13 @@ mod tests {
         assert!(!s.client_credentials);
 
         let f = Flags::parse(
-            &args("w --client-credentials --audience trino --audience lake"),
+            &args("w --client-credentials --audience sql-query --audience lake"),
             true,
         )
         .unwrap();
         f.apply(&mut s).unwrap();
         assert!(s.client_credentials);
-        assert_eq!(s.audiences, args("trino lake"));
+        assert_eq!(s.audiences, args("sql-query lake"));
         // Untouched by this update.
         assert_eq!(s.token_alg, SigningAlg::ES256);
         let f = Flags::parse(&args("w --pkce --no-require-policy"), true).unwrap();

@@ -1,6 +1,6 @@
 //! [`Es256Signer`]: the OIDC provider's second key, ECDSA P-256 (JWS
 //! `alg: ES256`, RFC 7518 §3.4), for the relying parties that only verify RSA
-//! or EC keys (Trino). The Ed25519 one ([`crate::oidc::Ed25519Signer`]) stays
+//! or EC keys. The Ed25519 one ([`crate::oidc::Ed25519Signer`]) stays
 //! the default; each application's settings choose.
 //!
 //! Also where the provider's keys are read from the environment: `NAME` or,

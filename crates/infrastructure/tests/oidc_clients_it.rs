@@ -58,7 +58,7 @@ async fn oidc_clients_round_trip_each_way_of_authenticating() {
             ClientSettings::default(),
         ),
         client(
-            "trino-ui",
+            "reports-ui",
             ClientAuth::Secret { hash: "h".into() },
             &["https://t/cb"],
             ClientSettings::default(),

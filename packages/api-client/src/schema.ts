@@ -2897,7 +2897,7 @@ export interface components {
         SourceColumn: {
             /**
              * @description As the engine reads the source's type: DuckDB's (`INTEGER`,
-             *     `DECIMAL(14,2)`) or Trino's (`integer`, `varchar(10)`).
+             *     `DECIMAL(14,2)`).
              */
             data_type: string;
             name: string;

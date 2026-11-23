@@ -135,13 +135,13 @@ mod tests {
             vec![module("Orchestrator", None)],
             vec![module("", None)],
             vec![module("a/b", None)],
-            vec![module("trino", None), module("trino", None)],
+            vec![module("orchestrator", None), module("orchestrator", None)],
             vec![no_version],
-            vec![module("trino", Some("drain"))],
-            vec![module("trino", Some("/"))],
-            vec![module("trino", Some("/../api/drain"))],
-            vec![module("trino", Some("/drain?x=1"))],
-            vec![module("trino", Some("//other/drain"))],
+            vec![module("orchestrator", Some("drain"))],
+            vec![module("orchestrator", Some("/"))],
+            vec![module("orchestrator", Some("/../api/drain"))],
+            vec![module("orchestrator", Some("/drain?x=1"))],
+            vec![module("orchestrator", Some("//other/drain"))],
         ] {
             let refused = service.set_modules(bad.clone()).await;
             assert!(

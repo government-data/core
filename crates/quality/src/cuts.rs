@@ -25,7 +25,7 @@ pub struct ExtractReport {
     /// [`crate::worker_api::SnapshotRead`]).
     pub snapshot: String,
     /// The silver snapshot it committed (decision 0061); none from an older
-    /// worker, a Trino extraction or a mapping silver could not take.
+    /// worker, or a mapping silver could not take.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub silver_snapshot: Option<String>,
 }

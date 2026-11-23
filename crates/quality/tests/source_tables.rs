@@ -214,7 +214,7 @@ async fn a_listing_of_a_sql_server_source_gets_its_credentials_for_duckdb() {
         (source.name.as_str(), source.driver.as_str()),
         ("core", "sqlserver")
     );
-    // DuckDB reads it (decision 0077): its credentials, no token for Trino.
+    // DuckDB reads it (decision 0077), with its credentials.
     assert!(source.secrets.contains_key("password"));
     assert_eq!(
         *f.issued.given.lock().unwrap(),

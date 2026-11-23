@@ -25,7 +25,7 @@ committed, pushed or published.** Ask for it if your checkout lacks it.
    An accepted decision changes only through a new record; a **proposed** one
    can be edited.
 3. **Verify external behaviour first.** Before building on what Iceberg,
-   RustFS, Dolt, Trino or DuckDB do, write or run a script in `tools/verify/`
+   RustFS, Dolt or DuckDB do, write or run a script in `tools/verify/`
    and record the result in the decision (date, version, what was found).
 
 ## Architecture patterns
@@ -34,7 +34,7 @@ committed, pushed or published.** Ask for it if your checkout lacks it.
   root `Cargo.toml`): `api → application → domain`; `infrastructure`
   implements the ports; `server` is the composition root.
 - **Ports and adapters.** Domain and use cases declare traits; SQL, HTTP,
-  Dolt, Iceberg, RustFS and Trino live in adapters in `infrastructure` (or
+  Dolt, Iceberg and RustFS live in adapters in `infrastructure` (or
   inside a module). No SQL or HTTP in a domain crate.
 - **Feature modules through `contracts`.** The quality core is a module
   (`crates/quality`): its own migrations, its own router, registered by
@@ -49,8 +49,8 @@ committed, pushed or published.** Ask for it if your checkout lacks it.
   (`quality-rules-model` → `-tree` → `-compile`, then SQL, lint, explain),
   each depending only on the stages before it; `quality-rules` gathers them.
 - **Rules reach an engine only through `quality-rules`.** Never write engine
-  SQL for a rule by hand. The same tree gives DuckDB, Trino and the
-  explanation; anything compiled for two engines has an equivalence test.
+  SQL for a rule by hand. The same tree gives DuckDB's SQL and the
+  explanation; DuckDB is the one engine (decision 0077).
 - **Rule semantics are fixed** (decision 0033): empty is `NULL`, blank or only
   spaces including U+00A0; other patterns skip empty values; regular
   expressions are anchored; dates compare with the cut (`:cut`), never today;

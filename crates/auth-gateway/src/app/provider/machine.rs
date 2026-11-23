@@ -1,5 +1,5 @@
 //! The `client_credentials` grant (RFC 6749 §4.4): a machine (a worker, the
-//! API) gets a short access token for one audience (Trino), with no person,
+//! API) gets a short access token for one audience, with no person,
 //! no id_token and no refresh token (decision 0030: dynamic credentials).
 //! A client with a secret gets [`TOKEN_TTL`] (0046); a machine role's
 //! client, authenticated by one machine's certificate, 15 minutes that name
@@ -42,8 +42,7 @@ impl AuthorizationServer {
 
     /// A token of this installation's own machine client `client_id` for
     /// `audience`, signed here with no secret: the API is the issuer, so
-    /// it does not ask itself over HTTP for its Trino token (decision
-    /// 0048). The client must be registered for `client_credentials` and
+    /// it does not ask itself over HTTP for its own token. The client must be registered for `client_credentials` and
     /// that audience, so deleting or changing it stops this too.
     pub async fn own_machine_token(
         &self,

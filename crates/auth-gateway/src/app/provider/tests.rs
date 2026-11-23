@@ -414,29 +414,32 @@ mod settings;
 async fn the_installations_own_machine_client_gets_its_token_without_a_secret() {
     let machine = ClientSettings {
         client_credentials: true,
-        audiences: vec!["trino".into()],
+        audiences: vec!["sql-query".into()],
         ..ClientSettings::default()
     };
     let secret = ClientAuth::Secret { hash: "h:s".into() };
     let f = fixture_with(secret, machine.clone());
     let token = f
         .server
-        .own_machine_token("gestion", "trino")
+        .own_machine_token("gestion", "sql-query")
         .await
         .unwrap();
     let c = claims(&token.access_token);
     assert_eq!(
         (c["aud"].as_str(), c["sub"].as_str()),
-        (Some("trino"), Some("gestion"))
+        (Some("sql-query"), Some("gestion"))
     );
     assert_eq!(c["client_id"], "gestion");
 
     // Another audience, an unknown client, or one that is no machine: none.
     let other = f.server.own_machine_token("gestion", "lake").await;
     assert_eq!(other.unwrap_err().code(), "invalid_target");
-    let unknown = f.server.own_machine_token("nadie", "trino").await;
+    let unknown = f.server.own_machine_token("nadie", "sql-query").await;
     assert_eq!(unknown.unwrap_err().code(), "invalid_client");
     let person = fixture(ClientAuth::Secret { hash: "h:s".into() });
-    let refused = person.server.own_machine_token("gestion", "trino").await;
+    let refused = person
+        .server
+        .own_machine_token("gestion", "sql-query")
+        .await;
     assert_eq!(refused.unwrap_err().code(), "unauthorized_client");
 }
