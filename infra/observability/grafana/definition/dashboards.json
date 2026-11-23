@@ -414,14 +414,6 @@
           "decimals": 0
         },
         {
-          "type": "stat",
-          "title": "health.on_trino",
-          "w": 6,
-          "h": 7,
-          "sql": "on_trino.sql",
-          "decimals": 0
-        },
-        {
           "type": "timeseries",
           "title": "health.finished",
           "w": 24,
@@ -469,14 +461,6 @@
             "last_failed": 170,
             "pending": { "w": 90 }
           }
-        },
-        {
-          "type": "table",
-          "title": "health.holds",
-          "w": 12,
-          "h": 7,
-          "sql": "holds.sql",
-          "columns": { "machine": null, "held_at": 170, "expires_at": 170 }
         },
         {
           "type": "table",

@@ -13,7 +13,6 @@ vars:
   DC_LAKE: "{{.DC_APP}} -p data-quality-lake -f infra/rustfs/docker-compose.yml -f infra/rustfs/compose.dev.yml"
   DC_OBS: "{{.DC_APP}} -p data-quality-observability -f infra/observability/docker-compose.yml -f infra/observability/compose.dev.yml"
   DC_CATALOG: "{{.DC_APP}} -p data-quality-dolt -f infra/dolt/docker-compose.yml -f infra/dolt/compose.dev.yml"
-  DC_TRINO: "{{.DC_APP}} -p data-quality-trino -f infra/trino/docker-compose.yml -f infra/trino/compose.dev.yml"
   DC_WORKER: "{{.DC_APP}} -p data-quality-worker -f infra/worker/docker-compose.yml -f infra/worker/compose.dev.yml"
 
 tasks:
@@ -41,7 +40,7 @@ tasks:
       - find infra/traefik/dynamic -maxdepth 1 \( -name '*.crt' -o -name '*.key' \) -exec cp {} .dev/traefik/ \;
       - "{{.DC_WATCH}} stop api web 2>/dev/null || true"
       - "{{.DC_WATCH}} --profile dev up -d"
-      - tools/dev/rejoin.sh --no-wait
+      - tools/dev/rejoin.sh
       - task: dev:watch:run
 
   dev:watch:run:
@@ -131,28 +130,8 @@ tasks:
     cmds:
       - infra/dolt/backup.sh
 
-  trino:lake-user:
-    desc: Create Trino's own RustFS user and the dev warehouse (once, with the lake up)
-    cmds:
-      - sh infra/trino/lake-user.sh
-
-  trino:up:
-    desc: Start the Trino cluster (coordinator + worker) as its own stack, as on its own servers
-    cmds:
-      - "{{.DC_TRINO}} up -d"
-
-  trino:down:
-    desc: Stop the Trino cluster (its catalogs stay in its volume)
-    cmds:
-      - "{{.DC_TRINO}} down"
-
-  trino:logs:
-    desc: Follow the Trino cluster's logs
-    cmds:
-      - "{{.DC_TRINO}} logs -f"
-
   sqlserver:load:
-    desc: "Dev SQL Server source: start it, load tmp/datos into it and point the source sqlserver_dev at it (0048)"
+    desc: "Dev SQL Server source: start it, load tmp/datos into it and point the source sqlserver_dev at it (0077)"
     cmds:
       - uv run --quiet tools/dev/sqlserver_source.py
 

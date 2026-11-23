@@ -13,13 +13,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
 
-  # Trino's client protocol (HTTPS, a JWT on every statement; decision 0048):
-  # the coordinator shares Traefik's network, so its port is published here,
-  # to this machine only, for the worker on the host's network (and the API
-  # in watch mode). In both modes: without it no source can be read.
   traefik:
-    ports:
-      - "127.0.0.1:8490:8490"
     # The API runs on this machine's network (below, or on the host in watch
     # mode): Traefik reaches it there, by its label or as `api` (the sign-in
     # gate of the applications calls http://api:8080).
@@ -37,7 +31,7 @@ services:
     # Traefik routes nothing new: its Docker provider exposes only labelled
     # containers on `edge` (exposedByDefault: false) and neither `postgres`
     # nor `mailpit` has a label. The other stacks in that namespace (RustFS,
-    # Trino, Loki, Alloy) can now open a connection to PostgreSQL, where they
+    # Loki, Alloy) can now open a connection to PostgreSQL, where they
     # have no role. Joining a running Traefik needs no recreation:
     #   docker network connect data-quality-backend data-quality-traefik-1
     networks:
@@ -46,8 +40,7 @@ services:
 
   # The API on this machine's network, as tools/dev/api.sh runs it in watch
   # mode: the dev certificate names only localhost, so the catalog (Dolt on
-  # 127.0.0.1:3307), the lake (https://localhost) and Trino (127.0.0.1:8490)
-  # are reached where they are published. It listens on 8080, as in watch
+  # 127.0.0.1:3307) and the lake (https://localhost) are reached where they are published. It listens on 8080, as in watch
   # mode. Pretty-printed, colored logs in dev.
   api:
     # The commit it is built from (`task dev` takes it from git), to see it at
@@ -67,12 +60,6 @@ services:
       LAKE_CA_FILE: /etc/qd/dev-ca.crt
       RUSTFS_STS_ISSUER_ACCESS_KEY: ${RUSTFS_STS_ISSUER_ACCESS_KEY:-}
       RUSTFS_STS_ISSUER_SECRET_KEY: ${RUSTFS_STS_ISSUER_SECRET_KEY:-}
-      # A source on Trino keeps its catalog there, as the machine client qd-api.
-      QUALITY_TRINO_URL: https://127.0.0.1:8490
-      QUALITY_TRINO_CA_FILE: /etc/qd/dev-ca.crt
-      # The secret Trino reads its rules with (decision 0062); empty, the
-      # route is not served and Trino does not start.
-      QUALITY_TRINO_RULES_KEY: ${QUALITY_TRINO_RULES_KEY:-}
     volumes:
       - ./infra/traefik/certs/dev-ca.crt:/etc/qd/dev-ca.crt:ro
 

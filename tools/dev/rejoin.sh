@@ -2,24 +2,18 @@
 # In development the applications' stacks (infra/<app>/compose.dev.yml) join
 # the network namespace of the application's Traefik. When `task dev`
 # recreates Traefik, they are left in a namespace that no longer exists:
-# Trino does not start and Traefik answers 502 for RustFS and Grafana. This
-# recreates, of those already created, the ones joined to another Traefik.
-# Trino goes last, once the OIDC provider answers: it reads it on start.
-# With --no-wait (watch mode, where the API starts afterwards) Trino is left
-# for later: run this script again once the API is up.
+# Traefik answers 502 for RustFS and Grafana. This recreates, of those
+# already created, the ones joined to another Traefik.
 set -eu
 cd "$(dirname "$0")/../.."
 
 traefik="${APP_STACK:-data-quality}-traefik-1"
-wait=1
-[ "${1:-}" = --no-wait ] && wait=0
 current=$(docker inspect -f '{{.Id}}' "$traefik")
 
 # project stack-directory
 stacks="lake rustfs
 dolt dolt
-observability observability
-trino trino"
+observability observability"
 
 echo "$stacks" | while read -r project dir; do
   stale=0
@@ -32,22 +26,6 @@ echo "$stacks" | while read -r project dir; do
   done
   [ "$stale" = 1 ] || continue
 
-  if [ "$project" = trino ]; then
-    if [ "$wait" = 0 ]; then
-      echo "data-quality-trino: once the API is up, run tools/dev/rejoin.sh"
-      continue
-    fi
-    echo "waiting for the OIDC provider before Trino"
-    i=0
-    until curl -fsk -o /dev/null https://localhost/api/.well-known/openid-configuration; do
-      i=$((i + 1))
-      if [ "$i" -ge 60 ]; then
-        echo "data-quality-trino: the API did not answer; run tools/dev/rejoin.sh later" >&2
-        continue 2
-      fi
-      sleep 1
-    done
-  fi
   echo "data-quality-$project: joining the new Traefik"
   docker compose --project-directory . --env-file .env -p "data-quality-$project" \
     -f "infra/$dir/docker-compose.yml" -f "infra/$dir/compose.dev.yml" \

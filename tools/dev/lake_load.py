@@ -129,7 +129,7 @@ def main():
     p.add_argument("--mappings", default=str(ROOT / "examples/datasets"), help="a directory of mapping files")
     p.add_argument("--load", action="append", default=[], metavar="DATASET[.TABLE]=FILE",
                    help="a table without a mapping; repeatable")
-    p.add_argument("--warehouse", default=os.environ.get("TRINO_LAKE_WAREHOUSE", "qd-tenant-00000000000000000000000000000001"))
+    p.add_argument("--warehouse", default=os.environ.get("LAKE_WAREHOUSE", "qd-tenant-00000000000000000000000000000001"))
     args = p.parse_args()
     cat = catalog(args.warehouse)
     ok = True

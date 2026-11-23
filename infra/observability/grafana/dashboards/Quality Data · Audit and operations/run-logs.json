@@ -33,7 +33,7 @@
         "y": 0
       },
       "options": {
-        "content": "Lines are matched by the **run's id** (`run_id`, its cut's id) or **one of its jobs' ids** (its extraction and its evaluation, `job_id`), as text, in any service of the platform over the time range shown. The API and the worker log these ids as fields; matching their text also finds older lines and other services' lines that name them (such as Traefik's access log of the worker's calls), and shows a line that names one for another reason. Trino's own lines carry only its query id: the worker's `trino query started` line ties a `trino_query_id` to the job, and that id's link opens Trino's lines for the query. The run's id is shared by the cut's replacement runs, so their lines are shown too; only the latest run's jobs are listed. The observability stack's own lines (Grafana, Loki, Alloy) are left out: they log the search itself.",
+        "content": "Lines are matched by the **run's id** (`run_id`, its cut's id) or **one of its jobs' ids** (its extraction and its evaluation, `job_id`), as text, in any service of the platform over the time range shown. The API and the worker log these ids as fields; matching their text also finds older lines and other services' lines that name them (such as Traefik's access log of the worker's calls), and shows a line that names one for another reason. The run's id is shared by the cut's replacement runs, so their lines are shown too; only the latest run's jobs are listed. The observability stack's own lines (Grafana, Loki, Alloy) are left out: they log the search itself.",
         "mode": "markdown"
       }
     },

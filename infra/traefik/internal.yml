@@ -24,11 +24,7 @@
 # routes (/api/internal/jobs/…, 0066 step 7) are here. The worker's stay on
 # the public entry point too, for the workers with a secret of the dev stack
 # and its Docker worker, until the dev stack moves to certificates (step 8),
-# when they leave it. Trino's rules (/api/internal/trino/rules) are here,
-# read with Trino's certificate (step 9); the public router of
-# dynamic/apps-trino.yml keeps the path for the dev stack's Trino, which
-# reads them with a key until it moves (in production no key is set and
-# that router finds 404).
+# when they leave it.
 {{ $internal := env "INTERNAL_DOMAIN" | default "internal.localhost" }}
 tls:
   certificates:
@@ -72,20 +68,6 @@ http:
     # report (/api/internal/jobs/…) with the token it got above.
     worker-jobs:
       rule: "Host(`{{ $internal }}`) && PathPrefix(`/api/internal/jobs/`)"
-      entryPoints: [internal]
-      tls:
-        options: machines
-      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
-      middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
-
-    # Trino's coordinator reads its access-control rules with its machine
-    # certificate (GET /api/internal/trino/rules, 0066 point 9), no secret
-    # in the URL. Its hold and release before a restart are machines'
-    # routes (/api/internal/machines/trino/…), on the router above.
-    # (Named apart from apps-trino.yml's public `trino-rules`: one file
-    # provider, one namespace.)
-    trino-rules-internal:
-      rule: "Host(`{{ $internal }}`) && Path(`/api/internal/trino/rules`)"
       entryPoints: [internal]
       tls:
         options: machines
