@@ -47,6 +47,7 @@ jobs:
       image-api: ${{ steps.filter.outputs.image-api }}
       image-web: ${{ steps.filter.outputs.image-web }}
       image-worker: ${{ steps.filter.outputs.image-worker }}
+      image-lake-rustfs-admin: ${{ steps.filter.outputs.image-lake-rustfs-admin }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -98,6 +99,16 @@ jobs:
               - 'infra/docker/worker.Dockerfile'
               - '.dockerignore'
               - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.github/workflows/ci.yml'
+            # The lake admin adapter (decision 0078) links contracts alone
+            # among the core's crates.
+            image-lake-rustfs-admin:
+              - 'infra/docker/lake-rustfs-admin.Dockerfile'
+              - '.dockerignore'
+              - 'crates/lake-rustfs-admin/**'
+              - 'crates/contracts/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - '.github/workflows/ci.yml'
@@ -324,6 +335,36 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  # The lake admin adapter's image (decision 0078, step 13), as the
+  # worker's: built and kept, never pushed (it reaches ECR from the
+  # lake-rustfs repository, step 15).
+  image-lake-rustfs-admin:
+    needs: check
+    if: ${{ needs.check.outputs.image-lake-rustfs-admin == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the lake admin adapter's image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: infra/docker/lake-rustfs-admin.Dockerfile
+          push: false
+          tags: qd-lake-rustfs-admin:${{ github.sha }}
+          outputs: type=docker,dest=${{ runner.temp }}/qd-lake-rustfs-admin.tar
+      # Kept for a week (decision 0082): `gh run download -n
+      # image-lake-rustfs-admin`, then `docker load -i qd-lake-rustfs-admin.tar`.
+      - name: Keep the lake admin adapter's image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-lake-rustfs-admin
+          path: ${{ runner.temp }}/qd-lake-rustfs-admin.tar
+          retention-days: 7
+          if-no-files-found: error
+
   # The web image keeps a small Actions cache (about 180 MB), deleted with the
   # PR's other caches when it closes (cache-cleanup.yml).
 
@@ -368,7 +409,7 @@ jobs:
   # affected job passed. Skipped stacks (unaffected) do not fail the gate.
   ci:
     if: always()
-    needs: [check, backend, frontend, image-api, image-web, image-worker]
+    needs: [check, backend, frontend, image-api, image-web, image-worker, image-lake-rustfs-admin]
     runs-on: ${{ fromJSON(vars.CI_RUNNER_LIVIANO || '"ubuntu-latest"') }}
     steps:
       - name: Aggregate result
@@ -377,13 +418,14 @@ jobs:
           if [ "${{ needs.check.result }}" != "success" ]; then
             echo "check job did not succeed"; exit 1
           fi
-          for stack in backend frontend image-api image-web image-worker; do
+          for stack in backend frontend image-api image-web image-worker image-lake-rustfs-admin; do
             case "$stack" in
               backend) result="${{ needs.backend.result }}" ;;
               frontend) result="${{ needs.frontend.result }}" ;;
               image-api) result="${{ needs.image-api.result }}" ;;
               image-web) result="${{ needs.image-web.result }}" ;;
               image-worker) result="${{ needs.image-worker.result }}" ;;
+              image-lake-rustfs-admin) result="${{ needs.image-lake-rustfs-admin.result }}" ;;
             esac
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
               echo "$stack job $result"; exit 1
