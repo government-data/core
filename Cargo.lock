@@ -147,6 +147,7 @@ dependencies = [
  "auth-gateway",
  "chrono",
  "chrono-tz",
+ "contracts",
  "domain",
  "iam",
  "platform",
