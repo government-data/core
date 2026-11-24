@@ -1,8 +1,8 @@
 //! The lakes' platform admin keys in Postgres (`lake_admin_keys`, 0066 step
 //! 11, the user's ruling of 2026-11-13): as a person pasted them, the secret
 //! sealed with the settings' key ([`SecretBox`]); pasted again, replaced.
-//! The secret is opened only for the lake's admin API's adapter
-//! ([`crate::rustfs_admin`]), through [`AdminKeySource`].
+//! The secret is opened only for the core's client of the lakes' adapters
+//! ([`crate::lake_admins`]), through [`AdminKeySource`].
 
 use std::time::SystemTime;
 
@@ -14,7 +14,7 @@ use sqlx::postgres::{PgPool, PgRow};
 use sqlx::Row;
 
 use super::backend;
-use crate::rustfs_admin::AdminKeySource;
+use crate::lake_admin_client::AdminKeySource;
 use crate::SecretBox;
 
 /// A Postgres-backed [`LakeAdminKeyStore`].

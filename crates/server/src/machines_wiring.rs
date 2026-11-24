@@ -24,8 +24,8 @@ use application::MachinesService;
 use auth_gateway::http::client_cert::ClientCertificates;
 use auth_gateway::SessionService;
 use infrastructure::ca::{Ca, X509CertificateReader};
+use infrastructure::lake_admins::AdapterLakeAdmins;
 use infrastructure::mimir_series::MimirSeries;
-use infrastructure::rustfs_admin::RustfsLakeAdmin;
 use infrastructure::{
     EmbeddedInstallFiles, PgAuditRepository, PgLakeAdminKeys, PgLakePools, PgLakeRootKeys,
     PgMachineAlerts, PgMachineSessions, PgMachines, PgPool, RingJoinTokenMint, SecretBox,
@@ -94,10 +94,13 @@ pub(crate) fn service(
         // Grafana's alerts about the machines (0072, point 11).
         .with_machine_alerts(Arc::new(PgMachineAlerts::new(pool.clone())));
     let machines = with_series(machines);
-    // The lakes' admin API reads the kept keys itself, and reaches a node's
-    // gate with the application VM's certificate, as the STS issuer does.
+    // Each lake's adapter (decision 0078): the main lake's at
+    // `LAKE_ADMIN_URL`, a replica's on its machine; the client sends the
+    // kept keys with each call, presenting the application VM's
+    // certificate (`LAKE_ADMIN_CERT_FILE` or `LAKE_CLIENT_CERT_FILE`) and
+    // trusting the installation's CA (`LAKE_ADMIN_CA_FILE` or `CA_CERT_FILE`).
     let keys = Arc::new(PgLakeAdminKeys::new(pool.clone(), sealer));
-    let machines = match RustfsLakeAdmin::from_env(keys) {
+    let machines = match AdapterLakeAdmins::from_env(keys) {
         Ok(api) => {
             let machines = machines
                 .with_lake_admin(Arc::new(api))
@@ -108,7 +111,7 @@ pub(crate) fn service(
             machines
         }
         Err(e) => {
-            tracing::warn!(error = %e, "the lakes' admin API is not reachable from here");
+            tracing::warn!(error = %e, "the lakes' adapters are not reachable from here");
             machines
         }
     };

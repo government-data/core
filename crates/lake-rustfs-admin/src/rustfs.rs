@@ -61,6 +61,13 @@ impl Rustfs {
         self
     }
 
+    /// Another lake's node reached over `scheme` on `port`.
+    pub fn at(mut self, scheme: &'static str, port: u16) -> Self {
+        self.scheme = scheme;
+        self.port = port;
+        self
+    }
+
     /// Where `node` answers: a base URL as it is, or a node's name on the
     /// gate's port.
     pub(crate) fn base(&self, node: &str) -> String {

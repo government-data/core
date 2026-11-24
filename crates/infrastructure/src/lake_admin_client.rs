@@ -1,11 +1,17 @@
 //! The core's client of a lake's adapter over `lake-admin/1` (decision
 //! 0078, step 6): `application::lake::LakeAdmin` at the wire, HTTPS with
 //! the core server's machine certificate, trusting the installation's CA
-//! alone and accepting only an adapter's certificate (role `lake`). A call
+//! alone and accepting only an adapter's certificate (the role of its
+//! lake's machines: `lake`, or `lake-replica` for the replica). A call
 //! is tried again only when the adapter says it may be (`retryable`) or
 //! did not answer. No body is logged: neither a key, a policy nor an
 //! answer of `/credentials`.
+//!
+//! The keys an operation needs (step 11, the user's ruling of 2026-11-24)
+//! are read from the core's sealed store for each call and sent in its
+//! headers (`contracts::lake_admin::headers`), never logged.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use application::lake::{
@@ -13,22 +19,45 @@ use application::lake::{
     ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
 };
 use async_trait::async_trait;
-use contracts::lake_admin::{self as wire, paths};
+use auth_gateway::{Lake, LakeAdminKeys};
+use contracts::lake_admin::{self as wire, headers, paths};
+use domain::RepositoryError;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-/// The role an adapter's certificate carries.
+/// The role an adapter's certificate carries, unless said otherwise.
 pub const ADAPTER_ROLE: &str = "lake";
 
 /// How many times a call is made at most.
 const ATTEMPTS: u32 = 3;
 
+/// Where the client reads a lake's admin keys, the secret opened. Only the
+/// clients of the lakes' adapters are given it.
+#[async_trait]
+pub trait AdminKeySource: Send + Sync {
+    async fn open(&self, lake: &Lake) -> Result<Option<LakeAdminKeys>, RepositoryError>;
+}
+
+/// The headers of one call: a name and its value.
+type Headers = Vec<(&'static str, String)>;
+
 /// A client of one adapter.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LakeAdminClient {
     base: String,
     http: reqwest::Client,
     pause: Duration,
+    role: &'static str,
+    keys: Option<(Arc<dyn AdminKeySource>, Lake)>,
+}
+
+impl std::fmt::Debug for LakeAdminClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LakeAdminClient")
+            .field("base", &self.base)
+            .field("role", &self.role)
+            .finish_non_exhaustive()
+    }
 }
 
 impl LakeAdminClient {
@@ -52,7 +81,49 @@ impl LakeAdminClient {
             base: base.trim_end_matches('/').to_string(),
             http,
             pause: Duration::from_millis(500),
+            role: ADAPTER_ROLE,
+            keys: None,
         })
+    }
+
+    /// The same client, accepting an adapter of `role` instead.
+    pub fn accepting(mut self, role: &'static str) -> Self {
+        self.role = role;
+        self
+    }
+
+    /// The same client, sending `lake`'s keys (and the replica's, to
+    /// replicate) from `source`.
+    pub fn with_keys(mut self, source: Arc<dyn AdminKeySource>, lake: Lake) -> Self {
+        self.keys = Some((source, lake));
+        self
+    }
+
+    /// `lake`'s keys in `header`, if they are kept.
+    async fn header(&self, lake: &Lake, header: &'static str) -> Result<Headers, LakeError> {
+        let Some((source, _)) = &self.keys else {
+            return Ok(Vec::new());
+        };
+        let kept = source.open(lake).await;
+        let kept = kept.map_err(|e| LakeError::Unavailable(format!("the kept keys: {e}")))?;
+        Ok(kept
+            .map(|k| {
+                let keys = wire::Credentials {
+                    access_key: k.access_key,
+                    secret_key: k.secret_key,
+                };
+                (header, headers::encode(&keys))
+            })
+            .into_iter()
+            .collect())
+    }
+
+    /// The lake's own admin keys, as headers.
+    async fn admin_keys(&self) -> Result<Headers, LakeError> {
+        match &self.keys {
+            Some((_, lake)) => self.header(lake, headers::ADMIN_KEYS).await,
+            None => Ok(Vec::new()),
+        }
     }
 
     /// The same client, pausing `pause` between attempts (tests).
@@ -68,10 +139,11 @@ impl LakeAdminClient {
         method: &str,
         path: &str,
         body: Option<Value>,
+        headers: &Headers,
     ) -> Result<Value, LakeError> {
         let mut attempt = 1;
         loop {
-            match self.once(method, path, body.as_ref()).await {
+            match self.once(method, path, body.as_ref(), headers).await {
                 Err(e) if e.retryable() && attempt < ATTEMPTS => {
                     tracing::warn!(method, path, attempt, error = %e, "lake-admin: trying again");
                     tokio::time::sleep(self.pause * attempt).await;
@@ -87,11 +159,15 @@ impl LakeAdminClient {
         method: &str,
         path: &str,
         body: Option<&Value>,
+        headers: &Headers,
     ) -> Result<Value, LakeError> {
         let what = format!("{method} {path}");
         let verb = reqwest::Method::from_bytes(method.as_bytes())
             .map_err(|e| LakeError::Invalid(format!("{what}: {e}")))?;
         let mut request = self.http.request(verb, format!("{}{path}", self.base));
+        for (name, value) in headers {
+            request = request.header(*name, value);
+        }
         if let Some(body) = body {
             request = request.json(body);
         }
@@ -99,7 +175,7 @@ impl LakeAdminClient {
             .send()
             .await
             .map_err(|e| LakeError::Unavailable(format!("{what}: {}", short(&e))))?;
-        if !is_adapter(&response) {
+        if !is_role(&response, self.role) {
             return Err(LakeError::Refused(format!(
                 "{what}: not an adapter's certificate"
             )));
@@ -117,8 +193,9 @@ impl LakeAdminClient {
         method: &str,
         path: &str,
         body: Option<Value>,
+        headers: &Headers,
     ) -> Result<T, LakeError> {
-        let value = self.call(method, path, body).await?;
+        let value = self.call(method, path, body, headers).await?;
         serde_json::from_value(value).map_err(|e| {
             LakeError::Lake(format!(
                 "{method} {path}: an answer not of the protocol: {e}"
@@ -144,8 +221,8 @@ fn answer(what: &str, status: u16, text: &str) -> Result<Value, LakeError> {
     }
 }
 
-/// Whether the peer presented a certificate of role [`ADAPTER_ROLE`].
-fn is_adapter(response: &reqwest::Response) -> bool {
+/// Whether the peer presented a certificate of `role`.
+fn is_role(response: &reqwest::Response, role: &str) -> bool {
     let Some(info) = response.extensions().get::<reqwest::tls::TlsInfo>() else {
         return false;
     };
@@ -155,8 +232,9 @@ fn is_adapter(response: &reqwest::Response) -> bool {
     let Ok((_, cert)) = x509_parser::parse_x509_certificate(der) else {
         return false;
     };
-    let role = cert.subject().iter_organizational_unit().next();
-    role.and_then(|r| r.as_str().ok()) == Some(ADAPTER_ROLE)
+    let ou = cert.subject().iter_organizational_unit().next();
+    let matches = ou.and_then(|r| r.as_str().ok()) == Some(role);
+    matches
 }
 
 /// An error's text without its source chain's details (no URL query).
@@ -182,8 +260,9 @@ impl LakeAdmin for LakeAdminClient {
         rules: &RetentionRules,
     ) -> Result<WarehouseMade, LakeError> {
         let body = to_value(&wire::RetentionRules::from(rules));
+        let keys = self.admin_keys().await?;
         let made: wire::WarehouseOutcome = self
-            .typed("PUT", &paths::warehouse(name), Some(body))
+            .typed("PUT", &paths::warehouse(name), Some(body), &keys)
             .await?;
         Ok(made.into())
     }
@@ -194,15 +273,18 @@ impl LakeAdmin for LakeAdminClient {
         replica: &ReplicaTarget,
     ) -> Result<ReplicationState, LakeError> {
         let body = to_value(&wire::ReplicaTarget::from(replica));
+        let mut keys = self.admin_keys().await?;
+        keys.extend(self.header(&Lake::Replica, headers::REPLICA_KEYS).await?);
         let state: wire::ReplicationState = self
-            .typed("PUT", &paths::replication(name), Some(body))
+            .typed("PUT", &paths::replication(name), Some(body), &keys)
             .await?;
         Ok(state.into())
     }
 
     async fn replication(&self, name: &str) -> Result<ReplicationState, LakeError> {
-        let state: wire::ReplicationState =
-            self.typed("GET", &paths::replication(name), None).await?;
+        let state: wire::ReplicationState = self
+            .typed("GET", &paths::replication(name), None, &Vec::new())
+            .await?;
         Ok(state.into())
     }
 
@@ -210,14 +292,19 @@ impl LakeAdmin for LakeAdminClient {
         let body = to_value(&wire::ManagedPolicies {
             policies: policies.iter().map(Into::into).collect(),
         });
-        self.call("PUT", &paths::managed_policies(), Some(body))
+        self.call("PUT", &paths::managed_policies(), Some(body), &Vec::new())
             .await
             .map(|_| ())
     }
 
     async fn session_policy(&self, grant: &LakeGrant) -> Result<SessionPolicy, LakeError> {
         let policy: wire::SessionPolicy = self
-            .typed("POST", &paths::session_policy(), Some(to_value(grant)))
+            .typed(
+                "POST",
+                &paths::session_policy(),
+                Some(to_value(grant)),
+                &Vec::new(),
+            )
             .await?;
         Ok(policy.into())
     }
@@ -232,12 +319,14 @@ impl LakeAdmin for LakeAdminClient {
             with: None,
         };
         let path = paths::credentials(wire::CredentialKind::from(kind));
-        let keys: wire::Credentials = self.typed("PUT", &path, Some(to_value(&request))).await?;
+        let body = Some(to_value(&request));
+        let keys: wire::Credentials = self.typed("PUT", &path, body, &Vec::new()).await?;
         Ok(keys.into())
     }
 
     async fn health(&self) -> Result<LakeHealth, LakeError> {
-        let health: wire::Health = self.typed("GET", &paths::health(), None).await?;
+        let keys = self.admin_keys().await?;
+        let health: wire::Health = self.typed("GET", &paths::health(), None, &keys).await?;
         Ok(health.into())
     }
 }
