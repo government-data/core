@@ -17,6 +17,12 @@ export class QualityError extends Error {
   }
 }
 
+/** Whether a refusal says the installation has no catalog (not that it failed). */
+export const noCatalog = (e: unknown): boolean =>
+  e instanceof QualityError &&
+  e.status === 503 &&
+  (e.body as { error?: string } | undefined)?.error === "catalog_not_configured";
+
 export const api = createApiClient();
 
 /** The data of a call, or a {@link QualityError}; a lost session signs in again. */

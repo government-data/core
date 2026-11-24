@@ -8,16 +8,7 @@ import {
   type Component,
   type JSX,
 } from "solid-js";
-import {
-  lakeApi,
-  may,
-  me,
-  QualityError,
-  rulesApi,
-  sourcesApi,
-  type DatasetOut,
-  type ListingView,
-} from "./api";
+import { lakeApi, may, me, sourcesApi, type DatasetOut, type ListingView } from "./api";
 import { databaseOf, filterSchemas, lakeSchemas, sourceSchemas, type SchemaNode } from "./explorer";
 import { Branch } from "./Branch";
 import { ColumnHistoryHost } from "./ColumnHistory";
@@ -34,7 +25,8 @@ import { MapDialog } from "./MapDialog";
 import { LakeIcon, ServerIcon, SourcesNavIcon } from "./NavIcon";
 import { NewSource, SourceActions } from "./SourceActions";
 import { t } from "./i18n";
-import { LoadFailed } from "./Notify";
+import { LoadFailed, NoCatalog } from "./Notify";
+import { datasetsOrNone, sourcesOrNone } from "./explorerLoad";
 import { onItsWay } from "./sources";
 
 /** How often a listing on its way is asked again. */
@@ -206,13 +198,6 @@ const Unattached: Component = () => {
   );
 };
 
-/** What the person may not view, as nothing: the rest of the tree is still there. */
-const orNone = <T,>(call: Promise<T[]>): Promise<T[]> =>
-  call.catch((e: unknown) =>
-    e instanceof QualityError && e.status === 403 ? [] : Promise.reject(e),
-  );
-const sourcesOrNone = () => orNone(sourcesApi.list());
-
 /**
  * The explorer (decisions 0043 and 0049), the quality panel in the
  * sidebar: every source, browsed as a database client shows its servers,
@@ -221,7 +206,8 @@ const sourcesOrNone = () => orNone(sourcesApi.list());
  */
 export const Explorer: Component = () => {
   const [sources, { refetch: refetchSources }] = createResource(sourcesOrNone);
-  const [asked] = createResource(mappings, () => orNone(rulesApi.datasets()));
+  const [catalogMissing, setCatalogMissing] = createSignal(false);
+  const [asked] = createResource(mappings, () => datasetsOrNone(setCatalogMissing));
   // The last answer while it is asked again (a table mapped): the tree stays.
   const datasets = () => asked.latest;
   const [who] = createResource(me);
@@ -248,6 +234,9 @@ export const Explorer: Component = () => {
         onInput={(e) => setQuery(e.currentTarget.value)}
       />
       <LoadFailed when={sources.error || asked.error} />
+      <Show when={catalogMissing()}>
+        <NoCatalog />
+      </Show>
       <Show when={sources() && datasets()}>
         <ul class="qd-tree" role="tree" aria-label={t("quality:explorer.title")}>
           <For each={sources()}>

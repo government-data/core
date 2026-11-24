@@ -14,7 +14,8 @@
     "loadError": "No se pudo cargar. Intenta de nuevo.",
     "saveError": "No se pudo guardar. Intenta de nuevo.",
     "forbidden": "No tienes permiso para esto.",
-    "catalogUnavailable": "El catálogo no responde: no se puede comprobar ahora."
+    "catalogUnavailable": "El catálogo no responde: no se puede comprobar ahora.",
+    "noCatalog": "Esta instalación no tiene un catálogo configurado: los conjuntos, sus reglas y los borradores no están disponibles hasta que un administrador lo configure."
   },
   "sources": {
     "title": "Fuentes",

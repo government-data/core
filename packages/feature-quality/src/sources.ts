@@ -6,6 +6,7 @@
  */
 
 import {
+  noCatalog,
   QualityError,
   type Driver,
   type ListingView,
@@ -108,6 +109,7 @@ export function deleteRefusal(err: unknown): string {
     return t("quality:sources.inUse", { datasets: datasets.join(", ") });
   }
   if (err.status === 403) return t("quality:common.forbidden");
+  if (noCatalog(err)) return t("quality:common.noCatalog");
   if (err.status === 503) return t("quality:common.catalogUnavailable");
   return t("quality:common.saveError");
 }

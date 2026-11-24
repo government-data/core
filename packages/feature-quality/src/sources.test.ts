@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QualityError, type Driver } from "./api";
+import { noCatalog, QualityError, type Driver } from "./api";
 import {
   deleteRefusal,
   filterTables,
@@ -84,6 +84,15 @@ describe("names and refusals", () => {
     const inUse = new QualityError(409, { datasets: ["loans", "clients"] });
     expect(deleteRefusal(inUse)).toContain("loans, clients");
     expect(deleteRefusal(new QualityError(502, null))).toBe(deleteRefusal(new Error("x")));
+  });
+
+  it("tells no catalog from a catalog that does not answer", () => {
+    const none = new QualityError(503, { error: "catalog_not_configured" });
+    const failing = new QualityError(503, { error: "catalog_unavailable" });
+    expect(noCatalog(none)).toBe(true);
+    expect(noCatalog(failing)).toBe(false);
+    expect(noCatalog(new Error("x"))).toBe(false);
+    expect(deleteRefusal(none)).not.toBe(deleteRefusal(failing));
   });
 });
 
