@@ -1,30 +1,29 @@
-//! `server audit verify` (decision 0070, point 11): every tenant's audit
-//! chain, or one tenant's, recomputed from its rows; a line per tenant with
-//! the rows and numbers checked, the head, where adoption ended and the
+//! `server audit verify` (decision 0070, point 11): the installation's audit
+//! chain (decision 0076: one), recomputed from its rows; a line with the
+//! rows and numbers checked, the head, where adoption ended and the
 //! first break by its number and kind, never a value. Each run is kept in
 //! `audit_chain_checks`; a break is logged at error level and the command
 //! exits 1.
 //!
 //! ```text
-//! server audit verify [--tenant ID] [--lang es|en]
+//! server audit verify [--lang es|en]
 //! ```
 
 use domain::audit_chain_check::ChainReport;
 use infrastructure::{PgAuditChain, PgConfig};
 use texts::{text_in, Language};
-use uuid::Uuid;
 
 use crate::init_tracing;
 
 type Failure = Box<dyn std::error::Error>;
 
 pub(crate) async fn run() -> Result<(), Failure> {
-    let (lang, tenant) = options(std::env::args().skip(2).collect())?;
+    let lang = options(std::env::args().skip(2).collect())?;
     init_tracing();
     let pool = infrastructure::connect(&PgConfig::from_env()?).await?;
     infrastructure::run_migrations(&pool).await?;
     let chain = PgAuditChain::new(pool);
-    let reports = application::audit_chain::verify_all(&chain, &chain, tenant.as_deref()).await?;
+    let reports = application::audit_chain::verify_all(&chain, &chain, None).await?;
     for report in &reports {
         println!("{}", line(lang, report));
     }
@@ -34,9 +33,9 @@ pub(crate) async fn run() -> Result<(), Failure> {
     Ok(())
 }
 
-/// `verify`, then `--tenant ID` and `--lang es|en`, each at most once.
-fn options(args: Vec<String>) -> Result<(Language, Option<String>), Failure> {
-    let (mut lang, mut tenant) = (Language::Es, None);
+/// `verify`, then `--lang es|en` at most once.
+fn options(args: Vec<String>) -> Result<Language, Failure> {
+    let mut lang = Language::Es;
     let usage = |lang| -> Failure { text_in(lang, "audit.chain.usage", &[]).into() };
     let mut args = args.into_iter();
     if args.next().as_deref() != Some("verify") {
@@ -46,17 +45,13 @@ fn options(args: Vec<String>) -> Result<(Language, Option<String>), Failure> {
         let value = args.next().ok_or_else(|| usage(lang))?;
         match flag.as_str() {
             "--lang" => lang = Language::parse(&value).ok_or_else(|| usage(lang))?,
-            "--tenant" => {
-                let id = Uuid::parse_str(&value).map_err(|_| usage(lang))?;
-                tenant = Some(id.to_string());
-            }
             _ => return Err(usage(lang)),
         }
     }
-    Ok((lang, tenant))
+    Ok(lang)
 }
 
-/// A tenant's report in one line.
+/// The chain's report in one line.
 fn line(lang: Language, r: &ChainReport) -> String {
     let number = |n: Option<i64>| n.map_or_else(|| "—".to_string(), |n| n.to_string());
     let hash = r.head.as_ref().map_or_else(
@@ -67,7 +62,6 @@ fn line(lang: Language, r: &ChainReport) -> String {
         lang,
         "audit.chain.report",
         &[
-            ("tenant", r.tenant.clone()),
             ("count", r.rows_checked.to_string()),
             ("first", number(r.first_seq)),
             ("last", number(r.last_seq)),
@@ -99,13 +93,12 @@ mod tests {
 
     #[test]
     fn reads_the_options() {
-        let tenant = "00000000-0000-0000-0000-000000000001";
-        let (lang, only) = options(args(&["verify", "--lang", "en", "--tenant", tenant])).unwrap();
-        assert_eq!((lang, only.as_deref()), (Language::En, Some(tenant)));
-        assert_eq!(options(args(&["verify"])).unwrap(), (Language::Es, None));
+        let lang = options(args(&["verify", "--lang", "en"])).unwrap();
+        assert_eq!(lang, Language::En);
+        assert_eq!(options(args(&["verify"])).unwrap(), Language::Es);
         for bad in [
             &["check"][..],
-            &["verify", "--tenant", "x"],
+            &["verify", "--tenant", "00000000-0000-0000-0000-000000000001"],
             &["verify", "--lang"],
         ] {
             assert!(options(args(bad)).is_err(), "{bad:?}");
@@ -128,11 +121,11 @@ mod tests {
         };
         assert_eq!(
             line(Language::En, &report),
-            "t: 4 rows checked, 1 to 4; head 6 ab01; adopted up to 2: first break at 5, gap"
+            "4 rows checked, 1 to 4; head 6 ab01; adopted up to 2: first break at 5, gap"
         );
         assert_eq!(
             line(Language::Es, &report),
-            "t: 4 filas revisadas, de 1 a 4; cabeza 6 ab01; adoptadas hasta 2: primera ruptura en 5, gap"
+            "4 filas revisadas, de 1 a 4; cabeza 6 ab01; adoptadas hasta 2: primera ruptura en 5, gap"
         );
     }
 }

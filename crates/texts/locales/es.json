@@ -1,9 +1,9 @@
 {
   "audit": {
     "chain": {
-      "usage": "Uso: server audit verify [--tenant ID] [--lang es|en]",
-      "report_one": "{{tenant}}: {{count}} fila revisada, de {{first}} a {{last}}; cabeza {{head}} {{hash}}; adoptadas hasta {{adopted}}",
-      "report_other": "{{tenant}}: {{count}} filas revisadas, de {{first}} a {{last}}; cabeza {{head}} {{hash}}; adoptadas hasta {{adopted}}",
+      "usage": "Uso: server audit verify [--lang es|en]",
+      "report_one": "{{count}} fila revisada, de {{first}} a {{last}}; cabeza {{head}} {{hash}}; adoptadas hasta {{adopted}}",
+      "report_other": "{{count}} filas revisadas, de {{first}} a {{last}}; cabeza {{head}} {{hash}}; adoptadas hasta {{adopted}}",
       "unbroken": "sin ruptura",
       "break": "primera ruptura en {{seq}}, {{kind}}",
       "broken": "la cadena de la auditoría está rota: su primera ruptura está arriba, por su número y tipo"
@@ -414,7 +414,7 @@
         "noColumn": "La fuente {{source}} no tiene la columna {{column}}"
       },
       "catalog": {
-        "usage": "Uso: server quality catalog import --mapping ARCHIVO REGLAS... [--tenant ID] [--author \"Nombre <correo>\"]",
+        "usage": "Uso: server quality catalog import --mapping ARCHIVO REGLAS... [--author \"Nombre <correo>\"]",
         "noCatalog": "Falta el catálogo: define DOLT_URL (o DOLT_URL_FILE).",
         "otherDataset": "{{file}} es del dataset {{dataset}}, no de {{mapping}}.",
         "imported": "{{dataset}}: {{files}} archivos de reglas en el catálogo, commit {{commit}}."

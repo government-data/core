@@ -1,9 +1,9 @@
 {
   "audit": {
     "chain": {
-      "usage": "Usage: server audit verify [--tenant ID] [--lang es|en]",
-      "report_one": "{{tenant}}: {{count}} row checked, {{first}} to {{last}}; head {{head}} {{hash}}; adopted up to {{adopted}}",
-      "report_other": "{{tenant}}: {{count}} rows checked, {{first}} to {{last}}; head {{head}} {{hash}}; adopted up to {{adopted}}",
+      "usage": "Usage: server audit verify [--lang es|en]",
+      "report_one": "{{count}} row checked, {{first}} to {{last}}; head {{head}} {{hash}}; adopted up to {{adopted}}",
+      "report_other": "{{count}} rows checked, {{first}} to {{last}}; head {{head}} {{hash}}; adopted up to {{adopted}}",
       "unbroken": "unbroken",
       "break": "first break at {{seq}}, {{kind}}",
       "broken": "the audit chain is broken: its first break is above, by its number and kind"
@@ -414,7 +414,7 @@
         "noColumn": "The source {{source}} has no column {{column}}"
       },
       "catalog": {
-        "usage": "Usage: server quality catalog import --mapping FILE RULES... [--tenant ID] [--author \"Name <email>\"]",
+        "usage": "Usage: server quality catalog import --mapping FILE RULES... [--author \"Name <email>\"]",
         "noCatalog": "No catalog: set DOLT_URL (or DOLT_URL_FILE).",
         "otherDataset": "{{file}} belongs to dataset {{dataset}}, not {{mapping}}.",
         "imported": "{{dataset}}: {{files}} rules files in the catalog, commit {{commit}}."

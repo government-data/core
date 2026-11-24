@@ -112,19 +112,6 @@ pub async fn app_role(db: &TestDb) -> sqlx::postgres::PgConnectOptions {
         .password("app")
 }
 
-/// A new tenant; returns its id.
-///
-/// # Panics
-///
-/// If the `slug` is not valid or already exists.
-pub async fn new_tenant(db: &TestDb, slug: &str) -> String {
-    sqlx::query_scalar("INSERT INTO tenants (slug, name) VALUES ($1, $1) RETURNING id::text")
-        .bind(slug)
-        .fetch_one(&db.pool)
-        .await
-        .expect("create the tenant")
-}
-
 /// A live ephemeral Dolt server (the catalog, decision 0021), its root
 /// reachable from the test (unlike in the stack, where root stays inside
 /// the container).
