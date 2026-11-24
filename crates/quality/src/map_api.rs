@@ -25,6 +25,7 @@ use crate::dataset_api::{recent_cuts, CutOut};
 use crate::firing::queue_job;
 use crate::mapping::ReadFrom;
 use crate::proposal::Patterns;
+use crate::refusal::refuse;
 use crate::source::valid_name;
 use crate::source_store;
 
@@ -91,10 +92,6 @@ pub struct MapProgress {
     pub error: Option<String>,
     /// Once mapped, the dataset's latest cut.
     pub cut: Option<CutOut>,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 /// Queues the map of a source's table.

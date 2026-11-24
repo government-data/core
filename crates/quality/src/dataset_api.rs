@@ -17,13 +17,13 @@ use axum::{Extension, Json, Router};
 use chrono::{DateTime, Utc};
 use contracts::Caller;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 use uuid::Uuid;
 
 use crate::catalog::Catalog;
 use crate::mapping::Mapping;
+use crate::refusal::{refuse, refuse_because};
 
 pub const VIEW: &str = "quality:ViewPipelines";
 /// What the rules screen asks a dataset for (decision 0019).
@@ -160,10 +160,6 @@ pub struct DatasetsQuery {
     pub for_: Option<String>,
 }
 
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
-}
-
 /// The datasets whose pipeline the caller may see, by name; with
 /// `for=rules`, those whose rules (`catalog/<dataset>`).
 #[utoipa::path(get, path = "/quality/datasets", operation_id = "quality_list_datasets", tag = "cuts",
@@ -185,7 +181,8 @@ async fn datasets(
         return refuse(StatusCode::FORBIDDEN, "forbidden");
     }
     let Some(catalog) = &api.catalog else {
-        return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+        let (code, cause) = ("catalog_unavailable", "catalog_not_configured");
+        return refuse_because(StatusCode::SERVICE_UNAVAILABLE, code, cause);
     };
     let last: Result<Vec<(String, String)>, sqlx::Error> =
         sqlx::query_as("SELECT dataset, max(cut)::text FROM quality.cuts GROUP BY dataset")
@@ -208,7 +205,8 @@ async fn datasets(
         }
         Err(e) => {
             tracing::error!("datasets: catalog: {e}");
-            refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable")
+            let (code, cause) = ("catalog_unavailable", "catalog_unreachable");
+            refuse_because(StatusCode::SERVICE_UNAVAILABLE, code, cause)
         }
     }
 }

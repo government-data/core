@@ -22,6 +22,7 @@ use uuid::Uuid;
 
 use crate::draft_api::{DraftCatalog, Refused, VIEW};
 use crate::edit_api;
+use crate::refusal::refuse;
 use crate::reveal::RevealIn;
 use crate::rule_test_view as view;
 use crate::source::valid_name;
@@ -160,10 +161,6 @@ pub fn mask(value: &str) -> String {
             chars[chars.len() - 4..].iter().collect::<String>()
         )
     }
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 fn internal(e: sqlx::Error) -> Response {

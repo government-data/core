@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use crate::console::{wrapped, ConsoleResult};
 use crate::personal_data;
+use crate::refusal::refuse;
 use crate::reveal::{self, Refusal, RevealIn, Shown};
 
 /// The job's kind.
@@ -70,10 +71,6 @@ pub struct ConsoleOut {
     /// engine message and the caller holds the permission that shows them.
     pub revealable: bool,
     pub result: Option<ConsoleResult>,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 fn internal(e: sqlx::Error) -> Response {

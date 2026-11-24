@@ -12,11 +12,11 @@ use axum::routing::get;
 use axum::{Extension, Json, Router};
 use contracts::{AuditEntry, Caller, Change};
 use serde::Serialize;
-use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 use uuid::Uuid;
 
+use crate::refusal::refuse;
 use crate::source_api::{MANAGE, VIEW};
 use crate::source_tables::{self, listable, ListingReason, ListingState, ListingView, SourceTable};
 
@@ -41,10 +41,6 @@ pub struct TablesDoc;
 pub struct ListingQueued {
     #[schema(value_type = String)]
     pub job: Uuid,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 fn internal(e: &sqlx::Error) -> Response {

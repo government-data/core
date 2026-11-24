@@ -21,11 +21,11 @@ use quality_rules::lint::{lint_globals, lint_with, placement, Report, Severity};
 use quality_rules::model::GLOBAL_FILE;
 use quality_rules::sql::Tables;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::draft_api::{DraftCatalog, VIEW};
 use crate::mapping::Mapping;
+use crate::refusal::refuse;
 use crate::rules_text;
 use crate::source::valid_name;
 
@@ -141,10 +141,6 @@ pub struct CheckOut {
     /// The fields of the dataset's mapping, for completion (only when
     /// checked through `POST /quality/rules/check`).
     pub fields: Vec<String>,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 /// The table's global rules among a dataset's files, if it has them (0045).

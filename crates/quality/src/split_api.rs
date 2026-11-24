@@ -28,6 +28,7 @@ use crate::draft_api::{self, DraftCatalog, DraftFiles, FilesEdit, Refused, MANAG
 use crate::edit_api::{SavedOut, EDIT};
 use crate::mapping::Mapping;
 use crate::mapping_rename::{renamed_mapping, renames, Renames};
+use crate::refusal::refuse;
 use crate::rules_api;
 use crate::source::valid_name;
 
@@ -42,10 +43,6 @@ pub fn routes(catalog: Arc<dyn DraftCatalog>) -> Router {
 #[derive(Debug, OpenApi)]
 #[openapi(paths(split))]
 pub struct SplitDoc;
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
-}
 
 /// Why the files were not split, for the person: a reason and its values.
 fn refused(why: SplitRefused) -> Response {

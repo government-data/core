@@ -6,10 +6,8 @@
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use contracts::{AuditEntry, Caller, Change, ViewDetail, ViewReason};
 use serde::Deserialize;
-use serde_json::json;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -43,7 +41,7 @@ pub(crate) struct Refusal(pub StatusCode, pub &'static str);
 
 impl IntoResponse for Refusal {
     fn into_response(self) -> Response {
-        (self.0, Json(json!({ "error": self.1 }))).into_response()
+        crate::refusal::refuse(self.0, self.1)
     }
 }
 

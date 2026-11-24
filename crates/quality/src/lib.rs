@@ -42,6 +42,7 @@ mod proposal_roles;
 pub mod queue;
 pub mod queue_ready;
 pub mod records_api;
+mod refusal;
 mod report;
 mod results;
 pub mod reveal;

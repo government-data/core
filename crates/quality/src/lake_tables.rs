@@ -21,6 +21,7 @@ use uuid::Uuid;
 use crate::firing::queue_job;
 use crate::job_sources;
 use crate::lake::{self, LakeAccess};
+use crate::refusal::refuse;
 use crate::source_api::MANAGE;
 use crate::source_tables::{assemble, Kept, Latest, ListingView, SourceTable, MAX_TABLES};
 use crate::tables_api::ListingQueued;
@@ -68,10 +69,6 @@ pub fn routes(pool: PgPool) -> Router {
 #[derive(Debug, OpenApi)]
 #[openapi(paths(listing, refresh))]
 pub struct LakeTablesDoc;
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
-}
 
 fn internal(e: &sqlx::Error) -> Response {
     tracing::error!("lake tables: {e}");

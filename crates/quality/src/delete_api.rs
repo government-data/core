@@ -17,7 +17,6 @@ use axum::routing::delete;
 use axum::{Extension, Json, Router};
 use contracts::{AuditEntry, Caller, Change};
 use serde::Deserialize;
-use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 
@@ -26,6 +25,7 @@ use crate::draft_catalog::DraftCatalog;
 use crate::lake::{self, TableCatalog};
 use crate::layers;
 use crate::mapping::Mapping;
+use crate::refusal::refuse;
 
 /// Who may delete: a dataset's manager; every dataset's, for a loose table.
 pub const MANAGE: &str = "quality:ManageDatasets";
@@ -75,10 +75,6 @@ pub struct DeleteDoc;
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct Confirm {
     pub confirm: String,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 /// Why a deletion stopped: its status and its word.

@@ -21,7 +21,6 @@ use axum::routing::get;
 use axum::{Extension, Json, Router};
 use contracts::{AuditEntry, Caller, Change};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 
@@ -110,7 +109,7 @@ struct Refused(StatusCode, &'static str);
 
 impl IntoResponse for Refused {
     fn into_response(self) -> Response {
-        (self.0, Json(json!({ "error": self.1 }))).into_response()
+        crate::refusal::refuse(self.0, self.1)
     }
 }
 

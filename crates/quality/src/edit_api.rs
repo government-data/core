@@ -25,6 +25,7 @@ use uuid::Uuid;
 
 use crate::draft_api::{self, DraftCatalog, FileEdit, FileSaved, Refused};
 use crate::mapping::Mapping;
+use crate::refusal::refuse;
 use crate::rules_api::{self, FindingOut};
 use crate::source::valid_name;
 use quality_rules::model::GLOBAL_FILE;
@@ -78,10 +79,6 @@ pub(crate) fn valid_file(file: &str) -> bool {
                 .bytes()
                 .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
     })
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 /// What `main` says of a file to save: the findings that block saving
