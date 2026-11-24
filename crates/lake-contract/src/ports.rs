@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime};
 
 use application::lake::{
     Lake, LakeAdmin, LakeCredentialKind, LakeError, LakeGrant, ManagedAccess, ManagedPolicy,
-    ReplicaTarget, RetentionRules, WriteOnce,
+    ReplicaTarget, RetentionRules, WarehouseMade, WriteOnce,
 };
 
 /// The provisioning: a warehouse, its replication, the managed policies, a
@@ -17,14 +17,22 @@ pub async fn lake_admin(admin: &dyn LakeAdmin, warehouse: &str) {
         locked_days: None,
         noncurrent_expire_days: Some(7),
     };
-    for _ in 0..2 {
-        admin
-            .ensure_warehouse(warehouse, &rules)
-            .await
-            .expect("a warehouse made unless there");
-    }
+    let first = admin
+        .ensure_warehouse(warehouse, &rules)
+        .await
+        .expect("a warehouse made unless there");
+    assert!(
+        matches!(first, WarehouseMade::Made | WarehouseMade::Present),
+        "{first:?}"
+    );
+    let again = admin
+        .ensure_warehouse(warehouse, &rules)
+        .await
+        .expect("a warehouse made unless there, again");
+    assert_eq!(again, WarehouseMade::Present, "a second run makes nothing");
     let replica = ReplicaTarget {
         endpoint: "https://replica.lake.test".into(),
+        source_pool: false,
     };
     let first = admin
         .replicate(warehouse, &replica)

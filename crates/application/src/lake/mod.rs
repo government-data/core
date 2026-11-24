@@ -138,11 +138,25 @@ pub struct RetentionRules {
     pub noncurrent_expire_days: Option<u32>,
 }
 
+/// What making a warehouse came to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WarehouseMade {
+    /// It was not there and was made.
+    Made,
+    /// It was there; nothing changed.
+    Present,
+    /// A step was refused or not reached: which, and what happened, in a
+    /// few words, without a key.
+    Failed { step: String, detail: String },
+}
+
 /// Where a warehouse is replicated: the replica lake, as the lake reaches
-/// it.
+/// it, and whether the source lake is a pool of nodes (the lake works out
+/// from it how its replication reaches the replica).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplicaTarget {
     pub endpoint: String,
+    pub source_pool: bool,
 }
 
 /// A warehouse's replication, as the lake reports it.
@@ -211,12 +225,55 @@ impl std::fmt::Debug for LakeKeys {
     }
 }
 
-/// The lake's health, as far as it says it (0078's Open 7).
+/// The lake's health, as far as it says it (0078's Open 7), asked with
+/// the admin keys the core keeps for it.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LakeHealth {
-    pub healthy: bool,
-    pub drives_online: Option<u32>,
-    pub drives_offline: Option<u32>,
+pub enum LakeHealth {
+    /// No admin keys are kept for the lake: nothing was asked.
+    NoKeys,
+    /// The keys were taken; its drives, online and not.
+    Answered {
+        drives_online: u32,
+        drives_offline: u32,
+    },
+    /// The lake refused the keys: its own error code.
+    KeysRefused { code: String },
+}
+
+/// What Settings → Lake shows of a lake: its health, or that it could not
+/// be reached, in a few words without a key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LakeProbe {
+    NoKeys,
+    Answered {
+        drives_online: u32,
+        drives_offline: u32,
+    },
+    KeysRefused {
+        code: String,
+    },
+    Unreachable {
+        detail: String,
+    },
+}
+
+impl From<Result<LakeHealth, LakeError>> for LakeProbe {
+    fn from(health: Result<LakeHealth, LakeError>) -> Self {
+        match health {
+            Ok(LakeHealth::NoKeys) => Self::NoKeys,
+            Ok(LakeHealth::Answered {
+                drives_online,
+                drives_offline,
+            }) => Self::Answered {
+                drives_online,
+                drives_offline,
+            },
+            Ok(LakeHealth::KeysRefused { code }) => Self::KeysRefused { code },
+            Err(e) => Self::Unreachable {
+                detail: e.to_string(),
+            },
+        }
+    }
 }
 
 /// Port: the lake's provisioning. Every operation can run twice: run again
@@ -224,7 +281,11 @@ pub struct LakeHealth {
 #[async_trait]
 pub trait LakeAdmin: Send + Sync {
     /// Makes the warehouse unless it is there, with `rules`.
-    async fn ensure_warehouse(&self, name: &str, rules: &RetentionRules) -> Result<(), LakeError>;
+    async fn ensure_warehouse(
+        &self,
+        name: &str,
+        rules: &RetentionRules,
+    ) -> Result<WarehouseMade, LakeError>;
     /// Replicates the warehouse into `replica`, made there unless it is.
     async fn replicate(
         &self,
@@ -270,6 +331,20 @@ mod tests {
             assert!(!shown.contains(secret), "{shown}");
         }
         assert!(shown.contains("AK"));
+    }
+
+    #[test]
+    fn a_lake_not_reached_is_shown_unreachable() {
+        let refused = LakeHealth::KeysRefused { code: "c".into() };
+        assert_eq!(
+            LakeProbe::from(Ok(refused)),
+            LakeProbe::KeysRefused { code: "c".into() }
+        );
+        let down = LakeProbe::from(Err(LakeError::Unavailable(
+            "GET health: no connection".into(),
+        )));
+        let detail = "unavailable: GET health: no connection".to_string();
+        assert_eq!(down, LakeProbe::Unreachable { detail });
     }
 
     #[test]

@@ -6,7 +6,7 @@ use contracts::lake_admin as wire;
 
 use super::{
     LakeCredentialKind, LakeError, LakeHealth, LakeKeys, ManagedAccess, ManagedPolicy,
-    ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy,
+    ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
 };
 
 impl From<&RetentionRules> for wire::RetentionRules {
@@ -33,6 +33,7 @@ impl From<&ReplicaTarget> for wire::ReplicaTarget {
     fn from(r: &ReplicaTarget) -> Self {
         Self {
             endpoint: r.endpoint.clone(),
+            source_pool: r.source_pool,
         }
     }
 }
@@ -41,6 +42,27 @@ impl From<wire::ReplicaTarget> for ReplicaTarget {
     fn from(r: wire::ReplicaTarget) -> Self {
         Self {
             endpoint: r.endpoint,
+            source_pool: r.source_pool,
+        }
+    }
+}
+
+impl From<WarehouseMade> for wire::WarehouseOutcome {
+    fn from(m: WarehouseMade) -> Self {
+        match m {
+            WarehouseMade::Made => Self::Made,
+            WarehouseMade::Present => Self::Present,
+            WarehouseMade::Failed { step, detail } => Self::Failed { step, detail },
+        }
+    }
+}
+
+impl From<wire::WarehouseOutcome> for WarehouseMade {
+    fn from(m: wire::WarehouseOutcome) -> Self {
+        match m {
+            wire::WarehouseOutcome::Made => Self::Made,
+            wire::WarehouseOutcome::Present => Self::Present,
+            wire::WarehouseOutcome::Failed { step, detail } => Self::Failed { step, detail },
         }
     }
 }
@@ -147,20 +169,32 @@ impl From<wire::Credentials> for LakeKeys {
 
 impl From<LakeHealth> for wire::Health {
     fn from(h: LakeHealth) -> Self {
-        Self {
-            healthy: h.healthy,
-            drives_online: h.drives_online,
-            drives_offline: h.drives_offline,
+        match h {
+            LakeHealth::NoKeys => Self::NoKeys,
+            LakeHealth::Answered {
+                drives_online,
+                drives_offline,
+            } => Self::Answered {
+                drives_online,
+                drives_offline,
+            },
+            LakeHealth::KeysRefused { code } => Self::KeysRefused { code },
         }
     }
 }
 
 impl From<wire::Health> for LakeHealth {
     fn from(h: wire::Health) -> Self {
-        Self {
-            healthy: h.healthy,
-            drives_online: h.drives_online,
-            drives_offline: h.drives_offline,
+        match h {
+            wire::Health::NoKeys => Self::NoKeys,
+            wire::Health::Answered {
+                drives_online,
+                drives_offline,
+            } => Self::Answered {
+                drives_online,
+                drives_offline,
+            },
+            wire::Health::KeysRefused { code } => Self::KeysRefused { code },
         }
     }
 }
@@ -238,6 +272,37 @@ mod tests {
         assert_eq!(
             ReplicationState::from(wire::ReplicationState::from(failed.clone())),
             failed
+        );
+        for made in [
+            WarehouseMade::Made,
+            WarehouseMade::Present,
+            WarehouseMade::Failed {
+                step: "warehouse_tables".into(),
+                detail: "HTTP 403".into(),
+            },
+        ] {
+            let back = WarehouseMade::from(wire::WarehouseOutcome::from(made.clone()));
+            assert_eq!(back, made);
+        }
+        for health in [
+            LakeHealth::NoKeys,
+            LakeHealth::Answered {
+                drives_online: 3,
+                drives_offline: 1,
+            },
+            LakeHealth::KeysRefused {
+                code: "AccessDenied".into(),
+            },
+        ] {
+            assert_eq!(LakeHealth::from(wire::Health::from(health.clone())), health);
+        }
+        let target = ReplicaTarget {
+            endpoint: "lake-replica-1".into(),
+            source_pool: true,
+        };
+        assert_eq!(
+            ReplicaTarget::from(wire::ReplicaTarget::from(&target)),
+            target
         );
         for kind in [
             LakeCredentialKind::Root,

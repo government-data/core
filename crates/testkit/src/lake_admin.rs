@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use application::lake::{LakeAdmin, LakeCredentialKind, LakeError, LakeKeys};
+use application::lake::{LakeAdmin, LakeCredentialKind, LakeError, LakeKeys, WarehouseMade};
 use contracts::lake_admin::{self as wire, CredentialKind};
 use contracts::LakeGrant;
 use rustls::pki_types::pem::PemObject;
@@ -127,10 +127,11 @@ impl LakeAdminServer {
             }),
             ("GET", ["health"]) => admin.health().await.map(|h| json(&wire::Health::from(h))),
             ("PUT", ["warehouses", name]) => match parse::<wire::RetentionRules>(body) {
-                Ok(rules) => admin
-                    .ensure_warehouse(name, &rules.into())
-                    .await
-                    .map(|()| (204, None)),
+                Ok(rules) => admin.ensure_warehouse(name, &rules.into()).await.map(|m| {
+                    let status = if m == WarehouseMade::Made { 201 } else { 200 };
+                    let (_, body) = json(&wire::WarehouseOutcome::from(m));
+                    (status, body)
+                }),
                 Err(e) => Err(e),
             },
             ("PUT", ["warehouses", name, "replication"]) => {
@@ -234,6 +235,7 @@ fn parse<T: serde::de::DeserializeOwned>(body: &[u8]) -> Result<T, LakeError> {
 fn reason(status: u16) -> &'static str {
     match status {
         200 => "OK",
+        201 => "Created",
         204 => "No Content",
         400 => "Bad Request",
         403 => "Forbidden",
@@ -329,13 +331,16 @@ mod tests {
         let server = serve(Arc::default(), &ca).await;
         let core = client(&ca, &ca.machine(CALLER_ROLE, "app-1"));
         let put = format!("{}{}", server.url, wire::paths::warehouse("qd-tenant-a1"));
-        for _ in 0..2 {
+        for (status, state) in [(201, "made"), (200, "present")] {
             let answer = core
                 .put(&put)
                 .json(&wire::RetentionRules::default())
                 .send()
-                .await;
-            assert_eq!(answer.unwrap().status(), 204);
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), status);
+            let body: serde_json::Value = answer.json().await.unwrap();
+            assert_eq!(body["state"], state);
         }
         assert_eq!(server.lake.snapshot().warehouses.len(), 1);
         let unknown = format!("{}{}", server.url, wire::paths::replication("qd-tenant-b2"));
