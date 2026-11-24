@@ -170,3 +170,57 @@ async fn a_hand_registered_client_or_a_bad_request_is_refused() {
         .await
         .is_err());
 }
+
+#[tokio::test]
+async fn a_module_clients_tokens_last_15_minutes_and_a_core_clients_a_day() {
+    let f = fixture(ClientAuth::Public);
+    // EdDSA, the fixture's only key.
+    let eddsa: ModuleClientsRequest = serde_json::from_value(json!({
+        "people": { "redirect_paths": ["/bi/oauth-authorized/qd"], "secret": PEOPLE },
+        "machine": { "capabilities": ["sql-query"], "audiences": ["trino"], "secret": MACHINE },
+    }))
+    .unwrap();
+    f.server
+        .put_module_clients("bi-superset", &eddsa, ORIGIN)
+        .await
+        .unwrap();
+    let now = 1_000_000;
+    let machine = f.server.token(&machine_token(MACHINE)).await.unwrap();
+    assert_eq!(machine.expires_in, MODULE_TOKEN_TTL.as_secs());
+    assert_eq!(claims(&machine.access_token)["exp"], now + 15 * 60);
+
+    let people = AuthorizeRequest {
+        client_id: Some("bi-superset".into()),
+        redirect_uri: Some(format!("{ORIGIN}/bi/oauth-authorized/qd")),
+        ..request()
+    };
+    let code = code_of(f.server.authorize(&people, Some(&f.session)).await);
+    let redeem = TokenRequest {
+        client_id: Some("bi-superset".into()),
+        client_secret: Some(PEOPLE.into()),
+        redirect_uri: people.redirect_uri.clone(),
+        ..token_request(&code)
+    };
+    let tokens = f.server.token(&redeem).await.unwrap();
+    assert_eq!(tokens.expires_in, 15 * 60);
+    assert_eq!(claims(&tokens.access_token)["exp"], now + 15 * 60);
+    assert_eq!(
+        claims(tokens.id_token.as_deref().unwrap())["exp"],
+        now + 15 * 60
+    );
+
+    // The core's own client (registered by hand) keeps a day.
+    let code = code_of(f.server.authorize(&request(), Some(&f.session)).await);
+    let core = f.server.token(&token_request(&code)).await.unwrap();
+    assert_eq!(core.expires_in, TOKEN_TTL.as_secs());
+    assert_eq!(claims(&core.access_token)["exp"], now + TOKEN_TTL.as_secs());
+}
+
+/// The code an `/authorize` sent back.
+fn code_of(outcome: AuthorizeOutcome) -> String {
+    let AuthorizeOutcome::Redirect(to) = outcome else {
+        panic!("{outcome:?}");
+    };
+    let code = to.split("code=").nth(1).unwrap();
+    code.split('&').next().unwrap().to_string()
+}

@@ -1,7 +1,8 @@
 //! The `client_credentials` grant (RFC 6749 §4.4): a machine (a worker, the
 //! API) gets a short access token for one audience, with no person,
 //! no id_token and no refresh token (decision 0030: dynamic credentials).
-//! A client with a secret gets [`TOKEN_TTL`] (0046); a machine role's
+//! A client with a secret gets a day (0046), a module's 15 minutes
+//! (quality-sdk decision 0009); a machine role's
 //! client, authenticated by one machine's certificate, 15 minutes that name
 //! the machine (0066, point 6).
 
@@ -11,12 +12,11 @@ use serde_json::{json, Map, Value};
 
 use super::{
     epoch, AuthorizationServer, TokenError, TokenRequest, TokenResponse, MACHINE_CERT_TOKEN_TTL,
-    TOKEN_TTL,
 };
 use crate::domain::{ClientAuth, ClientId, Machine, OidcClient};
 
 /// How long a job's token lasts (decision 0062): as a job's lake
-/// credentials (0030), whatever [`TOKEN_TTL`] is.
+/// credentials (0030), whatever a client's lifetime is.
 const JOB_TOKEN_TTL: Duration = Duration::from_secs(15 * 60);
 
 impl AuthorizationServer {
@@ -122,7 +122,7 @@ impl AuthorizationServer {
 
         let ttl = match client.auth {
             ClientAuth::Certificate { .. } => MACHINE_CERT_TOKEN_TTL,
-            _ => TOKEN_TTL,
+            _ => client.token_ttl(),
         };
 
         let now = self.clock.now();

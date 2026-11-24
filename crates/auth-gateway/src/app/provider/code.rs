@@ -5,7 +5,7 @@ use serde_json::{json, Map, Value};
 
 use super::{
     epoch, identity_claims, meets_policy, AuthorizationServer, TokenError, TokenRequest,
-    TokenResponse, TOKEN_TTL,
+    TokenResponse,
 };
 use crate::domain::{AdminAccount, AuthorizationCode, OidcClient};
 
@@ -73,7 +73,7 @@ impl AuthorizationServer {
         Ok(TokenResponse {
             access_token: signer.sign("at+jwt", &Value::Object(access).to_string()),
             id_token: Some(signer.sign("JWT", &Value::Object(id_token).to_string())),
-            expires_in: TOKEN_TTL.as_secs(),
+            expires_in: client.token_ttl().as_secs(),
             scope: record.scopes.join(" "),
         })
     }
@@ -91,7 +91,7 @@ impl AuthorizationServer {
         claims.insert("sub".into(), json!(admin.id.as_str()));
         claims.insert("aud".into(), json!(client.id.as_str()));
         claims.insert("iat".into(), json!(epoch(now)));
-        claims.insert("exp".into(), json!(epoch(now + TOKEN_TTL)));
+        claims.insert("exp".into(), json!(epoch(now + client.token_ttl())));
         claims.insert("auth_time".into(), json!(epoch(record.auth_time)));
         if let Some(nonce) = &record.nonce {
             claims.insert("nonce".into(), json!(nonce));
@@ -117,7 +117,7 @@ impl AuthorizationServer {
         claims.insert("aud".into(), json!(client.id.as_str()));
         claims.insert("client_id".into(), json!(client.id.as_str()));
         claims.insert("iat".into(), json!(epoch(now)));
-        claims.insert("exp".into(), json!(epoch(now + TOKEN_TTL)));
+        claims.insert("exp".into(), json!(epoch(now + client.token_ttl())));
         claims.insert("jti".into(), json!(self.code_tokens.generate()));
         claims.insert("scope".into(), json!(record.scopes.join(" ")));
         claims.insert("role".into(), json!(admin.role.as_str()));
