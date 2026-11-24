@@ -44,23 +44,23 @@ pub const PREFIX: &str = "/updater/v1";
 /// What this core understands beyond the calls above (quality-sdk decision
 /// 0009), so the agent refuses or hides what it would ignore. Each name is
 /// added with the calls or fields it stands for.
-pub const FEATURES: &[&str] = &["menu-requires", "module-permissions"];
+pub const FEATURES: &[&str] = &["menu-requires", "module-permissions", "module-clients"];
 
 /// "Scheduled soon" when the agent does not say: within 30 minutes.
 const DEFAULT_HORIZON: Duration = Duration::from_secs(30 * 60);
 
 /// Who may call: the machines and whether the certificate header is read.
 #[derive(Clone)]
-struct Gate {
+pub(crate) struct Gate {
     machines: MachinesService,
     certificates: ClientCertificates,
 }
 
 /// The agent's machine, as the gate found it, for the calls that record it.
 #[derive(Clone)]
-struct Caller {
-    machine: Machine,
-    machines: MachinesService,
+pub(crate) struct Caller {
+    pub(crate) machine: Machine,
+    pub(crate) machines: MachinesService,
 }
 
 /// Mount `updater/v1`; `certificates` says whether the client certificate
@@ -70,10 +70,7 @@ pub fn routes(
     machines: MachinesService,
     certificates: ClientCertificates,
 ) -> Router {
-    let gate = Gate {
-        machines,
-        certificates,
-    };
+    let gate = Gate::new(machines, certificates);
     Router::new()
         .route("/updater/v1/state", put(state))
         .route("/updater/v1/orders", get(orders))
@@ -87,8 +84,21 @@ pub fn routes(
         .layer(axum::middleware::from_fn_with_state(gate, require_updater))
 }
 
+impl Gate {
+    pub(crate) fn new(machines: MachinesService, certificates: ClientCertificates) -> Self {
+        Self {
+            machines,
+            certificates,
+        }
+    }
+}
+
 /// Only the update agent's certificate passes.
-async fn require_updater(State(gate): State<Gate>, mut req: Request, next: Next) -> Response {
+pub(crate) async fn require_updater(
+    State(gate): State<Gate>,
+    mut req: Request,
+    next: Next,
+) -> Response {
     let presented = match gate.certificates.read(req.headers()) {
         Ok(presented) => presented,
         Err(ClientCertificateError::NotTrusted) => {
@@ -264,7 +274,7 @@ async fn version() -> Json<Value> {
     Json(json!({ "version": domain::VERSION, "features": FEATURES }))
 }
 
-fn refusal(status: StatusCode, why: impl Into<String>) -> Response {
+pub(crate) fn refusal(status: StatusCode, why: impl Into<String>) -> Response {
     (status, Json(json!({ "error": why.into() }))).into_response()
 }
 
@@ -275,7 +285,7 @@ fn not_the_agent() -> Response {
     )
 }
 
-fn unavailable() -> Response {
+pub(crate) fn unavailable() -> Response {
     let why = texts::tr!("api.updater.unavailable");
     refusal(StatusCode::SERVICE_UNAVAILABLE, why)
 }

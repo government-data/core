@@ -199,6 +199,29 @@ pub(super) fn update_requested(
     )
 }
 
+/// What the update agent's machine did, or had done, to a module
+/// (quality-sdk decision 0009): `detail` (its version, outcome and, on
+/// failure, the step and the error; never a secret) on `module/<module>`,
+/// by no person.
+pub(super) fn module_event(
+    event_type: AuditEventType,
+    machine: &Machine,
+    module: &str,
+    detail: String,
+    origin: &Origin,
+    at: SystemTime,
+) -> NewActionAudit {
+    event(
+        event_type,
+        None,
+        Some(&machine.name),
+        detail,
+        format!("module/{module}"),
+        origin,
+        at,
+    )
+}
+
 /// A lake's root keys given to a node of `role` that is installing, before
 /// it joins (0066 step 11): `install:<role>` on `lake/<lake>`, by no person
 /// and no machine yet. Never the keys.

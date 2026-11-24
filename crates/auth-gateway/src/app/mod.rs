@@ -27,8 +27,8 @@ pub use password_reset::{
     ACTIVATION_TTL, RESET_FORM_PATH,
 };
 pub use provider::{
-    AuthorizationServer, AuthorizeOutcome, AuthorizeRequest, TokenError, TokenRequest,
-    TokenResponse,
+    AuthorizationServer, AuthorizeOutcome, AuthorizeRequest, ClientChange, ModuleClients,
+    ModuleClientsError, ModuleClientsRequest, TokenError, TokenRequest, TokenResponse,
 };
 pub use session::{AuthenticatedSession, IssuedSession, SessionError, SessionService};
 pub use users::{CreatedUser, NewUser, UserChanges, UsersError, UsersService, ASSIGNABLE_ROLES};

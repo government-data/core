@@ -58,6 +58,8 @@
       "roleForbids": "Your role in this area does not allow this action."
     },
     "updater": {
+      "clientTaken": "client {{client}} was registered by hand or by another module: a module does not take it over",
+      "noProvider": "this installation's OIDC provider is not configured (OIDC_SIGNING_KEY)",
       "notTheAgent": "Only the update agent's certificate calls updater/v1.",
       "noSuchModule": "no module {{name}} is installed",
       "unavailable": "The database does not answer."

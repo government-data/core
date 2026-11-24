@@ -20,8 +20,8 @@ pub use self::app::{
     RESET_FORM_PATH,
 };
 pub use self::app::{
-    AuthorizationServer, AuthorizeOutcome, AuthorizeRequest, TokenError, TokenRequest,
-    TokenResponse,
+    AuthorizationServer, AuthorizeOutcome, AuthorizeRequest, ClientChange, ModuleClients,
+    ModuleClientsError, ModuleClientsRequest, TokenError, TokenRequest, TokenResponse,
 };
 pub use self::domain::{
     is_join_token, CertificateSigner, CertificateTerm, JoinTokenMint, Machine, MachineChange,

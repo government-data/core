@@ -33,6 +33,41 @@ impl OidcClientRegistry for Clients {
         self.0.lock().unwrap().insert(c.id.to_string(), c.clone());
         Ok(())
     }
+    async fn save_module_client(&self, c: &OidcClient) -> Result<bool, RepositoryError> {
+        let mut all = self.0.lock().unwrap();
+        let module = |c: &OidcClient| c.settings.module.as_ref().map(|m| m.module.clone());
+        if all
+            .get(c.id.as_str())
+            .is_some_and(|o| module(o) != module(c))
+        {
+            return Ok(false);
+        }
+        all.insert(c.id.to_string(), c.clone());
+        Ok(true)
+    }
+    async fn module_clients(&self, module: &str) -> Result<Vec<OidcClient>, RepositoryError> {
+        let all = self.0.lock().unwrap();
+        let mut of: Vec<OidcClient> = all
+            .values()
+            .filter(|c| {
+                c.settings
+                    .module
+                    .as_ref()
+                    .is_some_and(|m| m.module == module)
+            })
+            .cloned()
+            .collect();
+        of.sort_by(|a, b| a.id.as_str().cmp(b.id.as_str()));
+        Ok(of)
+    }
+    async fn delete_module_clients(&self, module: &str) -> Result<u64, RepositoryError> {
+        let gone = self.module_clients(module).await?;
+        let mut all = self.0.lock().unwrap();
+        for c in &gone {
+            all.remove(c.id.as_str());
+        }
+        Ok(gone.len() as u64)
+    }
 }
 
 #[derive(Default)]
@@ -409,6 +444,7 @@ async fn the_tokens_carry_the_policy_names_for_the_applications() {
 mod certificate;
 mod job_token;
 mod module_client;
+mod module_clients;
 mod settings;
 
 #[tokio::test]

@@ -26,9 +26,15 @@ use crate::domain::{
 mod client_auth;
 mod code;
 mod machine;
+mod module_client_requests;
+mod module_clients;
 mod signers;
 mod userinfo;
 
+pub use module_clients::{
+    ClientChange, MachineClient, ModuleClients, ModuleClientsError, ModuleClientsRequest,
+    PeopleClient, RoleClaimRequest, PREVIOUS_SECRET_TTL,
+};
 use signers::Signers;
 
 /// How long a code waits to be redeemed: the application does it right away.
@@ -37,6 +43,22 @@ pub const CODE_TTL: Duration = Duration::from_secs(60);
 /// How long the tokens last: a day (0046). There is no revocation list, so a
 /// token works until it expires.
 pub const TOKEN_TTL: Duration = Duration::from_secs(24 * 3600);
+
+/// How long the tokens of a module's client last (quality-sdk decision
+/// 0009, as 0089): 15 minutes, so a client disabled at the module's removal
+/// is cut off everywhere within them, Trino included.
+pub const MODULE_TOKEN_TTL: Duration = Duration::from_secs(15 * 60);
+
+impl OidcClient {
+    /// How long a token of this client lasts, but a machine certificate's.
+    pub(crate) fn token_ttl(&self) -> Duration {
+        if self.settings.module.is_some() {
+            MODULE_TOKEN_TTL
+        } else {
+            TOKEN_TTL
+        }
+    }
+}
 
 /// How long a token asked with a machine's certificate lasts (0066, point
 /// 6; 0030): 15 minutes, whatever [`TOKEN_TTL`] is. The machine asks again

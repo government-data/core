@@ -23,6 +23,7 @@ pub mod openapi;
 pub mod platform;
 pub mod settings;
 pub mod updater_v1;
+pub mod updater_v1_clients;
 
 pub use auth_gateway::http::{auth, captcha, oauth, password_reset, rbac, session, users, verify};
 pub use http_kit::{error, rate_limit, telemetry};

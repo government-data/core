@@ -134,6 +134,28 @@ pub enum AuditEventType {
     /// The update agent's machine asked for an update now, for a person on
     /// the server (decision 0086): the machine, on `platform/updates`.
     UpdateRequested,
+    /// The update agent added a module (quality-sdk decision 0009): its
+    /// version and outcome, on `module/<name>`.
+    ModuleAdded,
+    /// The update agent removed a module.
+    ModuleRemoved,
+    /// The update agent began purging a module: recorded before anything
+    /// is deleted.
+    ModulePurgeStarted,
+    /// The update agent purged a module: its data deleted after a backup.
+    ModulePurged,
+    /// The update agent issued new values of a module's secrets, never the
+    /// values.
+    ModuleSecretsRotated,
+    /// A module's OIDC client registered, from the agent's call.
+    ModuleClientRegistered,
+    /// A module's OIDC client changed (a new secret says "changed", never
+    /// its value or hash), or enabled again.
+    ModuleClientChanged,
+    /// A module's OIDC client disabled: no code, no token.
+    ModuleClientDisabled,
+    /// A module's OIDC client deleted by its purge.
+    ModuleClientDeleted,
 }
 
 impl AuditEventType {
@@ -173,6 +195,15 @@ impl AuditEventType {
             Self::DoltHeld => "dolt_held",
             Self::DoltReleased => "dolt_released",
             Self::UpdateRequested => "update_requested",
+            Self::ModuleAdded => "module_added",
+            Self::ModuleRemoved => "module_removed",
+            Self::ModulePurgeStarted => "module_purge_started",
+            Self::ModulePurged => "module_purged",
+            Self::ModuleSecretsRotated => "module_secrets_rotated",
+            Self::ModuleClientRegistered => "module_client_registered",
+            Self::ModuleClientChanged => "module_client_changed",
+            Self::ModuleClientDisabled => "module_client_disabled",
+            Self::ModuleClientDeleted => "module_client_deleted",
             Self::TrinoReleased => "trino_released",
         }
     }
@@ -213,6 +244,15 @@ impl AuditEventType {
             "dolt_held" => Self::DoltHeld,
             "dolt_released" => Self::DoltReleased,
             "update_requested" => Self::UpdateRequested,
+            "module_added" => Self::ModuleAdded,
+            "module_removed" => Self::ModuleRemoved,
+            "module_purge_started" => Self::ModulePurgeStarted,
+            "module_purged" => Self::ModulePurged,
+            "module_secrets_rotated" => Self::ModuleSecretsRotated,
+            "module_client_registered" => Self::ModuleClientRegistered,
+            "module_client_changed" => Self::ModuleClientChanged,
+            "module_client_disabled" => Self::ModuleClientDisabled,
+            "module_client_deleted" => Self::ModuleClientDeleted,
             "trino_released" => Self::TrinoReleased,
             other => return Err(AuditEventTypeError::Unknown(other.to_string())),
         })
@@ -389,6 +429,15 @@ mod tests {
             AuditEventType::DoltHeld,
             AuditEventType::DoltReleased,
             AuditEventType::UpdateRequested,
+            AuditEventType::ModuleAdded,
+            AuditEventType::ModuleRemoved,
+            AuditEventType::ModulePurgeStarted,
+            AuditEventType::ModulePurged,
+            AuditEventType::ModuleSecretsRotated,
+            AuditEventType::ModuleClientRegistered,
+            AuditEventType::ModuleClientChanged,
+            AuditEventType::ModuleClientDisabled,
+            AuditEventType::ModuleClientDeleted,
         ] {
             assert_eq!(
                 AuditEventType::parse(event_type.as_str()).unwrap(),

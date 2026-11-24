@@ -124,7 +124,7 @@ fn app(
     // Who the session is, for every route that requires a capability: the
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
-    let (machines, modules) = machines_and_modules(&db, provider, &secret_box)?;
+    let (machines, modules) = machines_and_modules(&db, provider.clone(), &secret_box)?;
     // What the update agent waits for: each module's own work, and each
     // installed application module's as the agent tells them (0003).
     let app_modules =
@@ -166,6 +166,14 @@ fn app(
         .merge(machine_routes)
         // The update agent's protocol, with its certificate (decision 0003).
         .merge(api::updater_v1::routes(
+            updates.clone(),
+            machines.clone(),
+            certificates.clone(),
+        ))
+        // A module's OIDC clients, from the same agent (quality-sdk 0009).
+        .merge(api::updater_v1_clients::routes(
+            provider,
+            public_url_from_env(),
             updates.clone(),
             machines.clone(),
             certificates.clone(),
