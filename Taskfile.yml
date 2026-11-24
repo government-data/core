@@ -92,6 +92,7 @@ tasks:
   lake:up:
     desc: Start the lake (RustFS) as its own stack, as on its own servers, and make its platform admin user (its keys shown once)
     cmds:
+      - bash infra/rustfs/gen-dev-lake-admin.sh
       - "{{.DC_LAKE}} up -d"
       - sh infra/rustfs/admin-user.sh
 

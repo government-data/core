@@ -135,6 +135,16 @@ impl AdapterLakeAdmins {
     }
 }
 
+impl AdapterLakeAdmins {
+    /// What the main lake's adapter says it is (`GET /about`).
+    pub async fn main_about(&self) -> Result<contracts::lake_admin::About, LakeError> {
+        let client = self
+            .client(&Lake::main(), "")
+            .map_err(LakeError::Unavailable)?;
+        client.about().await
+    }
+}
+
 impl LakeAdmins for AdapterLakeAdmins {
     fn for_lake(&self, lake: &Lake, node: &str) -> Arc<dyn LakeAdmin> {
         match self.client(lake, node) {
