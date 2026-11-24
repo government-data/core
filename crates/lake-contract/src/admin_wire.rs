@@ -143,11 +143,12 @@ pub async fn refused_by_its_certificate(stranger: &AdminClient, warehouse: &str)
     error_shape(&body, wire::ErrorCode::Refused);
 }
 
-/// The error shape: an unknown warehouse (`404 unknown`) and a request the
+/// The error shape: an unknown warehouse (`404 unknown`, asked with
+/// `keys`, the headers that carry the lake's admin keys) and a request the
 /// adapter cannot read (`400 invalid`), neither retryable.
-pub async fn errors(client: &AdminClient, unknown_warehouse: &str) {
+pub async fn errors(client: &AdminClient, unknown_warehouse: &str, keys: &[(&str, String)]) {
     let path = wire::paths::replication(unknown_warehouse);
-    let (status, body) = client.call("GET", &path, None).await;
+    let (status, body) = client.call_with("GET", &path, None, keys).await;
     assert_eq!(status, 404, "{body}");
     error_shape(&body, wire::ErrorCode::Unknown);
     let path = wire::paths::session_policy();

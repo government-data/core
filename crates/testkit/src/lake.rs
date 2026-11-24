@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 use application::lake::{
     CatalogPrefix, Lake, LakeAdmin, LakeCredentialKind, LakeCredentials, LakeError, LakeGrant,
     LakeHealth, LakeKeys, LakeProperties, ManagedPolicy, ReplicaTarget, ReplicationState,
-    RetentionRules, SessionPolicy, UrlStyle, WarehouseMade, WriteOnce,
+    ReplicationSync, RetentionRules, SessionPolicy, UrlStyle, WarehouseMade, WriteOnce,
 };
 use async_trait::async_trait;
 
@@ -191,12 +191,18 @@ impl LakeAdmin for InMemoryLake {
         Ok(ReplicationState::Configured)
     }
 
-    async fn replication(&self, name: &str) -> Result<ReplicationState, LakeError> {
+    /// Its state; nothing waits or fails in memory.
+    async fn replication(&self, name: &str) -> Result<ReplicationSync, LakeError> {
         let state = self.known(name)?;
-        Ok(if state.replicas.contains_key(name) {
+        let state = if state.replicas.contains_key(name) {
             ReplicationState::Configured
         } else {
             ReplicationState::NotConfigured
+        };
+        Ok(ReplicationSync {
+            state,
+            pending: Some(0),
+            failed: Some(0),
         })
     }
 
@@ -290,7 +296,7 @@ mod tests {
             Ok(WarehouseMade::Present)
         );
         assert_eq!(
-            lake.replication(WH).await.unwrap(),
+            lake.replication(WH).await.unwrap().state,
             ReplicationState::Configured
         );
     }

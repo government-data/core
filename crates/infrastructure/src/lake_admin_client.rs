@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use application::lake::{
     LakeAdmin, LakeCredentialKind, LakeError, LakeGrant, LakeHealth, LakeKeys, ManagedPolicy,
-    ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
+    ReplicaTarget, ReplicationState, ReplicationSync, RetentionRules, SessionPolicy, WarehouseMade,
 };
 use async_trait::async_trait;
 use auth_gateway::{Lake, LakeAdminKeys};
@@ -287,11 +287,12 @@ impl LakeAdmin for LakeAdminClient {
         Ok(state.into())
     }
 
-    async fn replication(&self, name: &str) -> Result<ReplicationState, LakeError> {
-        let state: wire::ReplicationState = self
-            .typed("GET", &paths::replication(name), None, &Vec::new())
+    async fn replication(&self, name: &str) -> Result<ReplicationSync, LakeError> {
+        let keys = self.admin_keys().await?;
+        let sync: wire::ReplicationSync = self
+            .typed("GET", &paths::replication(name), None, &keys)
             .await?;
-        Ok(state.into())
+        Ok(sync.into())
     }
 
     async fn set_managed_policies(&self, policies: &[ManagedPolicy]) -> Result<(), LakeError> {

@@ -29,7 +29,7 @@ async fn the_fake_passes_lake_admin_1_at_the_wire() {
         &ca.machine(CALLER_ROLE, "app-1").bundle(),
     );
     admin_wire::operations_twice(&core, WAREHOUSE).await;
-    admin_wire::errors(&core, "qd-tenant-unknown").await;
+    admin_wire::errors(&core, "qd-tenant-unknown", &[]).await;
 
     let before = server.lake.snapshot();
     let worker = AdminClient::new(&server.url, &ca.pem, &ca.machine("worker", "w-1").bundle());

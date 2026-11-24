@@ -14,7 +14,8 @@ use std::sync::Arc;
 
 use application::lake::{
     LakeAdmin, LakeAdmins, LakeCredentialKind, LakeError, LakeGrant, LakeHealth, LakeKeys,
-    ManagedPolicy, ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
+    ManagedPolicy, ReplicaTarget, ReplicationState, ReplicationSync, RetentionRules, SessionPolicy,
+    WarehouseMade,
 };
 use async_trait::async_trait;
 use auth_gateway::Lake;
@@ -177,7 +178,7 @@ impl LakeAdmin for NotReached {
         self.answer()
     }
 
-    async fn replication(&self, _: &str) -> Result<ReplicationState, LakeError> {
+    async fn replication(&self, _: &str) -> Result<ReplicationSync, LakeError> {
         self.answer()
     }
 

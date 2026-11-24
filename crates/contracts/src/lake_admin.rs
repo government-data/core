@@ -30,7 +30,8 @@ pub mod paths {
     pub fn warehouse(name: &str) -> String {
         format!("{BASE}/warehouses/{name}")
     }
-    /// `PUT` with [`super::ReplicaTarget`], `GET`: [`super::ReplicationState`].
+    /// `PUT` with [`super::ReplicaTarget`]: [`super::ReplicationState`];
+    /// `GET`: [`super::ReplicationSync`].
     pub fn replication(name: &str) -> String {
         format!("{BASE}/warehouses/{name}/replication")
     }
@@ -144,6 +145,20 @@ pub enum ReplicationState {
     NotConfigured,
     Configured,
     Failed { step: String, detail: String },
+}
+
+/// `GET /warehouses/{name}/replication`: the replication's state and, from
+/// an adapter that reads them, what waits to be copied now and what failed
+/// to be copied in the last hour. Both counts are optional, so a core or an
+/// adapter older than them still reads and writes the answer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplicationSync {
+    #[serde(flatten)]
+    pub state: ReplicationState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failed: Option<u64>,
 }
 
 /// What a managed access policy allows, on every warehouse.
@@ -461,6 +476,30 @@ mod tests {
         for bad in ["", "no-colon", ":secret", "access:"] {
             assert_eq!(headers::decode(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    fn a_replications_counts_are_optional_both_ways() {
+        round_trip(
+            &ReplicationSync {
+                state: ReplicationState::Configured,
+                pending: Some(2),
+                failed: Some(0),
+            },
+            json!({"state": "configured", "pending": 2, "failed": 0}),
+        );
+        round_trip(
+            &ReplicationSync {
+                state: ReplicationState::Configured,
+                pending: None,
+                failed: None,
+            },
+            json!({"state": "configured"}),
+        );
+        // A core older than the counts reads the state and leaves them.
+        let newer = json!({"state": "configured", "pending": 2, "failed": 1});
+        let older: ReplicationState = serde_json::from_value(newer).unwrap();
+        assert_eq!(older, ReplicationState::Configured);
     }
 
     #[test]

@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use application::lake::{
     LakeAdmin, LakeAdmins, LakeCredentialKind, LakeError, LakeGrant, LakeHealth, LakeKeys,
-    ManagedPolicy, ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
+    ManagedPolicy, ReplicaTarget, ReplicationState, ReplicationSync, RetentionRules, SessionPolicy,
+    WarehouseMade,
 };
 use async_trait::async_trait;
 use auth_gateway::Lake;
@@ -70,7 +71,7 @@ impl LakeAdmin for At {
     async fn replicate(&self, n: &str, t: &ReplicaTarget) -> Result<ReplicationState, LakeError> {
         self.0.lake.replicate(n, t).await
     }
-    async fn replication(&self, n: &str) -> Result<ReplicationState, LakeError> {
+    async fn replication(&self, n: &str) -> Result<ReplicationSync, LakeError> {
         self.0.lake.replication(n).await
     }
     async fn set_managed_policies(&self, p: &[ManagedPolicy]) -> Result<(), LakeError> {

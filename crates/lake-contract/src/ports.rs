@@ -43,10 +43,8 @@ pub async fn lake_admin(admin: &dyn LakeAdmin, warehouse: &str) {
         .await
         .expect("replicated again");
     assert_eq!(first, again, "replicating twice answers the same");
-    assert_eq!(
-        admin.replication(warehouse).await.expect("its state"),
-        again
-    );
+    let sync = admin.replication(warehouse).await.expect("its state");
+    assert_eq!(sync.state, again, "the state replicating answered");
 
     let policies = [
         ManagedPolicy {

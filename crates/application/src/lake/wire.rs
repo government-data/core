@@ -6,7 +6,7 @@ use contracts::lake_admin as wire;
 
 use super::{
     LakeCredentialKind, LakeError, LakeHealth, LakeKeys, ManagedAccess, ManagedPolicy,
-    ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
+    ReplicaTarget, ReplicationState, ReplicationSync, RetentionRules, SessionPolicy, WarehouseMade,
 };
 
 impl From<&RetentionRules> for wire::RetentionRules {
@@ -83,6 +83,26 @@ impl From<wire::ReplicationState> for ReplicationState {
             wire::ReplicationState::NotConfigured => Self::NotConfigured,
             wire::ReplicationState::Configured => Self::Configured,
             wire::ReplicationState::Failed { step, detail } => Self::Failed { step, detail },
+        }
+    }
+}
+
+impl From<ReplicationSync> for wire::ReplicationSync {
+    fn from(s: ReplicationSync) -> Self {
+        Self {
+            state: s.state.into(),
+            pending: s.pending,
+            failed: s.failed,
+        }
+    }
+}
+
+impl From<wire::ReplicationSync> for ReplicationSync {
+    fn from(s: wire::ReplicationSync) -> Self {
+        Self {
+            state: s.state.into(),
+            pending: s.pending,
+            failed: s.failed,
         }
     }
 }
