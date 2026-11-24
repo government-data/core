@@ -26,9 +26,15 @@ use crate::domain::{
 mod client_auth;
 mod code;
 mod machine;
+mod module_client_requests;
+mod module_clients;
 mod signers;
 mod userinfo;
 
+pub use module_clients::{
+    ClientChange, MachineClient, ModuleClients, ModuleClientsError, ModuleClientsRequest,
+    PeopleClient, RoleClaimRequest, PREVIOUS_SECRET_TTL,
+};
 use signers::Signers;
 
 /// How long a code waits to be redeemed: the application does it right away.

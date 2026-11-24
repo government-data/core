@@ -58,6 +58,8 @@
       "roleForbids": "Tu rol en esta área no permite esta acción."
     },
     "updater": {
+      "clientTaken": "el cliente {{client}} se registró a mano o por otro módulo: un módulo no lo toma",
+      "noProvider": "el proveedor OIDC de esta instalación no está configurado (OIDC_SIGNING_KEY)",
       "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
       "noSuchModule": "no hay ningún módulo {{name}} instalado",
       "unavailable": "La base de datos no responde."

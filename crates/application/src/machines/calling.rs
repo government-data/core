@@ -45,6 +45,28 @@ impl MachinesService {
         })
     }
 
+    /// Record what `machine`, the update agent, did or had done to
+    /// `module` (quality-sdk decision 0009): `detail` says its version, the
+    /// outcome and, on failure, the step and the error, and never a secret.
+    pub async fn module_event(
+        &self,
+        event_type: domain::AuditEventType,
+        machine: &Machine,
+        module: &str,
+        detail: String,
+        origin: &Origin,
+    ) -> Result<(), MachinesError> {
+        let event = audit::module_event(
+            event_type,
+            machine,
+            module,
+            detail,
+            origin,
+            self.clock.now(),
+        );
+        Ok(self.record(event).await?)
+    }
+
     /// Record that `machine`, the update agent, asked for an update now for
     /// a person on the server (decision 0086).
     pub async fn update_requested(
