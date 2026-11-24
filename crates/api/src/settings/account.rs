@@ -1,29 +1,15 @@
-//! The shared account and the applications the session holder can go to:
-//! `/settings/account` (public) and `/settings/account/apps` (any session).
+//! The applications the session holder can go to: `/settings/account/apps`
+//! (any session).
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use application::{InstalledModule, SettingsService, UpdatesService};
+use application::{InstalledModule, UpdatesService};
 use auth_gateway::http::rbac::ActorResolver;
-use auth_gateway::AdminRepository;
-use axum::extract::State;
-use axum::http::StatusCode;
 use axum::{Extension, Json};
-use domain::AdminId;
 use serde_json::{json, Value};
 
-use super::ApiResult;
-use crate::error::ApiError;
 use crate::session::CurrentSession;
-
-/// `GET /settings/account`: `{"url": …}`, the shared account this instance signs
-/// in with (`null` without one). The UI signs out through its `/signout` (which
-/// also closes that session and goes back to the site) and offers it in the
-/// menu: switching application.
-pub(super) async fn account_url(State(settings): State<SettingsService>) -> Json<Value> {
-    Json(json!({ "url": settings.platform_account() }))
-}
 
 /// This installation's applications (those registered with
 /// `server oidc-client … --home URL`), in the request extensions.
@@ -131,42 +117,20 @@ async fn local_apps(local: Option<&LocalApps>) -> Vec<Value> {
 
 /// `GET /settings/account/apps`: where else the session holder can go: this
 /// installation's modules with a menu entry (the user guide…) and
-/// applications (RustFS…) and, with the shared account, by
-/// their email, management and their company's instances. If the
-/// account does not answer, `502`.
+/// applications (RustFS…).
 pub(super) async fn account_apps(
-    State((settings, admins)): State<(SettingsService, Arc<dyn AdminRepository>)>,
     Extension(session): Extension<CurrentSession>,
     local: Option<Extension<LocalApps>>,
     modules: Option<Extension<InstalledModules>>,
     resolver: Option<Extension<ActorResolver>>,
-) -> ApiResult<Json<Value>> {
+) -> Json<Value> {
     let actor = match resolver {
         Some(Extension(resolver)) => resolver.0.actor(&session).await.ok(),
         None => None,
     };
     let mut apps = module_apps(modules.as_ref().map(|e| &e.0), actor.as_ref()).await;
     apps.append(&mut local_apps(local.as_ref().map(|e| &e.0)).await);
-    let email = match admins.find_by_id(&AdminId::new(&session.admin_id)).await {
-        Ok(Some(a)) => a.email.to_string(),
-        _ => return Ok(Json(json!({ "apps": apps }))),
-    };
-    match settings.platform_apps(&email).await {
-        None => Ok(Json(json!({ "apps": apps }))),
-        Some(Ok(v)) => {
-            let mut all = v["apps"].as_array().cloned().unwrap_or_default();
-            all.append(&mut apps);
-            Ok(Json(json!({ "apps": all })))
-        }
-        Some(Err(e)) => {
-            tracing::warn!("account apps: {e}");
-            Err(ApiError::new(
-                StatusCode::BAD_GATEWAY,
-                "account_unreachable",
-                "The common account did not answer.",
-            ))
-        }
-    }
+    Json(json!({ "apps": apps }))
 }
 
 #[cfg(test)]

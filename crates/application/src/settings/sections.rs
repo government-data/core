@@ -73,10 +73,6 @@ pub struct MailSettings {
     /// The language of the email notices (`es` / `en`): they go to people who
     /// do not always have an account, so the company sets it. Empty: Spanish.
     pub notice_language: String,
-    /// The platform set it (the management panel's mail): the server
-    /// and its credentials update themselves and the company neither sees nor
-    /// changes them; if it saves its own, it stops being the platform's.
-    pub platform: bool,
 }
 
 /// An OAuth2/OIDC sign-in provider.

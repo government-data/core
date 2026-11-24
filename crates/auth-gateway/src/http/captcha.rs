@@ -3,10 +3,9 @@
 //! IP's third failed attempt.
 //!
 //! It goes as an extension (`Extension<Captcha>`): without it, or without
-//! keys, nothing is asked (customer installations and tests). The keys come
-//! from the environment or from management (the instances we manage) and can
-//! be changed live. The server verifies with the secret key: the browser
-//! only brings the token.
+//! keys, nothing is asked (installations without them and tests). The keys
+//! come from the environment. The server verifies with the secret key: the
+//! browser only brings the token.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError, RwLock};

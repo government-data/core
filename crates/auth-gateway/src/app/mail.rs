@@ -1,4 +1,4 @@
-//! Outgoing mail: the [`Mailer`] each tenant configured (or the platform's)
+//! Outgoing mail: the [`Mailer`] the installation configured (or a fallback)
 //! and the [`MailSlot`] that shares it with whoever sends mail — accounts
 //! (activation, password reset), and outside this crate the notices and the
 //! updates. Settings → Mail fills it.
@@ -45,42 +45,42 @@ struct AppliedMail {
 /// The [`Mailer`] in use, shared with whoever sends mail: the one configured
 /// in Settings → Mail (in memory, see [`domain::slot::Slot`]) with how long
 /// its password reset links work (`0`: the environment's) and, without one,
-/// the platform's.
+/// a fixed fallback (tests and whoever does not go through the settings).
 #[derive(Clone, Default)]
 pub struct MailSlot {
     applied: domain::slot::Slot<AppliedMail>,
-    platform: Arc<RwLock<Option<Arc<dyn Mailer>>>>,
+    fallback: Arc<RwLock<Option<Arc<dyn Mailer>>>>,
 }
 
 impl std::fmt::Debug for MailSlot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MailSlot")
             .field("configured", &self.get().is_some())
-            .field("platform", &self.platform_configured())
+            .field("fallback", &self.fallback_configured())
             .finish()
     }
 }
 
 impl MailSlot {
-    /// A fixed mailer for every tenant (for whoever does not go through the
-    /// settings, like tests).
+    /// A fixed mailer (for whoever does not go through the settings, like
+    /// tests).
     pub fn fixed(mailer: Arc<dyn Mailer>) -> Self {
         let slot = Self::default();
-        slot.set_platform(Some(mailer));
+        slot.set_fallback(Some(mailer));
         slot
     }
 
-    /// The platform's, for tenants without their own mail.
-    pub fn set_platform(&self, mailer: Option<Arc<dyn Mailer>>) {
+    /// The mailer used when Settings → Mail configures none.
+    pub fn set_fallback(&self, mailer: Option<Arc<dyn Mailer>>) {
         *self
-            .platform
+            .fallback
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = mailer;
     }
 
-    /// Whether there is platform mail.
-    pub fn platform_configured(&self) -> bool {
-        self.platform
+    /// Whether there is a fallback mailer.
+    fn fallback_configured(&self) -> bool {
+        self.fallback
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_some()
@@ -112,10 +112,10 @@ impl MailSlot {
         self.applied.update(|m| m.notice_language = lang);
     }
 
-    /// The current tenant's or, if it configured none, the platform's.
+    /// The configured mailer or, without one, the fallback.
     fn get(&self) -> Option<Arc<dyn Mailer>> {
         self.applied.get().and_then(|m| m.mailer).or_else(|| {
-            self.platform
+            self.fallback
                 .read()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone()
@@ -126,8 +126,7 @@ impl MailSlot {
         self.applied.update(|m| m.mailer = mailer);
     }
 
-    /// Whether the current tenant has outgoing mail (its own or the
-    /// platform's).
+    /// Whether there is outgoing mail (the configured one or the fallback).
     pub fn configured(&self) -> bool {
         self.get().is_some()
     }

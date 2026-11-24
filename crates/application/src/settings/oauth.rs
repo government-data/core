@@ -1,74 +1,24 @@
-//! The OAuth2/OIDC section, and the shared account (an instance we run signs
-//! in with the account the management panel gives it).
+//! The OAuth2/OIDC section.
 
 use std::collections::{BTreeMap, HashSet};
 
 use auth_gateway::ProviderId;
 
 use super::{
-    clean_list, invalid, OAuthProviderSettings, OAuthSettings, OidcDiscovery, Section,
-    SettingsError, SettingsService, OAUTH,
+    clean_list, invalid, OAuthSettings, OidcDiscovery, Section, SettingsError, SettingsService,
+    OAUTH,
 };
 
 impl SettingsService {
     pub(super) fn apply_oauth(&self, s: &OAuthSettings) -> Result<(), String> {
-        let platform = self
-            .platform_oauth
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone();
-        // With the shared account, only it: the management panel controls the
-        // access and whoever signs in is tied to the account. The company's
-        // own providers stay stored, unused.
-        let providers = match platform.as_ref() {
-            Some(p) => vec![self.connectors.oauth_provider(p)?],
-            None => s
-                .providers
-                .iter()
-                .filter(|p| p.enabled)
-                .map(|p| self.connectors.oauth_provider(p))
-                .collect::<Result<Vec<_>, _>>()?,
-        };
+        let providers = s
+            .providers
+            .iter()
+            .filter(|p| p.enabled)
+            .map(|p| self.connectors.oauth_provider(p))
+            .collect::<Result<Vec<_>, _>>()?;
         self.oauth.set_providers(providers);
         Ok(())
-    }
-
-    /// Sign in with the shared account: the provider the management panel
-    /// gives an instance we run (`None`: none). It replaces the company's and
-    /// applies at once.
-    pub async fn set_platform_oauth(
-        &self,
-        p: Option<OAuthProviderSettings>,
-    ) -> Result<(), SettingsError> {
-        *self
-            .platform_oauth
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = p;
-        self.ensure_loaded().await?;
-        self.apply_oauth(&self.read().oauth.value)
-            .map_err(SettingsError::Internal)
-    }
-
-    /// The shared account this instance signs in with (`https://cuenta.…`,
-    /// without a trailing `/`), to sign out through it or switch application.
-    /// `None` without the account.
-    pub fn platform_account(&self) -> Option<String> {
-        self.platform_oauth
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_ref()
-            .map(|p| p.issuer.trim_end_matches('/').to_string())
-    }
-
-    /// The shared account's applications `email` can go to, for the menu:
-    /// `None` without the account.
-    pub async fn platform_apps(&self, email: &str) -> Option<Result<serde_json::Value, String>> {
-        let p = self
-            .platform_oauth
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()?;
-        Some(self.connectors.account_apps(&p, email).await)
     }
 
     /// The callback URL to register with the provider.
@@ -143,9 +93,6 @@ impl SettingsService {
         input: OAuthSettings,
         actor: &str,
     ) -> Result<Section<OAuthSettings>, SettingsError> {
-        if self.platform_account().is_some() {
-            return Err(SettingsError::Managed);
-        }
         let value = self.complete_oauth(input)?;
         for (i, p) in value.providers.iter().enumerate() {
             if p.enabled {

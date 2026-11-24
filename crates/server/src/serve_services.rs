@@ -20,7 +20,7 @@ use infrastructure::{
     ReqwestHttpClient, ResetTokenAdapter, SecretBox, SecureRandomTokens, SystemClock,
 };
 
-use crate::background::{spawn_background, spawn_scheduler};
+use crate::background::spawn_scheduler;
 use crate::config::{env_value, public_url_from_env, OAuthSettings};
 use crate::database::Database;
 use crate::{settings_wiring, updates_wiring};
@@ -92,8 +92,9 @@ pub(crate) async fn services(db: &Database, auth: &AuthConfig) -> Result<Service
     let audit = AuditService::new(Arc::new(PgAuditRepository::new(pool.clone())));
 
     let (oauth_service, redirects, settings) = settings(&pool, auth, &secret_box, &login).await?;
-    let (captcha, _) = settings_wiring::captcha_from_env()?;
-    spawn_rounds(&settings, db);
+    let captcha = settings_wiring::captcha_from_env()?;
+    // The schedules (decision 0035): only the VM holding the lock fires.
+    spawn_scheduler(db.pool.clone());
     // Every new version and how each attempt ended, emailed to the
     // administrators (the daemon reports it through the internal routes).
     let updates = updates.with_notices(
@@ -129,13 +130,6 @@ pub(crate) async fn services(db: &Database, auth: &AuthConfig) -> Result<Service
         password_reset: (password_reset, reset_links),
         admin_access,
     })
-}
-
-/// The background round (the platform mail), once the settings are loaded,
-/// and the schedules (decision 0035): only the VM holding the lock fires.
-fn spawn_rounds(settings: &SettingsService, db: &Database) {
-    spawn_background(settings.clone());
-    spawn_scheduler(db.pool.clone());
 }
 
 /// The platform: the actor and IAM, secrets and updates.

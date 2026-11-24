@@ -12,7 +12,7 @@
 //! what is sent means "keep the current one".
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use auth_gateway::{DirectoryAccounts, DirectorySlot, OAuthLoginService};
 use chrono::{DateTime, Utc};
@@ -72,9 +72,6 @@ pub enum SettingsError {
     /// The test against the external service failed; the reason is for the
     /// admin.
     Unreachable(String),
-    /// The management panel (the cloud) runs it: the access, with the shared
-    /// account, or the platform's mail. It is not changed here.
-    Managed,
     Internal(String),
 }
 
@@ -83,7 +80,6 @@ impl std::fmt::Display for SettingsError {
         match self {
             Self::Invalid(fields) => write!(f, "invalid settings: {fields:?}"),
             Self::Unreachable(e) => write!(f, "{e}"),
-            Self::Managed => write!(f, "managed by the management panel"),
             Self::Internal(e) => write!(f, "internal error: {e}"),
         }
     }
@@ -137,13 +133,6 @@ pub struct SettingsService {
     env: EnvSettings,
     key_source: &'static str,
     current: domain::slot::Slot<Current>,
-    /// The platform's mail (the one the management panel sends), if
-    /// any.
-    platform: Arc<RwLock<Option<MailSettings>>>,
-    /// Sign-in with the shared account (an instance we run: the provider the
-    /// management panel gives it), if any. It goes in addition to the ones
-    /// the company configures.
-    platform_oauth: Arc<RwLock<Option<OAuthProviderSettings>>>,
 }
 
 impl std::fmt::Debug for SettingsService {
@@ -188,8 +177,6 @@ impl SettingsService {
             env,
             key_source: "file",
             current: domain::slot::Slot::default(),
-            platform: Arc::default(),
-            platform_oauth: Arc::default(),
         }
     }
 
@@ -236,9 +223,6 @@ impl SettingsService {
             oauth,
             platform,
         });
-        if let Err(e) = self.seed_loaded().await {
-            tracing::error!("the platform mail could not be set for this company: {e}");
-        }
         Ok(())
     }
 
@@ -351,11 +335,6 @@ impl SettingsService {
                 "section",
                 &texts::tr!("app.settings.unknownSection"),
             ));
-        }
-        if (section == OAUTH && self.platform_account().is_some())
-            || (section == MAIL && self.platform_mail().is_some())
-        {
-            return Err(SettingsError::Managed);
         }
         self.store
             .delete(section)

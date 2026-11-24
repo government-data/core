@@ -172,9 +172,9 @@ async fn app(pool: sqlx::PgPool, outbox: Option<Arc<Outbox>>) -> axum::Router {
         EnvSettings::default(),
     );
     settings.init().await.unwrap();
-    // The platform's mail, as if no company mail were configured.
+    // A fallback mailer, as if no mail were configured in Settings.
     if let Some(outbox) = outbox {
-        settings.mailer().set_platform(Some(outbox));
+        settings.mailer().set_fallback(Some(outbox));
     }
     let reset = PasswordResetService::new(
         admins.clone(),

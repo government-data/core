@@ -94,7 +94,7 @@ pub fn router(
         ));
     }
     if let Some(settings) = settings {
-        router = router.merge(settings::routes(settings, sessions.clone(), admins.clone()));
+        router = router.merge(settings::routes(settings, sessions.clone()));
     }
     if let Some((service, links)) = password_reset {
         router = router.merge(password_reset::routes(
