@@ -115,7 +115,10 @@ fn app(
     // applications registered with `server oidc-client` let their users in
     // with this installation's accounts.
     let oidc_issuer = format!("{}/api", public_url_from_env().trim_end_matches('/'));
-    let provider = infrastructure::oidc::provider_from_env(&db.pool, admins.clone(), &oidc_issuer)?;
+    let provider = infrastructure::oidc::provider_from_env(&db.pool, admins.clone(), &oidc_issuer)?
+        // A module client's role claim, from the actions each person holds
+        // (quality-sdk decision 0009).
+        .map(|p| p.with_actions(api::iam::action_holder(platform.clone())));
     let certificates = machines_wiring::client_certificates_from_env()?;
     let oidc = oidc_provider(provider.clone(), sessions.clone(), certificates.clone());
     // Who the session is, for every route that requires a capability: the

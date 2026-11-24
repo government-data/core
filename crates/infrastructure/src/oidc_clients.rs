@@ -7,6 +7,8 @@ use async_trait::async_trait;
 use auth_gateway::{
     ClientAuth, ClientId, ClientSettings, MachineRole, OidcClient, OidcClientRegistry, SigningAlg,
 };
+
+use crate::oidc_module_clients::{module_of, MODULE_COLUMNS};
 use domain::RepositoryError;
 use sqlx::{PgPool, Row};
 
@@ -55,31 +57,39 @@ fn auth_of(
 #[async_trait]
 impl OidcClientRegistry for PgOidcClients {
     async fn find(&self, id: &ClientId) -> Result<Option<OidcClient>, RepositoryError> {
-        let row = sqlx::query(
-            "SELECT client_id, name, redirect_uris, secret_hash, machine_role, token_alg, \
-             pkce_required, required_policy, grant_client_credentials, audiences, \
-             service_account_id::text AS service_account_id \
-             FROM oidc_clients WHERE client_id = $1",
-        )
+        let row = sqlx::query(&format!(
+            "SELECT {CLIENT_COLUMNS}, {MODULE_COLUMNS} FROM oidc_clients WHERE client_id = $1"
+        ))
         .bind(id.as_str())
         .fetch_optional(&self.pool)
         .await
         .map_err(backend)?;
-        let Some(row) = row else {
-            return Ok(None);
-        };
-        let raw: String = row.try_get("client_id").map_err(backend)?;
-        Ok(Some(OidcClient {
-            id: ClientId::parse(&raw)
-                .map_err(|e| RepositoryError::Backend(format!("stored client {raw:?}: {e}")))?,
-            name: row.try_get("name").map_err(backend)?,
-            redirect_uris: row.try_get("redirect_uris").map_err(backend)?,
-            auth: auth_of(
-                row.try_get("secret_hash").map_err(backend)?,
-                row.try_get("machine_role").map_err(backend)?,
-            )?,
-            settings: settings_of(&row)?,
-        }))
+        row.as_ref().map(client_of).transpose()
+    }
+
+    async fn save_module_client(&self, client: &OidcClient) -> Result<bool, RepositoryError> {
+        crate::oidc_module_clients::save(&self.pool, client).await
+    }
+
+    async fn module_clients(&self, module: &str) -> Result<Vec<OidcClient>, RepositoryError> {
+        let rows = sqlx::query(&format!(
+            "SELECT {CLIENT_COLUMNS}, {MODULE_COLUMNS} FROM oidc_clients \
+             WHERE module = $1 ORDER BY client_id"
+        ))
+        .bind(module)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(backend)?;
+        rows.iter().map(client_of).collect()
+    }
+
+    async fn delete_module_clients(&self, module: &str) -> Result<u64, RepositoryError> {
+        let deleted = sqlx::query("DELETE FROM oidc_clients WHERE module = $1")
+            .bind(module)
+            .execute(&self.pool)
+            .await
+            .map_err(backend)?;
+        Ok(deleted.rows_affected())
     }
 
     async fn listed(&self) -> Result<Vec<auth_gateway::ListedApp>, RepositoryError> {
@@ -156,6 +166,27 @@ impl OidcClientRegistry for PgOidcClients {
     }
 }
 
+/// The columns of a client, before its module's.
+const CLIENT_COLUMNS: &str = "client_id, name, redirect_uris, secret_hash, machine_role, \
+     token_alg, pkce_required, required_policy, grant_client_credentials, audiences, \
+     service_account_id::text AS service_account_id";
+
+/// A client from a row of [`CLIENT_COLUMNS`] and [`MODULE_COLUMNS`].
+fn client_of(row: &sqlx::postgres::PgRow) -> Result<OidcClient, RepositoryError> {
+    let raw: String = row.try_get("client_id").map_err(backend)?;
+    Ok(OidcClient {
+        id: ClientId::parse(&raw)
+            .map_err(|e| RepositoryError::Backend(format!("stored client {raw:?}: {e}")))?,
+        name: row.try_get("name").map_err(backend)?,
+        redirect_uris: row.try_get("redirect_uris").map_err(backend)?,
+        auth: auth_of(
+            row.try_get("secret_hash").map_err(backend)?,
+            row.try_get("machine_role").map_err(backend)?,
+        )?,
+        settings: settings_of(row)?,
+    })
+}
+
 /// The settings columns of an `oidc_clients` row.
 fn settings_of(row: &sqlx::postgres::PgRow) -> Result<ClientSettings, RepositoryError> {
     let alg: String = row.try_get("token_alg").map_err(backend)?;
@@ -167,5 +198,6 @@ fn settings_of(row: &sqlx::postgres::PgRow) -> Result<ClientSettings, Repository
         client_credentials: row.try_get("grant_client_credentials").map_err(backend)?,
         audiences: row.try_get("audiences").map_err(backend)?,
         service_account: row.try_get("service_account_id").map_err(backend)?,
+        module: module_of(row)?,
     })
 }

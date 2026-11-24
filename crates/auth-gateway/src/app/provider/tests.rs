@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 
 use crate::app::oauth::testing::{FixedClock, FixedSecrets, InMemoryAdmins};
-use crate::domain::{ClientAuth, ClientSettings};
+use crate::domain::{AdminId, ClientAuth, ClientSettings};
 use crate::domain::{
     CsrfToken, LockoutState, PasswordHash, RepositoryError, ResetTokenGenerator, Role,
 };
@@ -408,6 +408,7 @@ async fn the_tokens_carry_the_policy_names_for_the_applications() {
 
 mod certificate;
 mod job_token;
+mod module_client;
 mod settings;
 
 #[tokio::test]
