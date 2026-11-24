@@ -137,7 +137,7 @@ pub struct SettingsService {
     env: EnvSettings,
     key_source: &'static str,
     current: domain::slot::Slot<Current>,
-    /// The platform's mail (online, the one the management panel sends), if
+    /// The platform's mail (the one the management panel sends), if
     /// any.
     platform: Arc<RwLock<Option<MailSettings>>>,
     /// Sign-in with the shared account (an instance we run: the provider the
@@ -294,8 +294,8 @@ impl SettingsService {
         self.current.get().unwrap_or_default()
     }
 
-    /// Load the current company's settings if they are not in memory yet
-    /// (online, each one its own; the first time they are needed).
+    /// Load the installation's settings if they are not in memory yet (the
+    /// first time they are needed).
     pub async fn ensure_loaded(&self) -> Result<(), SettingsError> {
         if self.current.contains() {
             return Ok(());

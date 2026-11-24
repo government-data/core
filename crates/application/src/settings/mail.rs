@@ -1,5 +1,5 @@
-//! The outgoing mail section, and the platform's mail (online, the one the
-//! management panel sets for every company).
+//! The outgoing mail section, and the platform's mail (the one the
+//! management panel sets).
 
 use std::collections::BTreeMap;
 
@@ -12,8 +12,8 @@ use super::{
 };
 
 impl SettingsService {
-    /// The platform's mail (in the cloud, the one set in the management
-    /// panel): it is set in every company instead of its own
+    /// The platform's mail (the one set in the management panel): it is set
+    /// instead of the installation's own
     /// ([`Self::seed_platform_mail`]), and meanwhile it is the one that sends.
     pub fn set_platform_mail(&self, s: Option<MailSettings>) -> Result<(), String> {
         let mailer = s.as_ref().map(|s| self.connectors.mailer(s)).transpose()?;

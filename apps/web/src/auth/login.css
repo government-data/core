@@ -143,25 +143,6 @@
   border-color: var(--color-accent, #4338ca);
 }
 
-/* The common entrance (entrar.<domain>): the company's address, in one row. */
-
-.login__field--inline {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.login__field--inline input {
-  flex: 1;
-  min-width: 0;
-}
-
-.login__suffix {
-  color: var(--color-muted, #667);
-  font-size: 0.85rem;
-  font-weight: 400;
-}
-
 /* Password recovery (forgot-password and reset-password screens). */
 
 .login__label-row {
