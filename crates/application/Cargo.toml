@@ -26,7 +26,6 @@ contracts.workspace = true
 platform.workspace = true
 # Global capabilities and roles (ADR 0013).
 iam.workspace = true
-tenancy.workspace = true
 texts.workspace = true
 # The local time in the failure emails.
 chrono-tz.workspace = true

@@ -18,6 +18,7 @@ pub mod audit_view;
 pub mod build;
 pub mod health;
 pub mod kernel;
+pub mod slot;
 
 pub use audit::{
     AuditEvent, AuditEventType, AuditEventTypeError, AuditId, AuditRepository, NewActionAudit,

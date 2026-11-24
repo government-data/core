@@ -151,8 +151,8 @@ fn platform(
     // in the database), the Actor kept in memory stops being valid (ADR 0013).
     {
         let platform = platform.clone();
-        infrastructure::permission_notices::spawn_listener(pool.clone(), move |tenant| {
-            platform.invalidate_permissions(tenant)
+        infrastructure::permission_notices::spawn_listener(pool.clone(), move |_| {
+            platform.invalidate_permissions()
         });
     }
     platform

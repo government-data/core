@@ -4,18 +4,16 @@ use super::*;
 
 /// Where [`LoginService`] finds its directory, shared by every clone so the
 /// settings can turn LDAP on, off or point it elsewhere without a restart.
-/// One per tenant (see [`tenancy::PerTenant`]): online, each company signs
-/// in against its own directory, never another's.
 #[derive(Clone, Default)]
-pub struct DirectorySlot(tenancy::PerTenant<Option<Arc<DirectoryLogin>>>);
+pub struct DirectorySlot(domain::slot::Slot<Option<Arc<DirectoryLogin>>>);
 
 impl DirectorySlot {
-    /// The current tenant's directory in use right now, if any.
+    /// The directory in use right now, if any.
     pub fn get(&self) -> Option<Arc<DirectoryLogin>> {
         self.0.get().flatten()
     }
 
-    /// Replace the current tenant's directory; `None` turns directory sign-in off.
+    /// Replace the directory; `None` turns directory sign-in off.
     pub fn set(&self, directory: Option<DirectoryLogin>) {
         self.0.set(directory.map(Arc::new));
     }
