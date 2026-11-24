@@ -5,7 +5,8 @@
 # (cut) to (cut, _load) through RustFS's REST catalog; an extraction's
 # INSERT … SELECT as one commit; the loads listed in $partitions; a
 # partition-only DELETE of a superseded load (metadata only: no delete
-# files); the old rows read with a NULL _load; reads pinned FOR VERSION AS
+# files) once one optimize has rewritten the old spec's files (the user's
+# ruling of 2026-11-24, point 5.5); the old rows read with a NULL _load; reads pinned FOR VERSION AS
 # OF a recorded snapshot, before and after later loads and the delete.
 #
 # One throwaway RustFS and one Trino (2 GB heap) on a network of their
@@ -52,6 +53,9 @@ tq_ok "SET PROPERTIES partitioning = (cut, _load)" "$U" \
   "ALTER TABLE $T SET PROPERTIES partitioning = ARRAY['cut', '_load']"
 expect_match "the table's partitioning now" "cut.*_load" \
   "$(q "SHOW CREATE TABLE $T" | grep -i partitioning)"
+tq_ok "optimize after the evolution (the migration step of point 5.5)" "$U" "ALTER TABLE $T EXECUTE optimize"
+expect "files of the old partition spec left" "0" \
+  "$(q "SELECT count(*) FROM lake.loans_bronze.\"accounts\$files\" WHERE spec_id = 0")"
 
 echo "== an extraction: one INSERT, one commit"
 before=$(snapshots)
@@ -87,7 +91,9 @@ expect "old rows still read" "1500" "$(q "SELECT count(*) FROM $T WHERE cut = $O
 tq_ok "an old cut replaced by a new load (job-c)" "$U" \
   "INSERT INTO $T SELECT custkey, name, acctbal, $OLD, 'job-c' FROM tpch.tiny.customer"
 tq_ok "DELETE of the old cut's NULL-load rows" "$U" "DELETE FROM $T WHERE cut = $OLD AND _load IS NULL"
-info "  its snapshot: $(last_summary); delete files now: $(delete_files)"
+expect_match "  its snapshot: whole files removed, no delete files" \
+  "^delete deleted-data-files=[1-9][0-9]* added-delete-files=- " "$(last_summary)"
+expect "  delete files in the table" "0" "$(delete_files)"
 expect "the old cut now holds job-c only" "1500 job-c" \
   "$(q "SELECT CAST(count(*) AS varchar) || ' ' || array_join(array_agg(DISTINCT _load), ',') FROM $T WHERE cut = $OLD")"
 
@@ -100,12 +106,5 @@ tq_ok "  DELETE of that load" "$U" "DELETE FROM lake.loans_bronze.control WHERE 
 expect "  delete files in the control table" "0" \
   "$(q "SELECT count(*) FROM lake.loans_bronze.\"control\$files\" WHERE content <> 0")"
 
-echo "== the evolved table after optimize"
-tq_ok "optimize (rewrites the old spec's files)" "$U" "ALTER TABLE $T EXECUTE optimize"
-info "files by partition spec after it: $(q "SELECT CAST(spec_id AS varchar) || ':' || CAST(count(*) AS varchar)
-  FROM lake.loans_bronze.\"accounts\$files\" GROUP BY spec_id ORDER BY spec_id" | paste -sd' ')"
-tq_ok "a new load (job-d)" "$U" "INSERT INTO $T SELECT custkey, name, acctbal, $NEW, 'job-d' FROM tpch.tiny.customer"
-tq_ok "DELETE of job-d" "$U" "DELETE FROM $T WHERE cut = $NEW AND _load = 'job-d'"
-info "  its snapshot: $(last_summary)"
 [ "$FAILED" = 0 ] && echo "ALL OK" || echo "SOME CHECKS FAILED"
 exit "$FAILED"

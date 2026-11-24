@@ -6,9 +6,10 @@
 # U+00A0; CAST to varchar and TRY_CAST of a text corpus; substr on
 # combining marks and emoji; to_hex's case; sha256 and HMAC against
 # reference vectors (FIPS 180-2, RFC 4231); regexp_like on 'a\nb' and (?i)
-# on U+212A, with Trino on RE2J and the Joni probe; DuckDB's quantile_cont
-# and median against one portable window SQL on both engines, bit for bit;
-# approx_percentile's error on 10^6 and 10^7 values and on a PSI.
+# on U+212A, with Trino on RE2J and the Joni probe; the portable window
+# SQL that defines the percentiles (the user's ruling of 2026-11-24, no
+# quantile_cont) on both engines, bit for bit; approx_percentile's error on
+# 10^6 and 10^7 values and on a PSI, against that window SQL.
 #
 # One throwaway Trino 484 node (2 GB heap, memory catalog only, its HTTP
 # port on a random port of 127.0.0.1) on a network of its own; DuckDB in
