@@ -14,7 +14,8 @@
     "loadError": "Could not load. Try again.",
     "saveError": "Could not save. Try again.",
     "forbidden": "You do not have permission for this.",
-    "catalogUnavailable": "The catalog does not answer: it cannot be checked now."
+    "catalogUnavailable": "The catalog does not answer: it cannot be checked now.",
+    "noCatalog": "No catalog is configured on this installation: datasets, their rules and drafts are not available until an administrator sets it up."
   },
   "sources": {
     "title": "Sources",

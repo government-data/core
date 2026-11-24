@@ -23,6 +23,7 @@ function refused(err: unknown) {
   const code =
     err instanceof QualityError ? (err.body as { error?: string } | undefined)?.error : undefined;
   if (err instanceof QualityError && err.status === 403) warn(t("quality:common.forbidden"));
+  else if (code === "catalog_not_configured") warn(t("quality:common.noCatalog"));
   else if (code === "catalog_unavailable") warn(t("quality:common.catalogUnavailable"));
   else if (code && REFUSALS.includes(code)) warn(t(`quality:slas.refusal.${code}`));
   else notify(t("quality:common.saveError"), true);

@@ -7,9 +7,9 @@
 
 import { type components } from "@knime-orchestador/api-client";
 import { sessionExpired } from "@knime-orchestador/feature-kit";
-import { api, csrf, done, QualityError } from "./apiCore";
+import { api, csrf, done, noCatalog, QualityError } from "./apiCore";
 
-export { QualityError };
+export { noCatalog, QualityError };
 
 export type Driver = components["schemas"]["DriverOut"];
 export type DriverField = components["schemas"]["DriverFieldOut"];
