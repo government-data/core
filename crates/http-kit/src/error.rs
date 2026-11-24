@@ -146,13 +146,19 @@ impl IntoResponse for ApiError {
             tracing::error!(code = self.code, trace_id, "{detail}");
         }
 
+        let (status, code) = (self.status, self.code);
         let body = ErrorResponse {
-            code: self.code,
+            code,
             message: self.message,
             trace_id,
             fields: self.fields,
         };
-        (self.status, Json(body)).into_response()
+        let response = (status, Json(body)).into_response();
+        // A server error's code is its cause on the request's line.
+        if status.is_server_error() {
+            return telemetry::with_cause(response, code);
+        }
+        response
     }
 }
 
@@ -189,6 +195,18 @@ mod tests {
         // The internal detail must not appear anywhere in the client body.
         assert!(!json.to_string().contains("10.0.0.5"));
         assert!(json["trace_id"].as_str().is_some_and(|s| !s.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn only_a_server_error_gives_its_code_as_the_cause() {
+        let internal = ApiError::internal("synthetic detail").into_response();
+        let cause = internal.extensions().get::<telemetry::Cause>();
+        assert_eq!(cause, Some(&telemetry::Cause("internal_error")));
+        let gateway = ApiError::bad_gateway("idp_unavailable", "Try again.").into_response();
+        let cause = gateway.extensions().get::<telemetry::Cause>();
+        assert_eq!(cause, Some(&telemetry::Cause("idp_unavailable")));
+        let missing = ApiError::not_found("No such widget.").into_response();
+        assert!(missing.extensions().get::<telemetry::Cause>().is_none());
     }
 
     #[tokio::test]

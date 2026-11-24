@@ -84,17 +84,8 @@ pub async fn request_context(request: Request, next: Next) -> Response {
         // A number, rounded once to hundredths of a millisecond.
         let duration_ms = (elapsed.as_secs_f64() * 100_000.0).round() / 100.0;
 
-        match status {
-            200..=299 => tracing::info!(
-                status,
-                duration_ms,
-                bytes = content_length.unwrap_or(0),
-                "request completed",
-            ),
-            400..=499 => tracing::warn!(status, duration_ms, "client error"),
-            _ => tracing::error!(status, duration_ms, "server error"),
-        }
-
+        let cause = response.extensions().get::<Cause>().map(|c| c.0);
+        completed(status, duration_ms, content_length.unwrap_or(0), cause);
         response
     };
     let mut response = REQUEST_ID.scope(id.clone(), served.instrument(span)).await;
@@ -105,6 +96,32 @@ pub async fn request_context(request: Request, next: Next) -> Response {
             .insert(HeaderName::from_static(REQUEST_ID_HEADER), value);
     }
     response
+}
+
+/// Why a request answered `5xx`: a fixed error kind (`internal_error`,
+/// `catalog_unavailable`), never a value, a body, a key or personal data
+/// (decision 0026, point 5). A handler puts it in the response's extensions
+/// ([`with_cause`]); [`request_context`] writes it as the `cause` of the
+/// request's line, and the client never sees it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Cause(pub &'static str);
+
+/// `response` with `cause` as the reason its request's line gives.
+pub fn with_cause(mut response: Response, cause: &'static str) -> Response {
+    response.extensions_mut().insert(Cause(cause));
+    response
+}
+
+/// The request's one line, at the level its status calls for: an answer
+/// (`1xx`, `2xx`, a redirect) is `INFO`, the client's error `WARN`, the
+/// server's `ERROR` with its cause when the handler gave one.
+fn completed(status: u16, duration_ms: f64, bytes: u64, cause: Option<&'static str>) {
+    match (status, cause) {
+        (100..=399, _) => tracing::info!(status, duration_ms, bytes, "request completed"),
+        (400..=499, _) => tracing::warn!(status, duration_ms, "client error"),
+        (_, Some(cause)) => tracing::error!(status, duration_ms, cause, "server error"),
+        (_, None) => tracing::error!(status, duration_ms, "server error"),
+    }
 }
 
 #[cfg(test)]
