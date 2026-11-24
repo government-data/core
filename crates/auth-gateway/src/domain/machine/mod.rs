@@ -147,7 +147,8 @@ pub trait CertificateSigner: Send + Sync {
     fn check(&self, csr_pem: &str, name: &str) -> Result<(), SigningRefusal>;
 
     /// Sign `csr_pem` for `O=qd, OU=<role>, CN=<name>`, with `name` as its
-    /// only alternative name, for `term`.
+    /// alternative name (the application machine's also `dolt`, decision
+    /// 0080's amendment), for `term`.
     fn sign(
         &self,
         csr_pem: &str,
