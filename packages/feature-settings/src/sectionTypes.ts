@@ -48,8 +48,6 @@ export interface MailSettings {
   reset_link_minutes: number;
   /** The language of the email notices (`es` / `en`); empty: Spanish. */
   notice_language?: string;
-  /** Set by the platform (management panel): the server is not shown or changed here. */
-  platform?: boolean;
 }
 
 export interface OAuthProvider {
@@ -89,7 +87,4 @@ export interface AllSettings {
   reset_link_default_minutes: number;
   /** Where the key that encrypts the secrets comes from. */
   encryption_key: "environment" | "file" | "generated";
-  /** The platform's sender for whoever does not configure their own mail
-   * (the management panel's); `null` if there is none. */
-  platform_mail_from?: string | null;
 }

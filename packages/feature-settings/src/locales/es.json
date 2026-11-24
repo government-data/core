@@ -87,7 +87,6 @@
     "adminOnly": "Solo un administrador puede cambiar la configuración."
   },
   "mail": {
-    "managedByPlatform": "Los avisos salen con {{from}}, el correo de Quality Data: en la nube el servidor de correo lo administra gestión y no se configura aquí.",
     "outgoingMail": "Correo saliente",
     "intro": "Desde dónde envía correo Quality Data: Office 365 por Microsoft Graph o cualquier servidor SMTP.",
     "offHelp": "Apagado, Quality Data no envía nada: ni los avisos ni los de la licencia.",
@@ -161,10 +160,7 @@
     "noOwnServer": "Esta instalación no trae servidor de correo: configura el de tu empresa. Sin él no llegan los avisos ni los de la licencia, ni los correos de activación de cuentas y de recuperación de contraseña.",
     "alerts": "Avisos",
     "alertLanguage": "Idioma de los avisos",
-    "alertLanguageTip": "En qué idioma salen los correos de aviso (fallos, servidores sin comunicación, recursos, cambios en la máquina). Van también a personas sin cuenta, así que lo fija la empresa.",
-    "platformMailServer": "Servidor de correo de la plataforma",
-    "platformHelp": "Lo configura y mantiene la plataforma: los avisos salen desde {{from}} por {{host}}. Sus credenciales no se muestran ni se pueden usar con otro servidor.",
-    "useMyCompany": "Usar el correo de mi empresa"
+    "alertLanguageTip": "En qué idioma salen los correos de aviso (fallos, servidores sin comunicación, recursos, cambios en la máquina). Van también a personas sin cuenta, así que lo fija la empresa."
   },
   "ldap": {
     "ldapActiveDirectory": "LDAP / Active Directory",

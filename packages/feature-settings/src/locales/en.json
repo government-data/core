@@ -87,7 +87,6 @@
     "adminOnly": "Only an administrator can change the settings."
   },
   "mail": {
-    "managedByPlatform": "Notices are sent from {{from}}, Quality Data's mail: in the cloud the mail server is managed from gestión and is not configured here.",
     "outgoingMail": "Outgoing mail",
     "intro": "Where Quality Data sends mail from: Office 365 via Microsoft Graph or any SMTP server.",
     "offHelp": "When off, Quality Data sends nothing: neither its notices nor the license's.",
@@ -161,10 +160,7 @@
     "noOwnServer": "This installation has no mail server of its own: configure your company's. Without it, no notices or license alerts are sent, nor account activation and password recovery emails.",
     "alerts": "Alerts",
     "alertLanguage": "Alert language",
-    "alertLanguageTip": "The language of alert emails (failures, servers without communication, resources, changes on the machine). They also go to people without an account, so the company sets it.",
-    "platformMailServer": "Platform mail server",
-    "platformHelp": "The platform configures and maintains it: alerts are sent from {{from}} through {{host}}. Its credentials are not shown and cannot be used with another server.",
-    "useMyCompany": "Use my company's mail"
+    "alertLanguageTip": "The language of alert emails (failures, servers without communication, resources, changes on the machine). They also go to people without an account, so the company sets it."
   },
   "ldap": {
     "ldapActiveDirectory": "LDAP / Active Directory",
