@@ -112,5 +112,6 @@ if [ $? -ne 0 ]; then ok "an empty DELETE refused: $(printf '%s' "$out" | head -
 info "snapshots after the empty DELETE: $(tq qd-quality "SELECT count(*) FROM $G.\"rule_results\$snapshots\"")"
 
 . tools/verify/trino_gold_replace_more.sh
+. tools/verify/trino_gold_concurrency.sh
 [ "$FAILED" = 0 ] && echo "ALL OK" || echo "SOME CHECKS FAILED"
 exit "$FAILED"
