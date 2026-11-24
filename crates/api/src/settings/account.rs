@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use application::SettingsService;
+use application::{InstalledModule, SettingsService, UpdatesService};
 use auth_gateway::AdminRepository;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -32,6 +32,51 @@ impl std::fmt::Debug for LocalApps {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("LocalApps")
     }
+}
+
+/// The installed modules as the update agent tells them (quality-sdk
+/// decision 0002): those with a menu entry are offered in the list, in the
+/// request's language. In the request extensions.
+#[derive(Clone)]
+pub struct InstalledModules(pub UpdatesService);
+
+impl std::fmt::Debug for InstalledModules {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("InstalledModules")
+    }
+}
+
+/// The installed modules with a menu entry, as entries of the list
+/// (`kind: module`): their label and page in the request's language,
+/// opened on this site.
+async fn module_apps(modules: Option<&InstalledModules>) -> Vec<Value> {
+    let Some(InstalledModules(updates)) = modules else {
+        return Vec::new();
+    };
+    match updates.installed_modules().await {
+        Ok(modules) => module_entries(modules, texts::current().code()),
+        Err(e) => {
+            tracing::warn!("installed modules: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// The entries of the modules that have a menu entry, in `language`.
+fn module_entries(modules: Vec<InstalledModule>, language: &str) -> Vec<Value> {
+    modules
+        .into_iter()
+        .filter_map(|m| {
+            let menu = m.menu?;
+            Some(json!({
+                "kind": "module",
+                "id": m.name,
+                "name": menu.label.get(language),
+                "detail": "",
+                "url": menu.path.get(language),
+            }))
+        })
+        .collect()
 }
 
 /// The ones that sign in with this installation, as entries of the list
@@ -63,15 +108,18 @@ async fn local_apps(local: Option<&LocalApps>) -> Vec<Value> {
 }
 
 /// `GET /settings/account/apps`: where else the session holder can go: this
-/// installation's applications (RustFS…) and, with the shared account, by
+/// installation's modules with a menu entry (the user guide…) and
+/// applications (RustFS…) and, with the shared account, by
 /// their email, management and their company's instances. If the
 /// account does not answer, `502`.
 pub(super) async fn account_apps(
     State((settings, admins)): State<(SettingsService, Arc<dyn AdminRepository>)>,
     Extension(session): Extension<CurrentSession>,
     local: Option<Extension<LocalApps>>,
+    modules: Option<Extension<InstalledModules>>,
 ) -> ApiResult<Json<Value>> {
-    let mut apps = local_apps(local.as_ref().map(|e| &e.0)).await;
+    let mut apps = module_apps(modules.as_ref().map(|e| &e.0)).await;
+    apps.append(&mut local_apps(local.as_ref().map(|e| &e.0)).await);
     let email = match admins.find_by_id(&AdminId::new(&session.admin_id)).await {
         Ok(Some(a)) => a.email.to_string(),
         _ => return Ok(Json(json!({ "apps": apps }))),
@@ -91,5 +139,46 @@ pub(super) async fn account_apps(
                 "The common account did not answer.",
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use application::{InLanguages, ModuleMenu};
+
+    use super::*;
+
+    fn module(name: &str, menu: Option<ModuleMenu>) -> InstalledModule {
+        InstalledModule {
+            name: name.into(),
+            version: "1.0.0".into(),
+            drain_path: None,
+            route_path: menu.as_ref().map(|_| format!("/{name}")),
+            menu,
+        }
+    }
+
+    #[test]
+    fn only_modules_with_a_menu_entry_are_offered_in_the_language() {
+        let guide = ModuleMenu {
+            label: InLanguages {
+                en: "User guide".into(),
+                es: "Guía de usuario".into(),
+            },
+            path: InLanguages {
+                en: "/docs/".into(),
+                es: "/docs/es/".into(),
+            },
+        };
+        let modules = vec![module("quality-data", None), module("docs", Some(guide))];
+        assert_eq!(
+            module_entries(modules.clone(), "es"),
+            [
+                json!({ "kind": "module", "id": "docs", "name": "Guía de usuario",
+                     "detail": "", "url": "/docs/es/" })
+            ]
+        );
+        assert_eq!(module_entries(modules, "en")[0]["url"], "/docs/");
+        assert!(module_entries(vec![module("quality-data", None)], "en").is_empty());
     }
 }

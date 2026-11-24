@@ -248,6 +248,9 @@ async fn the_agent_tells_the_installed_modules_whole() {
     let modules = json!({ "modules": [
         { "name": "orchestrator", "version": "2.0.1", "drain_path": "/internal/drain" },
         { "name": "quality-data", "version": "1.4.0", "drain_path": null },
+        { "name": "docs", "version": "0.2.0", "drain_path": null, "route_path": "/docs",
+          "menu": { "label": { "en": "User guide", "es": "Guía de usuario" },
+                    "path": { "en": "/docs/", "es": "/docs/es/" } } },
     ] });
     for _ in 0..2 {
         let (status, _) = call(
@@ -270,8 +273,23 @@ async fn the_agent_tells_the_installed_modules_whole() {
         [
             ("orchestrator", "2.0.1", Some("/internal/drain")),
             ("quality-data", "1.4.0", None),
+            ("docs", "0.2.0", None),
         ]
     );
+    let docs = &stored[2];
+    assert_eq!(docs.route_path.as_deref(), Some("/docs"));
+    assert_eq!(
+        docs.menu.as_ref().map(|m| m.path.get("es")),
+        Some("/docs/es/")
+    );
+
+    // A menu whose page leaves its route is refused, and the list kept.
+    let outside = json!({ "modules": [{ "name": "docs", "version": "0.2.0", "route_path": "/docs",
+        "menu": { "label": { "en": "Guide", "es": "Guía" },
+                  "path": { "en": "/api/", "es": "/docs/" } } }] });
+    let (status, _) = call(&w, "PUT", "/updater/v1/modules", agent, Some(outside)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(w.updates.installed_modules().await.unwrap(), stored, "kept");
 
     let bad = json!({ "modules": [{ "name": "orchestrator", "version": "1.0.0", "drain_path": "/../api" }] });
     let (status, body) = call(&w, "PUT", "/updater/v1/modules", agent, Some(bad)).await;

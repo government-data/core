@@ -169,6 +169,10 @@ fn app(
             certificates.clone(),
         ));
     let app = app.layer(axum::Extension(resolver));
+    // The installed modules' menu entries, for the avatar's apps menu.
+    let app = app.layer(axum::Extension(api::settings::InstalledModules(
+        updates.clone(),
+    )));
     Ok((
         layered(app, tenancy, oidc, captcha, machines),
         updates,

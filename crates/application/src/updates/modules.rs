@@ -2,9 +2,12 @@
 //! the whole list each time (`PUT /updater/v1/modules`), each with its
 //! version and, when its manifest declares one, its drain path. The drain
 //! asks every module that has a drain path ([`UpdatesService::installed_modules`]).
+//! A module with a route also tells its path and, with a menu entry, the
+//! entry the apps menu shows ([`super::module_menu`]).
 
 use serde::{Deserialize, Serialize};
 
+use super::module_menu::{self, ModuleMenu, Refusal};
 use super::{UpdatesError, UpdatesService};
 
 /// The longest name, version or drain path taken.
@@ -19,6 +22,13 @@ pub struct InstalledModule {
     /// Where it answers its drain (`/…`), `None` when it declares none.
     #[serde(default)]
     pub drain_path: Option<String>,
+    /// The path its route serves on the web entry point (`/docs`), `None`
+    /// without a route.
+    #[serde(default)]
+    pub route_path: Option<String>,
+    /// Its entry in the apps menu, `None` without one.
+    #[serde(default)]
+    pub menu: Option<ModuleMenu>,
 }
 
 impl UpdatesService {
@@ -57,6 +67,24 @@ fn check(modules: &[InstalledModule]) -> Result<(), String> {
                     "app.updates.modules.badDrainPath",
                     name = m.name
                 ));
+            }
+        }
+        match module_menu::check(m.route_path.as_deref(), m.menu.as_ref()) {
+            Ok(()) => {}
+            Err(Refusal::BadRoutePath) => {
+                return Err(texts::tr!(
+                    "app.updates.modules.badRoutePath",
+                    name = m.name
+                ))
+            }
+            Err(Refusal::MenuWithoutRoute) => {
+                return Err(texts::tr!(
+                    "app.updates.modules.menuWithoutRoute",
+                    name = m.name
+                ))
+            }
+            Err(Refusal::BadMenu) => {
+                return Err(texts::tr!("app.updates.modules.badMenu", name = m.name))
             }
         }
     }
@@ -100,6 +128,8 @@ mod tests {
             name: name.into(),
             version: "1.0.0".into(),
             drain_path: drain_path.map(Into::into),
+            route_path: None,
+            menu: None,
         }
     }
 

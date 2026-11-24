@@ -88,12 +88,13 @@ export function AppsMenu(props: {
                     classList={{ "profile-menu__app--current": app.current }}
                     role="menuitem"
                     // This installation's (RustFS…) open inside the app;
-                    // the account's are other sites: a full load.
+                    // a module's page (the user guide…) in this tab, and
+                    // the account's are other sites: both a full load.
                     href={app.kind === "app" && app.id ? `/apps/${app.id}` : app.url}
                     rel={app.kind === "app" ? undefined : "external"}
                     aria-current={app.current ? "page" : undefined}
                     onClick={(e) => {
-                      if (app.kind === "app") return props.onClose();
+                      if (app.kind === "app" || app.kind === "module") return props.onClose();
                       if (!app.current) props.onLeave(e, t("web:shell.opening", { app: app.name }));
                     }}
                   >

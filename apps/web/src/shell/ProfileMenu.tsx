@@ -1,6 +1,6 @@
 import { createResource, createSignal, onCleanup, Show, type Component } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
-import { lang, t } from "@knime-orchestador/i18n";
+import { t } from "@knime-orchestador/i18n";
 import { useNavigate } from "@solidjs/router";
 import { SettingsNavIcon } from "@knime-orchestador/feature-settings";
 import { Leaving } from "@knime-orchestador/feature-kit/ui";
@@ -71,27 +71,13 @@ function Avatar(p: { class: string }) {
   );
 }
 
-/** The foot of the profile menu: the docs, the theme, the language and signing out. */
+/**
+ * The foot of the profile menu: the theme, the language and signing out.
+ * The user guide is a module: its entry comes with the applications.
+ */
 function MenuFoot(props: { signOut: () => void }) {
   return (
     <>
-      <div class="profile-menu__divider" />
-      <nav class="profile-menu">
-        {/* Same tab: the docs carry this avatar menu, with the way back.
-            rel="external": a full load, not a route of this app. */}
-        <a
-          class="profile-menu__item"
-          role="menuitem"
-          href={lang() === "en" ? "/docs/" : `/docs/${lang()}/`}
-          rel="external"
-        >
-          <span class="profile-menu__icon">
-            <MenuIcon name="docs" />
-          </span>
-          <span>{t("web:shell.docs")}</span>
-        </a>
-      </nav>
-
       <div class="profile-menu__divider" />
       <div class="profile-menu__lang">
         <span class="profile-menu__lang-label">{t("web:shell.theme")}</span>
@@ -166,7 +152,7 @@ function ProfileCard(props: { onNavigate: (path: string) => void }) {
 
 /**
  * The signed-in person at the top right and, opened, their menu: their
- * account, Settings, the other applications, the docs, theme, language and
+ * account, Settings, the other applications and modules, theme, language and
  * signing out.
  */
 export function ProfileMenu() {

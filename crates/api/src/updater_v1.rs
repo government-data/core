@@ -162,7 +162,8 @@ struct ModulesBody {
     modules: Vec<InstalledModule>,
 }
 
-/// `PUT /updater/v1/modules`: `{"modules": [{name, version, drain_path}]}`,
+/// `PUT /updater/v1/modules`: `{"modules": [{name, version, drain_path,
+/// route_path?, menu?}]}` (`menu`: `{label: {en, es}, path: {en, es}}`),
 /// every installed module; it replaces the list before it.
 async fn modules(State(updates): State<UpdatesService>, Json(body): Json<ModulesBody>) -> Response {
     match updates.set_modules(body.modules).await {

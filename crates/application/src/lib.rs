@@ -40,9 +40,9 @@ pub use settings::{
     SettingsTargets, SmtpSecurity, StoredSection,
 };
 pub use updates::{
-    DrainStatus, HistoryEntry, InstalledModule, Maintenance, MaintenanceError, ModuleWork,
-    ModulesWork, Requester, UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError, UpdatesService,
-    UpdatesStore, UpdatesView,
+    DrainStatus, HistoryEntry, InLanguages, InstalledModule, Maintenance, MaintenanceError,
+    ModuleMenu, ModuleWork, ModulesWork, Requester, UpdatePolicy, UpdateRequest, UpdaterRow,
+    UpdatesError, UpdatesService, UpdatesStore, UpdatesView,
 };
 
 /// Application service exposing the health use case.
