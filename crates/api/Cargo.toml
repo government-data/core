@@ -29,7 +29,6 @@ platform.workspace = true
 sigv4.workspace = true
 # Actions, policies and the Actor (ADR 0016).
 iam.workspace = true
-tenancy.workspace = true
 texts.workspace = true
 serde_json.workspace = true
 axum.workspace = true
@@ -56,7 +55,7 @@ chrono.workspace = true
 # back the `*_it.rs` end-to-end suites with a real, ephemeral Postgres instead
 # of fakes.
 tower.workspace = true
-# The lines a request writes (tenancy.rs's tests).
+# The lines a request writes.
 logging.workspace = true
 infrastructure.workspace = true
 testkit.workspace = true

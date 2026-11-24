@@ -51,7 +51,6 @@ platform = { path = "crates/platform" }
 iam = { path = "crates/iam" }
 # The current task's tenant (online edition): api, application and
 # infrastructure share it without depending on one another.
-tenancy = { path = "crates/tenancy" }
 texts = { path = "crates/texts" }
 # The rule language (decisions 0019, 0033), one stage per crate, each pure
 # and depending only on the stages before it:

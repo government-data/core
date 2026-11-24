@@ -25,7 +25,6 @@ http-kit.workspace = true
 platform.workspace = true
 # The IAM policies the repository stores.
 iam.workspace = true
-tenancy.workspace = true
 chrono.workspace = true
 ldap3.workspace = true
 lettre.workspace = true

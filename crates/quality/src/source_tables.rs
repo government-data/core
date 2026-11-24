@@ -2,8 +2,7 @@
 //! the source's driver, its catalog only (each table's columns, by name
 //! and declared type, in order), never a row, the
 //! system's schemas left out; the source keeps its last listing, which a
-//! late report of an older job never replaces. Inside the tenant's
-//! `tenancy::within`, as the sources' store.
+//! late report of an older job never replaces.
 
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Postgres, Transaction};

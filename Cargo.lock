@@ -128,7 +128,6 @@ dependencies = [
  "sha2 0.10.9",
  "sigv4",
  "sqlx",
- "tenancy",
  "testkit",
  "texts",
  "time",
@@ -2085,7 +2084,6 @@ dependencies = [
  "sha2 0.10.9",
  "sigv4",
  "sqlx",
- "tenancy",
  "testkit",
  "time",
  "tokio",
@@ -2973,7 +2971,6 @@ dependencies = [
  "serde-saphyr",
  "serde_json",
  "sqlx",
- "tenancy",
  "testkit",
  "texts",
  "tokio",
@@ -3757,7 +3754,6 @@ dependencies = [
  "quality-rules-duckdb",
  "serde_json",
  "sqlx",
- "tenancy",
  "testkit",
  "texts",
  "tokio",
@@ -4249,13 +4245,6 @@ dependencies = [
  "filetime",
  "libc",
  "xattr",
-]
-
-[[package]]
-name = "tenancy"
-version = "0.1.0"
-dependencies = [
- "tokio",
 ]
 
 [[package]]

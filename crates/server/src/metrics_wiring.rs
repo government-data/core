@@ -1,7 +1,6 @@
 //! The API's metrics file (decision 0071, points 8 and 9): the requests by
 //! route template (`http_kit::metrics`), the queue's ready jobs and the
-//! oldest's wait by kind (`quality::queue_ready`, summed over this cell's
-//! active tenants), the approved machines (`crate::machine_gauge`, decision
+//! oldest's wait by kind (`quality::queue_ready`), the approved machines (`crate::machine_gauge`, decision
 //! 0072) and Grafana's alerts of no known machine ([`unknown_alerts`]),
 //! and the process's CPU and memory, written to
 //! `/run/qd-metrics/api.prom` every 15 seconds (`logging::metrics`). No

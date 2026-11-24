@@ -24,10 +24,10 @@ use infrastructure::auth_config::AuthConfig;
 use infrastructure::{PgAuditRepository, PgConfig, SecretBox};
 
 use crate::config::{public_url_from_env, Config};
+use crate::database::Database;
 use crate::serve_services::{services, Services};
 use crate::startup::oidc_provider;
-use crate::tenants::Tenancy;
-use crate::{drain_wiring, init_tracing, machines_wiring, tenants};
+use crate::{database, drain_wiring, init_tracing, machines_wiring};
 
 type Failure = Box<dyn std::error::Error>;
 
@@ -46,8 +46,8 @@ pub(crate) async fn serve() -> Result<(), Failure> {
     let modules = crate::modules::registry();
 
     // 3. The pool and the schema.
-    let tenancy = tenants::connect(&pg_config).await?;
-    let pool = tenancy.pool.clone();
+    let db = database::connect(&pg_config).await?;
+    let pool = db.pool.clone();
 
     // Apply every module's migrations — isolated per module and ordered — on
     // PostgreSQL, refusing to start if one already applied has changed.
@@ -62,8 +62,8 @@ pub(crate) async fn serve() -> Result<(), Failure> {
     modules.init()?;
 
     // 5. The services and the routes.
-    let services = services(&tenancy, &auth).await?;
-    let (app, updates, admin_access) = app(services, tenancy, &config, &auth)?;
+    let services = services(&db, &auth).await?;
+    let (app, updates, admin_access) = app(services, db, &config, &auth)?;
 
     crate::startup::internal_routes(updates, admin_access).await?;
 
@@ -85,7 +85,7 @@ pub(crate) async fn serve() -> Result<(), Failure> {
 /// updates and the administrator's entry.
 fn app(
     services: Services,
-    tenancy: Tenancy,
+    db: Database,
     config: &Config,
     auth: &AuthConfig,
 ) -> Result<
@@ -115,14 +115,13 @@ fn app(
     // applications registered with `server oidc-client` let their users in
     // with this installation's accounts.
     let oidc_issuer = format!("{}/api", public_url_from_env().trim_end_matches('/'));
-    let provider =
-        infrastructure::oidc::provider_from_env(&tenancy.pool, admins.clone(), &oidc_issuer)?;
+    let provider = infrastructure::oidc::provider_from_env(&db.pool, admins.clone(), &oidc_issuer)?;
     let certificates = machines_wiring::client_certificates_from_env()?;
     let oidc = oidc_provider(provider.clone(), sessions.clone(), certificates.clone());
     // Who the session is, for every route that requires a capability: the
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
-    let (machines, modules) = machines_and_modules(&tenancy, provider, &secret_box)?;
+    let (machines, modules) = machines_and_modules(&db, provider, &secret_box)?;
     // What the update agent waits for: each module's own work, and each
     // installed application module's as the agent tells them (0003).
     let app_modules =
@@ -144,7 +143,7 @@ fn app(
     let module_users = crate::callers::user_routes(
         &modules,
         sessions.clone(),
-        Arc::new(PgAuditRepository::new(tenancy.pool.clone())),
+        Arc::new(PgAuditRepository::new(db.pool.clone())),
     );
     let app = modules
         .router(api::router(
@@ -174,7 +173,7 @@ fn app(
         updates.clone(),
     )));
     Ok((
-        layered(app, tenancy, oidc, captcha, machines),
+        layered(app, db, oidc, captcha, machines),
         updates,
         admin_access,
     ))
@@ -183,31 +182,31 @@ fn app(
 /// The machines (with the catalog, `DOLT_URL`) and the feature modules with
 /// the services their routes use.
 fn machines_and_modules(
-    tenancy: &Tenancy,
+    db: &Database,
     provider: Option<AuthorizationServer>,
     secret_box: &SecretBox,
 ) -> Result<(MachinesService, ModuleRegistry), Failure> {
     let dolt = crate::catalog_wiring::DoltSnapshots::from_env()?;
-    let machines = machines_wiring::service(&tenancy.pool, secret_box.clone())?;
+    let machines = machines_wiring::service(&db.pool, secret_box.clone())?;
     let machines = match &dolt {
         Some(d) => machines.with_dolt(d.clone()),
         None => machines,
     };
-    let modules = crate::modules::serving(&tenancy.pool, provider, secret_box.clone(), dolt)?;
+    let modules = crate::modules::serving(&db.pool, provider, secret_box.clone(), dolt)?;
     Ok((machines, modules))
 }
 
 /// The layers around every route, modules included.
 fn layered(
     app: Router,
-    tenancy: Tenancy,
+    db: Database,
     oidc: Option<Router>,
     captcha: api::captcha::Captcha,
     machines: MachinesService,
 ) -> Router {
     // This installation's applications, for the avatar's «Aplicaciones».
     let app = app.layer(axum::Extension(api::settings::LocalApps(Arc::new(
-        infrastructure::oidc::PgOidcClients::new(tenancy.pool.clone()),
+        infrastructure::oidc::PgOidcClients::new(db.pool.clone()),
     ))));
     let app = match oidc {
         Some(provider) => app.merge(provider),
@@ -219,7 +218,7 @@ fn layered(
     let app = app.layer(axum::middleware::from_fn(api::language::per_request));
     // Each request counted by its route's template, and its metrics file
     // (decision 0071), with the approved machines' gauge (0072).
-    let metrics = crate::metrics_wiring::start(tenancy.pool.clone(), machines);
+    let metrics = crate::metrics_wiring::start(db.pool.clone(), machines);
     let app = app.layer(axum::middleware::from_fn_with_state(
         metrics,
         http_kit::metrics::track,

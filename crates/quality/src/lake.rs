@@ -85,9 +85,6 @@ mod tests {
 
     #[test]
     fn the_warehouse_keeps_the_main_tenants_name() {
-        assert_eq!(
-            WAREHOUSE,
-            format!("qd-tenant-{}", tenancy::MAIN_ID.replace('-', ""))
-        );
+        assert_eq!(WAREHOUSE, "qd-tenant-00000000000000000000000000000001");
     }
 }

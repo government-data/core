@@ -33,7 +33,7 @@ fn generate() -> String {
     format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple())
 }
 
-/// The current tenant's key (inside its `tenancy::within`), created the
+/// The installation's key, created the
 /// first time; two evaluations asking at once get the same one.
 pub async fn of_tenant(pool: &PgPool, sealer: &dyn Sealer) -> Result<EntityKey, String> {
     let sealed = sealer.seal(&generate())?;
