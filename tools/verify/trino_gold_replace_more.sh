@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The second half of tools/verify/trino_gold_replace.sh (decision 0090,
 # T2), sourced by it: row filters through the views, a pinned snapshot,
-# two datasets writing one table at once, CREATE BRANCH and DROP TABLE.
+# CREATE BRANCH and DROP TABLE.
 
 echo "== row filters through SECURITY INVOKER views over the READ_ONLY catalog"
 for s in 1 2 3; do step savings s1 7 "$s"; done
@@ -30,20 +30,6 @@ expect "pinned read unchanged after a later insert" "$before" \
 expect "unpinned read sees the insert" "$((before + 3))" "$(tq job_rules_loans "SELECT count(*) FROM $G.rule_results")"
 expect "pinned read through gold (person_loans)" "$before" \
   "$(tq person_loans "SELECT count(*) FROM gold.quality_gold.rule_results FOR VERSION AS OF $snap")"
-
-echo "== two datasets inserting into one table at once"
-for i in 1 2 3 4; do
-  for d in loans savings; do
-    tq_http "job_rules_$d" "INSERT INTO $G.rule_results VALUES ('$d', DATE '2026-11-02', 'c$i', 'r1', $i)" \
-      >"$D/conc-$d-$i" 2>&1 &
-  done
-done
-wait
-bad=$(grep -l "failed" "$D"/conc-* 2>/dev/null | wc -l)
-expect "eight concurrent inserts (4 per dataset) committed" "0 failed" "$bad failed"
-grep -h "failed" "$D"/conc-* 2>/dev/null | head -2 | while read -r l; do info "  $l"; done
-expect "rows of the concurrent inserts" "8" \
-  "$(tq qd-quality "SELECT count(*) FROM $G.rule_results WHERE cut = DATE '2026-11-02'")"
 
 echo "== CREATE BRANCH and DROP TABLE"
 tq_refused "CREATE BRANCH as job_rules_loans" job_rules_loans "CREATE BRANCH audit IN TABLE $G.rule_results"

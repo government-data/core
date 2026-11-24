@@ -1,8 +1,10 @@
 # shellcheck shell=bash
 # The concurrency part of tools/verify/trino_gold_replace.sh (decision
 # 0090, T2), sourced by it: eight inserts from two datasets into one gold
-# table at once, how many commits conflict, and how many data files the
-# failed commits leave in the lake (orphans: written but named by no
+# table, serialized by a per-table lock as the operator does (point 4: all
+# must commit), then without it and with more commit retries (findings,
+# reported, not checked): how many commits conflict and how many data files
+# the failed commits leave in the lake (orphans: written but named by no
 # snapshot). Only inserts touch these tables, so every file a snapshot
 # names is in "$files".
 
@@ -42,9 +44,17 @@ burst() {
   done
   wait
   n=$(grep -l "failed" "$D"/burst-* 2>/dev/null | wc -l)
-  grep -h "failed" "$D"/burst-* 2>/dev/null | head -1 | while read -r l; do info "    $l"; done
+  grep -h "failed" "$D"/burst-* 2>/dev/null | head -1 | while read -r l; do info "    $l" >&2; done
   echo "$n failed, $(tq qd-quality "SELECT count(*) FROM $G.$1") rows, $(orphans "$1") orphans"
 }
+
+echo "== one writer per gold table (the ruled lock): eight inserts, serialized per table"
+new_table serialized
+expect "serialized inserts all committed, no orphan files" "0 failed, 8 rows, 0 orphans" "$(burst serialized serial)"
+
+echo "== finding, not pass/fail: unserialized inserts with the default commit retries"
+new_table unserialized
+info "  eight concurrent inserts without the lock: $(burst unserialized parallel)"
 
 echo "== more commit retries: max_commit_retry = 20 (commit.retry.num-retries), unserialized"
 for r in 1 2 3; do
