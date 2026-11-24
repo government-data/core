@@ -18,6 +18,7 @@ pub mod clock;
 pub mod db;
 pub mod directory_accounts;
 pub mod health;
+pub mod lake_admin_client;
 pub mod lake_catalog;
 pub mod lake_http;
 pub mod lake_objects;
