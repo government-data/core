@@ -65,7 +65,10 @@ impl AuthorizationServer {
         }
         let signer = self.signers.for_client(&client)?;
         let policies = policies.map(|p| json!(p));
-        let id_token = self.id_token_claims(&client, &admin, &record, policies.clone());
+        let mut id_token = self.id_token_claims(&client, &admin, &record, policies.clone());
+        if let Some((name, values)) = self.role_claim(&client, &admin).await {
+            id_token.insert(name, json!(values));
+        }
         let access = self.person_access_claims(&client, &admin, &record, policies);
         Ok(TokenResponse {
             access_token: signer.sign("at+jwt", &Value::Object(access).to_string()),

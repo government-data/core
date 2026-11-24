@@ -25,6 +25,7 @@ impl AuthorizationServer {
             .find(&id)
             .await
             .map_err(|e| TokenError::Internal(e.to_string()))?
+            .filter(|c| !c.disabled())
             .ok_or(TokenError::InvalidClient)
     }
 
@@ -48,13 +49,27 @@ impl AuthorizationServer {
     ) -> Result<(), TokenError> {
         match (&client.auth, req.client_secret.as_deref()) {
             (ClientAuth::Public, None) => Ok(()),
-            (ClientAuth::Secret { hash }, Some(secret))
-                if &self.code_tokens.hash(secret) == hash =>
-            {
-                Ok(())
+            (ClientAuth::Secret { hash }, Some(secret)) => {
+                let given = self.code_tokens.hash(secret);
+                if &given == hash || self.previous_secret_matches(client, &given) {
+                    Ok(())
+                } else {
+                    Err(TokenError::InvalidClient)
+                }
             }
             _ => Err(TokenError::InvalidClient),
         }
+    }
+
+    /// Whether `given` (a hash) is the secret a module's client had before
+    /// a rotation, still within its time (quality-sdk decision 0009).
+    fn previous_secret_matches(&self, client: &OidcClient, given: &str) -> bool {
+        client
+            .settings
+            .module
+            .as_ref()
+            .and_then(|m| m.previous_secret.as_ref())
+            .is_some_and(|p| p.hash == given && self.clock.now() < p.until)
     }
 
     /// The machine whose certificate came with `req`, if it authenticates a

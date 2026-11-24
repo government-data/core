@@ -296,3 +296,32 @@ impl ActorSource for PlatformActors {
 pub fn resolver(platform: PlatformService) -> ActorResolver {
     ActorResolver(Arc::new(PlatformActors(platform)))
 }
+
+/// Which actions a person holds on some resource, from their Actor, for
+/// the OIDC provider's role claims (quality-sdk decision 0009).
+struct PlatformActions(PlatformService);
+
+#[async_trait::async_trait]
+impl auth_gateway::ActionHolder for PlatformActions {
+    async fn held(
+        &self,
+        admin: &auth_gateway::AdminAccount,
+        actions: &[String],
+    ) -> Result<Vec<String>, domain::RepositoryError> {
+        let actor = self
+            .0
+            .actor(admin.id.as_str(), &admin.role, None)
+            .await
+            .map_err(|e| domain::RepositoryError::Backend(format!("{e:?}")))?;
+        Ok(actions
+            .iter()
+            .filter(|a| actor.can_some(a))
+            .cloned()
+            .collect())
+    }
+}
+
+/// The provider's source of the actions a person holds.
+pub fn action_holder(platform: PlatformService) -> Arc<dyn auth_gateway::ActionHolder> {
+    Arc::new(PlatformActions(platform))
+}

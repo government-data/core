@@ -39,6 +39,7 @@ pub mod oidc;
 mod oidc_cli;
 mod oidc_clients;
 pub mod oidc_es256;
+mod oidc_module_clients;
 pub mod password;
 pub mod password_reset_repo;
 pub mod permission_notices;

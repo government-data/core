@@ -29,9 +29,9 @@ pub use self::domain::{
     SignedCertificate, SigningRefusal, JOIN_TOKEN_LEN, JOIN_TOKEN_PREFIX,
 };
 pub use self::domain::{
-    AccountPolicies, AuthorizationCode, AuthorizationCodeStore, ClientAuth, ClientId,
-    ClientIdError, ClientSettings, ListedApp, OidcClient, OidcClientRegistry, SigningAlg,
-    TokenSigner,
+    AccountPolicies, ActionHolder, AuthorizationCode, AuthorizationCodeStore, ClientAuth, ClientId,
+    ClientIdError, ClientSettings, ListedApp, ModuleClient, OidcClient, OidcClientRegistry,
+    PreviousSecret, RoleClaim, RoleValue, SigningAlg, TokenSigner,
 };
 pub use self::domain::{
     AccountStatus, AccountSummary, AdminAccount, AdminRepository, AuthorizeParams, CsrfToken,

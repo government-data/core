@@ -18,7 +18,7 @@ use serde_json::{json, Map, Value};
 
 use crate::app::session::AuthenticatedSession;
 use crate::domain::{
-    AccountPolicies, AdminAccount, AdminId, AdminRepository, AuthorizationCode,
+    AccountPolicies, ActionHolder, AdminAccount, AdminRepository, AuthorizationCode,
     AuthorizationCodeStore, ClientId, Clock, MachineCertificate, MachineRegistry,
     OAuthSecretGenerator, OidcClient, OidcClientRegistry, ResetTokenGenerator, TokenSigner,
 };
@@ -27,6 +27,7 @@ mod client_auth;
 mod code;
 mod machine;
 mod signers;
+mod userinfo;
 
 use signers::Signers;
 
@@ -148,6 +149,9 @@ pub struct AuthorizationServer {
     /// The installation's machines, whose certificates authenticate the
     /// machine roles' clients; without them, none of those does.
     machines: Option<Arc<dyn MachineRegistry>>,
+    /// Which actions a person holds, for a module client's role claim;
+    /// without it, the claim is sent empty.
+    actions: Option<Arc<dyn ActionHolder>>,
 }
 
 impl std::fmt::Debug for AuthorizationServer {
@@ -183,7 +187,15 @@ impl AuthorizationServer {
             issuer: issuer.into().trim_end_matches('/').to_string(),
             policies: None,
             machines: None,
+            actions: None,
         }
+    }
+
+    /// Compute the role claims of module clients (quality-sdk decision
+    /// 0009) from the actions each person holds.
+    pub fn with_actions(mut self, actions: Arc<dyn ActionHolder>) -> Self {
+        self.actions = Some(actions);
+        self
     }
 
     /// Authenticate the machine roles' clients with the certificates of
@@ -332,8 +344,8 @@ impl AuthorizationServer {
             return Err(AuthorizeOutcome::Invalid("unknown client"));
         };
         let client = match self.clients.find(&client_id).await {
-            Ok(Some(c)) => c,
-            Ok(None) => return Err(AuthorizeOutcome::Invalid("unknown client")),
+            Ok(Some(c)) if !c.disabled() => c,
+            Ok(_) => return Err(AuthorizeOutcome::Invalid("unknown client")),
             Err(e) => {
                 tracing::error!("oidc: client lookup failed: {e}");
                 return Err(AuthorizeOutcome::Invalid("temporarily unavailable"));
@@ -378,47 +390,6 @@ impl AuthorizationServer {
             Some("client_credentials") => self.client_credentials(req).await,
             _ => Err(TokenError::UnsupportedGrantType),
         }
-    }
-
-    /// `GET /userinfo`: the claims of the person an access token speaks for,
-    /// or `None` if the token is not a live one of ours.
-    pub async fn userinfo(&self, access_token: &str) -> Option<Value> {
-        let claims: Value =
-            serde_json::from_str(&self.signers.verify("at+jwt", access_token)?).ok()?;
-        if claims.get("iss")?.as_str()? != self.issuer {
-            return None;
-        }
-        if claims.get("exp")?.as_u64()? <= epoch(self.clock.now()) {
-            return None;
-        }
-        let admin = self
-            .admins
-            .find_by_id(&AdminId::new(claims.get("sub")?.as_str()?))
-            .await
-            .ok()??;
-        let scopes = granted_scopes(claims.get("scope")?.as_str());
-        let mut out = Map::new();
-        out.insert("sub".into(), json!(admin.id.as_str()));
-        identity_claims(&mut out, &admin, &scopes);
-        if let Some(policies) = self.policy_names(&admin).await {
-            out.insert("policy".into(), json!(policies));
-        }
-        Some(Value::Object(out))
-    }
-
-    /// The account's IAM policy names (ADR 0016), for the `policy` claim, or
-    /// `None` without a source. If they cannot be read, an empty list: the
-    /// application then grants nothing, rather than signing in without its
-    /// permissions known.
-    async fn policy_names(&self, admin: &AdminAccount) -> Option<Vec<String>> {
-        let source = self.policies.as_ref()?;
-        Some(match source.policies(admin).await {
-            Ok(names) => names,
-            Err(e) => {
-                tracing::warn!("policy claim: {e}");
-                Vec::new()
-            }
-        })
     }
 
     fn error_redirect(&self, redirect_uri: &str, code: &str, state: Option<&str>) -> String {

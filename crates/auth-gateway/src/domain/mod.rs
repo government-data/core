@@ -17,6 +17,7 @@ pub mod machine_certificate;
 pub mod machine_install;
 pub mod machine_series;
 pub mod machine_sessions;
+pub mod module_client;
 pub mod oauth;
 pub mod password_reset;
 pub mod provider;
@@ -56,6 +57,7 @@ pub use machine_series::{
     Line, MachineCharts, MachineSeries, SeriesRange, SeriesUnavailable, SeriesWindow,
 };
 pub use machine_sessions::MachineSessions;
+pub use module_client::{ActionHolder, ModuleClient, PreviousSecret, RoleClaim, RoleValue};
 pub use oauth::{
     AuthorizeParams, ExchangeRequest, LinkedIdentity, OAuthError, OAuthIdentity,
     OAuthIdentityRepository, OAuthProvider, OAuthSecretGenerator, PendingAuthStore,

@@ -9,7 +9,7 @@
 
 use std::time::SystemTime;
 
-use crate::domain::{AdminAccount, AdminId, MachineRole, RepositoryError};
+use crate::domain::{AdminAccount, AdminId, MachineRole, ModuleClient, RepositoryError};
 
 /// An application's `client_id`: lowercase letters, digits and `-`, so it is
 /// safe in URLs and logs.
@@ -117,6 +117,12 @@ impl OidcClient {
             )
     }
 
+    /// Whether a module disabled it (quality-sdk decision 0009): no code and
+    /// no token.
+    pub fn disabled(&self) -> bool {
+        self.settings.module.as_ref().is_some_and(|m| m.disabled)
+    }
+
     /// The role of the machines whose certificate authenticates it, if it
     /// is such a client.
     pub fn machine_role(&self) -> Option<MachineRole> {
@@ -173,6 +179,9 @@ pub struct ClientSettings {
     /// The IAM service account it acts as with `client_credentials`: the
     /// token's subject, and its policies go in the `policy` claim.
     pub service_account: Option<String>,
+    /// Of a client a module registered, the module's side; `None` for one
+    /// registered by hand.
+    pub module: Option<ModuleClient>,
 }
 
 impl Default for ClientSettings {
@@ -184,6 +193,7 @@ impl Default for ClientSettings {
             client_credentials: false,
             audiences: Vec::new(),
             service_account: None,
+            module: None,
         }
     }
 }
@@ -246,6 +256,25 @@ pub trait OidcClientRegistry: Send + Sync {
     /// Register it or, if the id exists, replace its name, redirect URIs and
     /// how it authenticates (an installation management registers for itself).
     async fn upsert(&self, client: &OidcClient) -> Result<(), RepositoryError>;
+
+    /// Register or replace a module's client whole (quality-sdk decision
+    /// 0009): its settings with [`ClientSettings::module`] set. `Ok(false)`
+    /// when the id is a client registered by hand or another module's.
+    async fn save_module_client(&self, _client: &OidcClient) -> Result<bool, RepositoryError> {
+        Err(RepositoryError::Backend(
+            "module clients are not stored here".into(),
+        ))
+    }
+
+    /// The clients `module` registered.
+    async fn module_clients(&self, _module: &str) -> Result<Vec<OidcClient>, RepositoryError> {
+        Ok(Vec::new())
+    }
+
+    /// Delete the clients `module` registered (its purge); how many.
+    async fn delete_module_clients(&self, _module: &str) -> Result<u64, RepositoryError> {
+        Ok(0)
+    }
 
     /// The applications registered with a start address, to list them in the
     /// avatar's «Aplicaciones».
