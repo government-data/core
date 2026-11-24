@@ -63,7 +63,6 @@ impl LoginService {
         ip: &str,
         ip_state: &crate::LockoutState,
         now: std::time::SystemTime,
-        record: bool,
     ) -> Result<AuthenticatedAdmin, LoginError> {
         let internal = |e: &dyn std::fmt::Display| LoginError::Internal(e.to_string());
 
@@ -79,9 +78,7 @@ impl LoginService {
         };
         if let Some(account) = &known {
             if self.policy.is_locked(&account.lockout, now) {
-                if record {
-                    self.record_ip_failure(ip, ip_state, now).await?;
-                }
+                self.record_ip_failure(ip, ip_state, now).await?;
                 return Err(self.too_many_attempts(&account.lockout, now));
             }
         }
@@ -92,12 +89,10 @@ impl LoginService {
             .await
             .map_err(|e| LoginError::DirectoryUnavailable(e.0))?;
         let Some(user) = user else {
-            if record {
-                if let Some(account) = &known {
-                    self.register_account_failure(account, now).await?;
-                }
-                self.record_ip_failure(ip, ip_state, now).await?;
+            if let Some(account) = &known {
+                self.register_account_failure(account, now).await?;
             }
+            self.record_ip_failure(ip, ip_state, now).await?;
             return Err(LoginError::InvalidCredentials);
         };
 
@@ -136,9 +131,7 @@ impl LoginService {
             Err(e) => return Err(internal(&e)),
         };
         if self.policy.is_locked(&account.lockout, now) {
-            if record {
-                self.record_ip_failure(ip, ip_state, now).await?;
-            }
+            self.record_ip_failure(ip, ip_state, now).await?;
             return Err(self.too_many_attempts(&account.lockout, now));
         }
         directory

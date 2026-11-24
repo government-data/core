@@ -162,7 +162,7 @@ fn platform(user: &str, password: &str) -> MailSettings {
     MailSettings {
         enabled: true,
         transport: MailTransport::Smtp,
-        from_address: "avisos@orquestador.app".into(),
+        from_address: "notices@example.test".into(),
         smtp_host: "email-smtp.us-east-1.amazonaws.com".into(),
         smtp_port: 587,
         smtp_username: user.into(),
@@ -182,7 +182,7 @@ async fn the_platform_mail_replaces_the_own_stays_up_to_date_and_never_leaks() {
             MailSettings {
                 enabled: true,
                 transport: MailTransport::Smtp,
-                from_address: "avisos@coop-b.co".into(),
+                from_address: "notices@example.test".into(),
                 smtp_host: "smtp.coop-b.co".into(),
                 smtp_port: 587,
                 smtp_password: "its-own".into(),
@@ -241,7 +241,7 @@ async fn the_platform_mail_replaces_the_own_stays_up_to_date_and_never_leaks() {
         let own = MailSettings {
             enabled: true,
             transport: MailTransport::Smtp,
-            from_address: "avisos@coop-b.co".into(),
+            from_address: "notices@example.test".into(),
             smtp_host: "smtp.coop-b.co".into(),
             smtp_port: 587,
             smtp_username: "AKIA2".into(),

@@ -172,46 +172,6 @@ impl LoginService {
     ///    always and the account counter when the account exists; a success
     ///    clears both.
     pub async fn login(&self, request: LoginRequest) -> Result<AuthenticatedAdmin, LoginError> {
-        self.attempt(request, true).await
-    }
-
-    /// Like [`Self::login`], but a failure is not recorded: the common entrance
-    /// (`entrar.<domain>`) tries the password in every company where the email
-    /// is, and one company's password need not be another's. If it works in
-    /// none, it records the failure in all of them with
-    /// [`Self::record_failure`]. A success clears the counters as always.
-    pub async fn check(&self, request: LoginRequest) -> Result<AuthenticatedAdmin, LoginError> {
-        self.attempt(request, false).await
-    }
-
-    /// Record a failed attempt, as [`Self::login`] would: on the IP and, if it
-    /// exists, on the account.
-    pub async fn record_failure(&self, request: &LoginRequest) -> Result<(), LoginError> {
-        let now = self.clock.now();
-        let ip = request.client_ip.as_str();
-        let ip_state = self
-            .ip_lockouts
-            .get(ip)
-            .await
-            .map_err(|e| LoginError::Internal(e.to_string()))?;
-        if let Ok(email) = Email::parse(&request.email) {
-            if let Some(account) = self
-                .repo
-                .find_by_email(&email)
-                .await
-                .map_err(|e| LoginError::Internal(e.to_string()))?
-            {
-                self.register_account_failure(&account, now).await?;
-            }
-        }
-        self.record_ip_failure(ip, &ip_state, now).await
-    }
-
-    async fn attempt(
-        &self,
-        request: LoginRequest,
-        record: bool,
-    ) -> Result<AuthenticatedAdmin, LoginError> {
         let now = self.clock.now();
         let ip = request.client_ip.as_str();
 
@@ -243,7 +203,7 @@ impl LoginService {
         let local = account.filter(|a| !a.password_hash.is_directory_managed());
         if let (Some(directory), None) = (self.directory.get(), &local) {
             return self
-                .directory_login(&directory, &request, ip, &ip_state, now, record)
+                .directory_login(&directory, &request, ip, &ip_state, now)
                 .await;
         }
         // An account still waiting for its activation has no password yet:
@@ -267,9 +227,7 @@ impl LoginService {
             Some(account) => {
                 // A locked account is rejected even with the right password.
                 if self.policy.is_locked(&account.lockout, now) {
-                    if record {
-                        self.record_ip_failure(ip, &ip_state, now).await?;
-                    }
+                    self.record_ip_failure(ip, &ip_state, now).await?;
                     return Err(self.too_many_attempts(&account.lockout, now));
                 }
                 if verified {
@@ -282,18 +240,14 @@ impl LoginService {
                     })
                 } else {
                     // Wrong password: bump the account and IP counters.
-                    if record {
-                        self.register_account_failure(&account, now).await?;
-                        self.record_ip_failure(ip, &ip_state, now).await?;
-                    }
+                    self.register_account_failure(&account, now).await?;
+                    self.record_ip_failure(ip, &ip_state, now).await?;
                     Err(LoginError::InvalidCredentials)
                 }
             }
             // No account: only the IP counter moves. Same error, same work.
             None => {
-                if record {
-                    self.record_ip_failure(ip, &ip_state, now).await?;
-                }
+                self.record_ip_failure(ip, &ip_state, now).await?;
                 Err(LoginError::InvalidCredentials)
             }
         }

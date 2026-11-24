@@ -203,7 +203,7 @@ async fn get_all(State(settings): State<SettingsService>) -> Json<Value> {
         // How long recovery links last when the mail settings set none.
         "reset_link_default_minutes": settings.reset_link_default_minutes(),
         "encryption_key": settings.key_source(),
-        // The platform mail's sender (online, the management one); `null` if
+        // The platform mail's sender (the management panel's); `null` if
         // there is none: then configuring one's own is mandatory.
         "platform_mail_from": settings.platform_mail_from(),
         // The shared account it signs in with (`null` without one): then OAuth2

@@ -248,7 +248,7 @@ impl api::captcha::TokenVerifier for TurnstileVerifier {
 /// The captcha (Turnstile), with its keys from the environment
 /// (`TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` or `_FILE`) when they are
 /// there; `true` alongside when they were. Without them, management may send
-/// the platform's later (online and the instances we manage).
+/// the platform's later (the instances we manage).
 pub(crate) fn captcha_from_env() -> Result<(api::captcha::Captcha, bool), String> {
     let captcha = api::captcha::Captcha::new(Arc::new(TurnstileVerifier(
         infrastructure::turnstile::Turnstile::new()?,

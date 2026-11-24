@@ -48,7 +48,7 @@ export interface MailSettings {
   reset_link_minutes: number;
   /** The language of the email notices (`es` / `en`); empty: Spanish. */
   notice_language?: string;
-  /** Set by the platform (online): the server is not shown or changed here. */
+  /** Set by the platform (management panel): the server is not shown or changed here. */
   platform?: boolean;
 }
 
@@ -90,7 +90,7 @@ export interface AllSettings {
   /** Where the key that encrypts the secrets comes from. */
   encryption_key: "environment" | "file" | "generated";
   /** The platform's sender for whoever does not configure their own mail
-   * (online); `null` if there is none. */
+   * (the management panel's); `null` if there is none. */
   platform_mail_from?: string | null;
   /** The common account the instance signs in with; `null` if there is none.
    * With it OAuth2 is not configured here: gestión handles the access. */

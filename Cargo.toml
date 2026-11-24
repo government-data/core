@@ -49,8 +49,6 @@ contracts = { path = "crates/contracts" }
 platform = { path = "crates/platform" }
 # Who can do what: actions, policies and the Actor (ADR 0016).
 iam = { path = "crates/iam" }
-# The current task's tenant (online edition): api, application and
-# infrastructure share it without depending on one another.
 texts = { path = "crates/texts" }
 # The rule language (decisions 0019, 0033), one stage per crate, each pure
 # and depending only on the stages before it:
