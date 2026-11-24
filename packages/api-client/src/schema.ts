@@ -2649,8 +2649,8 @@ export interface components {
              */
             retention_days: number;
             /**
-             * @description With `ready`: the main lake, the replica's node and the proxy the
-             *     main lake reaches it through.
+             * @description With `ready`: the main lake and the replica's node; `proxy` is no
+             *     longer said (the lake's adapter works it out) and stays null.
              */
             source?: string | null;
             warehouses: components["schemas"]["WarehouseReplicationOut"][];

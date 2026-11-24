@@ -788,6 +788,7 @@ mod dolt;
 mod install;
 mod install_files;
 mod lake;
+mod lake_adapters;
 mod lake_admin;
 mod lake_keys;
 mod lake_pools;

@@ -9,12 +9,28 @@
 //! `GET` of a table bucket says nothing of the bucket. Versioning is the
 //! replication's step, not this one. No key or signature is logged.
 
-use async_trait::async_trait;
-use auth_gateway::{Lake, LakeWarehouses, ReplicationStep, WarehouseOutcome};
+use auth_gateway::{Lake, ReplicationStep};
 use domain::RepositoryError;
 
 use crate::rustfs_admin::{code, RustfsLakeAdmin};
 use crate::rustfs_replication::{call, Answer};
+
+/// What making one tenant's warehouse on the main lake came to. Holds no
+/// key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WarehouseOutcome {
+    /// It was not there and was made, with its table bucket.
+    Made,
+    /// It was there; its table bucket was asked for again.
+    Present,
+    /// The main lake's admin keys are not kept: nothing was asked.
+    NoKeys,
+    /// A step (the bucket or its table bucket) was refused or not reached.
+    Failed {
+        step: ReplicationStep,
+        detail: String,
+    },
+}
 
 /// A step's answer: 200 passes; anything else fails it, in a few words.
 fn passed(step: ReplicationStep, answer: Answer) -> Result<(), WarehouseOutcome> {
@@ -62,9 +78,11 @@ impl RustfsLakeAdmin {
     }
 }
 
-#[async_trait]
-impl LakeWarehouses for RustfsLakeAdmin {
-    async fn ensure(
+impl RustfsLakeAdmin {
+    /// Makes the warehouse on the main lake at `source` when it is missing,
+    /// the bucket and its Iceberg table bucket; a second run makes nothing
+    /// and asks for the table bucket again.
+    pub async fn ensure(
         &self,
         source: &str,
         warehouse: &str,

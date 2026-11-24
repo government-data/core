@@ -25,22 +25,6 @@ pub const SOURCE_NONCURRENT_DAYS: u32 = 7;
 /// loopback (`infra/rustfs/replication.yml`).
 pub const REPLICATION_PROXY_PORT: u16 = 9100;
 
-/// What one warehouse's replication is configured with. Holds no key.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WarehouseReplication {
-    /// The bucket, `qd-tenant-<id>`, the same on both lakes.
-    pub warehouse: String,
-    /// Where the source answers: its base URL (the main lake's,
-    /// `LAKE_ENDPOINT`).
-    pub source: String,
-    /// The replica's node, by its name (its gate's port).
-    pub replica: String,
-    /// The remote target as the source reaches it: its own proxy,
-    /// `<the source node's name>:9100`, over TLS; a pool's,
-    /// `qd-lake-replication:9100` on each node's loopback, plain.
-    pub proxy: String,
-}
-
 /// A step of one warehouse's configuration, in the order they are done:
 /// first the warehouse itself on the main lake, then its replication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +43,24 @@ pub enum ReplicationStep {
 }
 
 impl ReplicationStep {
+    /// Every step, in the order they are done.
+    pub const ALL: [Self; 9] = [
+        Self::WarehouseBucket,
+        Self::WarehouseTables,
+        Self::SourceBucket,
+        Self::ReplicaBucket,
+        Self::ReplicaRetention,
+        Self::SourceVersioning,
+        Self::SourceLifecycle,
+        Self::RemoteTarget,
+        Self::Rule,
+    ];
+
+    /// The step of that name ([`Self::as_str`]), if it is one.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|s| s.as_str() == name)
+    }
+
     /// As the API and the state name it.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -93,47 +95,6 @@ pub enum ReplicationOutcome {
         step: ReplicationStep,
         detail: String,
     },
-}
-
-/// Port: configures a warehouse's replication, signed with each lake's
-/// kept admin keys, which only its adapter reads.
-#[async_trait::async_trait]
-pub trait LakeReplication: Send + Sync {
-    async fn configure(
-        &self,
-        warehouse: &WarehouseReplication,
-    ) -> Result<ReplicationOutcome, RepositoryError>;
-}
-
-/// What making one tenant's warehouse on the main lake came to. Holds no
-/// key.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum WarehouseOutcome {
-    /// It was not there and was made, with its table bucket.
-    Made,
-    /// It was there; its table bucket was asked for again.
-    Present,
-    /// The main lake's admin keys are not kept: nothing was asked.
-    NoKeys,
-    /// A step (the bucket or its table bucket) was refused or not reached.
-    Failed {
-        step: ReplicationStep,
-        detail: String,
-    },
-}
-
-/// Port: makes a tenant's warehouse on the main lake when it is missing,
-/// the bucket and its Iceberg table bucket (0028), signed with the main
-/// lake's kept admin keys, which only its adapter reads. Idempotent: a
-/// second run makes nothing and asks for the table bucket again.
-#[async_trait::async_trait]
-pub trait LakeWarehouses: Send + Sync {
-    /// `source` is the main lake's base URL; `warehouse`, `qd-tenant-<id>`.
-    async fn ensure(
-        &self,
-        source: &str,
-        warehouse: &str,
-    ) -> Result<WarehouseOutcome, RepositoryError>;
 }
 
 /// One warehouse's replication as the last run left it.

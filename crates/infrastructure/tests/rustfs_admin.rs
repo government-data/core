@@ -7,8 +7,9 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 
+use application::lake::LakeProbe;
 use async_trait::async_trait;
-use auth_gateway::{Lake, LakeAdmin, LakeAdminKeys, LakeProbe};
+use auth_gateway::{Lake, LakeAdminKeys};
 use domain::RepositoryError;
 use infrastructure::rustfs_admin::{AdminKeySource, RustfsLakeAdmin};
 

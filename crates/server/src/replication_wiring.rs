@@ -79,16 +79,13 @@ pub(crate) fn spawn_reconcile(machines: MachinesService) {
     });
 }
 
-/// With the replication: the lake's adapter (`api`), which also makes a
-/// missing warehouse on the main lake, its state and the warehouse.
+/// With the replication: its state and the warehouse; the lakes' adapters
+/// are the machines' (`with_lake_admin`).
 pub(crate) fn with_replication(
     machines: MachinesService,
-    api: Arc<infrastructure::rustfs_admin::RustfsLakeAdmin>,
     pool: &infrastructure::PgPool,
 ) -> MachinesService {
     machines.with_replication(
-        api.clone(),
-        api,
         Arc::new(infrastructure::PgReplicationState::new(pool.clone())),
         Arc::new(TheWarehouse),
     )

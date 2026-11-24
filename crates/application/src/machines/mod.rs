@@ -138,7 +138,7 @@ pub struct MachinesService {
     /// The lakes' admin keys, as a person pasted them.
     lake_admin: Option<Arc<dyn auth_gateway::LakeAdminKeyStore>>,
     /// The lakes' admin API, signed with those keys.
-    lake_api: Option<Arc<dyn auth_gateway::LakeAdmin>>,
+    lake_api: Option<Arc<dyn crate::lake::LakeAdmins>>,
     /// Where the main lake answers (`LAKE_ENDPOINT`), for its admin API.
     main_lake: Option<String>,
     /// The replication into the replica: its adapter, state and warehouses.

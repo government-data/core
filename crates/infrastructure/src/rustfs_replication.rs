@@ -9,10 +9,9 @@
 //! with the payload's hash signed. No key or signature is logged; the
 //! replica's keys travel only in the remote target's body, to the source.
 
-use async_trait::async_trait;
 use auth_gateway::{
-    Lake, LakeAdminKeys, LakeReplication, ReplicationOutcome, ReplicationStep,
-    WarehouseReplication, REPLICATION_ALIAS, REPLICA_RETENTION_DAYS, SOURCE_NONCURRENT_DAYS,
+    Lake, LakeAdminKeys, ReplicationOutcome, ReplicationStep, REPLICATION_ALIAS,
+    REPLICATION_PROXY_PORT, REPLICA_RETENTION_DAYS, SOURCE_NONCURRENT_DAYS,
 };
 use chrono::Utc;
 use domain::RepositoryError;
@@ -25,6 +24,32 @@ const S3_XMLNS: &str = "http://s3.amazonaws.com/doc/2006-03-01/";
 pub const RULE_ID: &str = "qd-replica";
 /// The lifecycle rule's id.
 pub const LIFECYCLE_ID: &str = "qd-noncurrent";
+
+/// What one warehouse's replication is configured with. Holds no key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WarehouseReplication {
+    /// The bucket, the same on both lakes.
+    pub warehouse: String,
+    /// Where the source answers: its base URL (the main lake's,
+    /// `LAKE_ENDPOINT`).
+    pub source: String,
+    /// The replica's node, by its name (its gate's port).
+    pub replica: String,
+    /// The remote target as the source reaches it: [`proxy_of`].
+    pub proxy: String,
+}
+
+/// Where the source reaches its replication proxy: a pool's nodes each
+/// their own, by the alias they all map to their loopback (0066 step 11,
+/// ruling 5); a single node's, its own name; on
+/// [`REPLICATION_PROXY_PORT`]. `None` if `source` names no host.
+pub fn proxy_of(source: &str, pool: bool) -> Option<String> {
+    let rest = source.split_once("://").map_or(source, |(_, r)| r);
+    let authority = rest.split('/').next()?;
+    let host = authority.rsplit_once(':').map_or(authority, |(h, _)| h);
+    let host = if pool { REPLICATION_ALIAS } else { host };
+    (!host.is_empty()).then(|| format!("{host}:{REPLICATION_PROXY_PORT}"))
+}
 
 /// One signed call: where, what, and the body.
 pub(crate) struct Call<'a> {
@@ -228,9 +253,10 @@ impl RustfsLakeAdmin {
     }
 }
 
-#[async_trait]
-impl LakeReplication for RustfsLakeAdmin {
-    async fn configure(
+impl RustfsLakeAdmin {
+    /// Configures a warehouse's replication, signed with each lake's kept
+    /// admin keys.
+    pub async fn configure(
         &self,
         w: &WarehouseReplication,
     ) -> Result<ReplicationOutcome, RepositoryError> {
@@ -262,6 +288,27 @@ mod tests {
             "<Destination><Bucket>arn:minio:replication:us-east-1:x:qd-tenant-a</Bucket>"
         ));
         assert!(rule_xml("a<b&c").contains("<Role>a&lt;b&amp;c</Role>"));
+    }
+
+    #[test]
+    fn the_proxy_is_the_source_nodes_name_or_a_pools_alias() {
+        assert_eq!(
+            proxy_of("https://lake-1:9000", false).as_deref(),
+            Some("lake-1:9100")
+        );
+        assert_eq!(
+            proxy_of("https://lake-1.internal/", false).as_deref(),
+            Some("lake-1.internal:9100")
+        );
+        assert_eq!(
+            proxy_of("lake-1:9000", false).as_deref(),
+            Some("lake-1:9100")
+        );
+        assert_eq!(
+            proxy_of("https://lake-1:9000", true).as_deref(),
+            Some("qd-lake-replication:9100")
+        );
+        assert_eq!(proxy_of("https://", false), None);
     }
 
     #[test]

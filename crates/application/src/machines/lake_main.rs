@@ -3,9 +3,12 @@
 //! single RustFS, the replication's source until a pool is installed, its
 //! admin keys kept as `pool:main`. It is not a machine of the registry: it
 //! is reached where the application reaches the lake (`LAKE_ENDPOINT`),
-//! through its gate. The keys are read by the lake's adapter alone.
+//! through its gate. The keys are read by the core's client of the lake's
+//! adapter alone (decision 0078).
 
-use auth_gateway::{Lake, LakeProbe};
+use auth_gateway::Lake;
+
+use crate::lake::LakeProbe;
 
 use super::{LakeAdminError, MachinesService};
 
@@ -40,8 +43,7 @@ impl MachinesService {
         let Some(endpoint) = self.main_lake.clone() else {
             return Ok(MainLakeState::NoAddress);
         };
-        let probe = api.probe(&Lake::main(), &endpoint).await;
-        let probe = probe.map_err(|e| LakeAdminError::Backend(e.to_string()))?;
+        let probe = LakeProbe::from(api.for_lake(&Lake::main(), &endpoint).health().await);
         Ok(MainLakeState::Probed { endpoint, probe })
     }
 }

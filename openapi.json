@@ -6585,7 +6585,7 @@
               "string",
               "null"
             ],
-            "description": "With `ready`: the main lake, the replica's node and the proxy the\nmain lake reaches it through."
+            "description": "With `ready`: the main lake and the replica's node; `proxy` is no\nlonger said (the lake's adapter works it out) and stays null."
           },
           "warehouses": {
             "type": "array",

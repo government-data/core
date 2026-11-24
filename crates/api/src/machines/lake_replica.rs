@@ -7,8 +7,8 @@
 //! | ------------------------- | --------------------------------------------- |
 //! | `GET /lake/replica/state` | the replica's machine and what it answers now |
 
+use application::lake::LakeProbe;
 use application::{LakeAdminError, MachinesService, ReplicaState};
-use auth_gateway::LakeProbe;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};

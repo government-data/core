@@ -42,6 +42,7 @@ pub mod password_reset_repo;
 pub mod permission_notices;
 pub mod platform_repo;
 pub mod rustfs_admin;
+pub mod rustfs_lake_admins;
 pub mod rustfs_replication;
 pub mod rustfs_sts;
 pub mod rustfs_warehouse;

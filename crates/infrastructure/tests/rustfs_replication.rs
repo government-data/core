@@ -8,11 +8,10 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use auth_gateway::{
-    Lake, LakeAdminKeys, LakeReplication, ReplicationOutcome, ReplicationStep, WarehouseReplication,
-};
+use auth_gateway::{Lake, LakeAdminKeys, ReplicationOutcome, ReplicationStep};
 use domain::RepositoryError;
 use infrastructure::rustfs_admin::{AdminKeySource, RustfsLakeAdmin};
+use infrastructure::rustfs_replication::WarehouseReplication;
 
 const SOURCE_SECRET: &str = "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a";
 const REPLICA_SECRET: &str = "7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b";

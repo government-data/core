@@ -1,33 +1,19 @@
 //! The replica as Settings → Lake shows it (0066 step 11): the machine of
 //! role `lake-replica` that is approved or draining, asked by its name with
-//! the keys only the lake's adapter reads.
+//! the keys only the core's client of the lake's adapter reads.
 
-use auth_gateway::{Lake, LakeAdmin, LakeProbe};
+use crate::lake::{LakeHealth, LakeProbe};
 
+use super::lake_adapters::{Adapters, Asked, Shared};
 use super::*;
 
-/// A lake's admin API that answers `probe` and records whom it was asked.
-struct Api {
-    probe: LakeProbe,
-    asked: Mutex<Vec<(String, String)>>,
-}
-
-#[async_trait]
-impl LakeAdmin for Api {
-    async fn probe(&self, lake: &Lake, node: &str) -> Result<LakeProbe, RepositoryError> {
-        self.asked.lock().unwrap().push((lake.key(), node.into()));
-        Ok(self.probe.clone())
-    }
-}
-
-fn answering(probe: LakeProbe) -> (World, Arc<Api>) {
-    let api = Arc::new(Api {
-        probe,
-        asked: Mutex::default(),
-    });
+/// The lakes' adapters answering `health`, and what they were asked.
+fn answering(health: LakeHealth) -> (World, Arc<Adapters>) {
+    let api = Arc::new(Adapters::default());
+    *api.health.lock().unwrap() = Some(health);
     let w = world();
     let w = World {
-        service: w.service.with_lake_admin(api.clone()),
+        service: w.service.with_lake_admin(Arc::new(Shared(api.clone()))),
         audit: w.audit,
         clock: w.clock,
     };
@@ -45,11 +31,14 @@ impl World {
 
 #[tokio::test]
 async fn the_replica_is_its_approved_machine_asked_by_name() {
+    let (w, api) = answering(LakeHealth::Answered {
+        drives_online: 2,
+        drives_offline: 0,
+    });
     let answered = LakeProbe::Answered {
         drives_online: 2,
         drives_offline: 0,
     };
-    let (w, api) = answering(answered.clone());
     let s = &w.service;
     let none = ReplicaState::NoMachine { pending: None };
     assert_eq!(s.replica_state().await, Ok(none));
@@ -68,7 +57,7 @@ async fn the_replica_is_its_approved_machine_asked_by_name() {
     s.drain(&replica.id, &admin(), &origin()).await.unwrap();
     assert_eq!(s.replica_state().await, Ok(probed));
     let asked = api.asked.lock().unwrap().clone();
-    let once = ("replica".to_string(), "replica-1".to_string());
+    let once = Asked::Health("replica".into(), "replica-1".into());
     assert_eq!(asked, vec![once.clone(), once]);
     // A read: nothing audited beyond the machines' own changes.
     let kinds = w.kinds();
@@ -80,10 +69,9 @@ async fn the_replica_is_its_approved_machine_asked_by_name() {
 
 #[tokio::test]
 async fn a_retired_replica_is_none_and_two_are_not_chosen_between() {
-    let refused = LakeProbe::KeysRefused {
+    let (w, api) = answering(LakeHealth::KeysRefused {
         code: "SignatureDoesNotMatch".into(),
-    };
-    let (w, api) = answering(refused);
+    });
     let s = &w.service;
     let first = w.replica("replica-1").await;
     s.approve(&first.id, &admin(), &origin()).await.unwrap();
@@ -109,11 +97,14 @@ async fn without_the_lakes_admin_api_the_state_is_unavailable() {
 
 #[tokio::test]
 async fn the_main_lake_is_asked_where_the_application_reaches_the_lake() {
+    let (w, api) = answering(LakeHealth::Answered {
+        drives_online: 4,
+        drives_offline: 0,
+    });
     let answered = LakeProbe::Answered {
         drives_online: 4,
         drives_offline: 0,
     };
-    let (w, api) = answering(answered.clone());
     let s = w.service.clone();
     assert_eq!(s.main_lake_state().await, Ok(MainLakeState::NoAddress));
     assert!(api.asked.lock().unwrap().is_empty());
@@ -126,7 +117,8 @@ async fn the_main_lake_is_asked_where_the_application_reaches_the_lake() {
     };
     assert_eq!(s.main_lake_state().await, Ok(probed));
     let asked = api.asked.lock().unwrap().clone();
-    assert_eq!(asked, [("pool:main".into(), "https://lake-1:9000".into())]);
+    let main = Asked::Health("pool:main".into(), "https://lake-1:9000".into());
+    assert_eq!(asked, [main]);
     assert!(w.kinds().is_empty());
     let bare = world()
         .service
@@ -135,4 +127,20 @@ async fn the_main_lake_is_asked_where_the_application_reaches_the_lake() {
         bare.main_lake_state().await,
         Err(LakeAdminError::Unavailable)
     );
+}
+
+#[tokio::test]
+async fn an_adapter_not_reached_is_shown_unreachable() {
+    let w = world();
+    let api = Arc::new(Adapters::default());
+    let s = w
+        .service
+        .with_lake_admin(Arc::new(Shared(api)))
+        .with_main_lake(Some("https://lake-1:9000".into()));
+    let detail = "unavailable: GET health: no connection".to_string();
+    let probed = MainLakeState::Probed {
+        endpoint: "https://lake-1:9000".into(),
+        probe: LakeProbe::Unreachable { detail },
+    };
+    assert_eq!(s.main_lake_state().await, Ok(probed));
 }

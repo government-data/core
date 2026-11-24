@@ -99,12 +99,11 @@ pub(crate) fn service(
     let keys = Arc::new(PgLakeAdminKeys::new(pool.clone(), sealer));
     let machines = match RustfsLakeAdmin::from_env(keys) {
         Ok(api) => {
-            let api = Arc::new(api);
             let machines = machines
-                .with_lake_admin(api.clone())
+                .with_lake_admin(Arc::new(api))
                 // The main lake, where the application reaches it (0066 step 11).
                 .with_main_lake(std::env::var("LAKE_ENDPOINT").ok());
-            let machines = replication_wiring::with_replication(machines, api, pool);
+            let machines = replication_wiring::with_replication(machines, pool);
             replication_wiring::spawn_reconcile(machines.clone());
             machines
         }

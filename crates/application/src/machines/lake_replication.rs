@@ -1,7 +1,8 @@
 //! The replication of the main lake into the replica (decisions 0027, 0028
 //! and 0029, point 7; 0066 step 11, the user's rulings of 2026-11-13): for
-//! every tenant's warehouse, configured by the lake's adapter with both
-//! lakes' admin keys, which it alone reads. Run when a person pastes either
+//! every tenant's warehouse, configured by the main lake's adapter
+//! (decision 0078) with both lakes' admin keys, which the core's client of
+//! it alone reads. Run when a person pastes either
 //! lake's keys and by the periodic reconcile; each run is idempotent, so a
 //! second one changes nothing. A warehouse's change of state (configured,
 //! or failed) is audited, by the person who pasted the keys or by the
@@ -12,8 +13,7 @@
 use std::sync::Arc;
 
 use auth_gateway::{
-    Lake, LakeReplication, LakeWarehouses, ReplicationOutcome, ReplicationStateStore,
-    WarehouseState, Warehouses, MAIN_POOL, REPLICATION_ALIAS, REPLICATION_PROXY_PORT,
+    Lake, ReplicationOutcome, ReplicationStateStore, WarehouseState, Warehouses, MAIN_POOL,
 };
 use domain::{AdminId, AuditEventType, RepositoryError};
 
@@ -24,12 +24,10 @@ use super::{LakeAdminError, MachinesService, Origin};
 /// Who the application is in the audit when it runs by itself.
 pub const RECONCILER: &str = "qd-api";
 
-/// The replication's ports, given together.
+/// The replication's ports, given together; the lakes' adapters are
+/// [`MachinesService::with_lake_admin`]'s.
 #[derive(Clone)]
 pub(super) struct Replication {
-    pub(super) api: Arc<dyn LakeReplication>,
-    /// Makes a warehouse on the main lake when it is missing.
-    pub(super) maker: Arc<dyn LakeWarehouses>,
     state: Arc<dyn ReplicationStateStore>,
     warehouses: Arc<dyn Warehouses>,
 }
@@ -47,12 +45,14 @@ pub enum ReplicationReadiness {
     NoKeys { lake: Lake },
 }
 
-/// The two lakes, as a run reaches them.
+/// The two lakes, as a run reaches them: the main lake's address, the
+/// replica's machine, and whether the main lake is a pool (its adapter
+/// works out from it how the replication reaches the replica).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lakes {
     pub source: String,
     pub replica: String,
-    pub proxy: String,
+    pub source_pool: bool,
 }
 
 /// What Settings → Lake says of the replication.
@@ -60,14 +60,6 @@ pub struct Lakes {
 pub struct ReplicationStatus {
     pub readiness: ReplicationReadiness,
     pub warehouses: Vec<WarehouseState>,
-}
-
-/// The host of a base URL, without its scheme, port or path.
-fn host_of(url: &str) -> Option<&str> {
-    let rest = url.split_once("://").map_or(url, |(_, r)| r);
-    let authority = rest.split('/').next()?;
-    let host = authority.rsplit_once(':').map_or(authority, |(h, _)| h);
-    (!host.is_empty()).then_some(host)
 }
 
 /// Whether a state is one a person should hear of: configured, or failed.
@@ -80,21 +72,14 @@ fn worth_auditing(before: Option<&ReplicationOutcome>, now: &ReplicationOutcome)
 }
 
 impl MachinesService {
-    /// With the replication's adapter, the adapter that makes a missing
-    /// warehouse (`maker`), the state and the tenants' warehouses.
+    /// With the replication's state and the tenants' warehouses; the runs
+    /// also need the lakes' adapters ([`Self::with_lake_admin`]).
     pub fn with_replication(
         mut self,
-        api: Arc<dyn LakeReplication>,
-        maker: Arc<dyn LakeWarehouses>,
         state: Arc<dyn ReplicationStateStore>,
         warehouses: Arc<dyn Warehouses>,
     ) -> Self {
-        self.replication = Some(Replication {
-            api,
-            maker,
-            state,
-            warehouses,
-        });
+        self.replication = Some(Replication { state, warehouses });
         self
     }
 
@@ -108,19 +93,10 @@ impl MachinesService {
         let Some(source) = self.main_lake.clone() else {
             return Ok(ReplicationReadiness::NoAddress);
         };
-        let Some(host) = host_of(&source) else {
-            return Ok(ReplicationReadiness::NoAddress);
+        let source_pool = match &self.pools {
+            Some(pools) => pools.find(MAIN_POOL).await.map_err(backend)?.is_some(),
+            None => false,
         };
-        // A pool's nodes each reach their own proxy by the alias they all
-        // map to their loopback (0066 step 11, ruling 5); a single node's
-        // is its own name.
-        let host = match &self.pools {
-            Some(pools) if pools.find(MAIN_POOL).await.map_err(backend)?.is_some() => {
-                REPLICATION_ALIAS
-            }
-            _ => host,
-        };
-        let proxy = format!("{host}:{REPLICATION_PROXY_PORT}");
         let replica = match self.replica_machine().await? {
             Ok(name) => name,
             Err(state) => return Ok(ReplicationReadiness::NoReplica(state)),
@@ -137,7 +113,7 @@ impl MachinesService {
         Ok(ReplicationReadiness::Ready(Lakes {
             source,
             replica,
-            proxy,
+            source_pool,
         }))
     }
 
@@ -162,10 +138,12 @@ impl MachinesService {
         by: Option<(&AdminId, &Origin)>,
     ) -> Result<ReplicationStatus, LakeAdminError> {
         let replication = self.replication()?;
+        let admins = self.lake_api.as_ref().ok_or(LakeAdminError::Unavailable)?;
         let backend = |e: RepositoryError| LakeAdminError::Backend(e.to_string());
         let Some(source) = self.warehouse_source().await? else {
             return self.replication_status().await;
         };
+        let main = admins.for_lake(&Lake::main(), &source);
         let readiness = self.replication_readiness().await?;
         let lakes = match &readiness {
             ReplicationReadiness::Ready(lakes) => Some(lakes),
@@ -177,7 +155,7 @@ impl MachinesService {
         names.dedup();
         for warehouse in names {
             let outcome = self
-                .warehouse_outcome(replication, &source, &warehouse, lakes, by)
+                .warehouse_outcome(main.as_ref(), &warehouse, lakes, by)
                 .await?;
             let now = self.clock.now();
             let was = before.iter().find(|s| s.warehouse == warehouse);
@@ -252,18 +230,5 @@ fn audit_replication(
         ip: by.map_or_else(|| "-".to_string(), |(_, o)| o.ip.clone()),
         user_agent: by.and_then(|(_, o)| o.user_agent.clone()),
         occurred_at: at,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_proxy_is_the_source_nodes_name() {
-        assert_eq!(host_of("https://lake-1:9000"), Some("lake-1"));
-        assert_eq!(host_of("https://lake-1.internal/"), Some("lake-1.internal"));
-        assert_eq!(host_of("lake-1:9000"), Some("lake-1"));
-        assert_eq!(host_of("https://"), None);
     }
 }
