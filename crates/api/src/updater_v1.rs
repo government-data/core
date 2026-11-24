@@ -8,7 +8,7 @@
 //! | `PUT /updater/v1/maintenance`          | maintenance begins (`active`) or ends    |
 //! | `PUT /updater/v1/modules`              | the installed modules, the whole list    |
 //! | `GET /updater/v1/drain?horizon_secs=N` | what still runs, and whether it drained  |
-//! | `GET /updater/v1/version`              | the version that answers                 |
+//! | `GET /updater/v1/version`              | the version and the features it has      |
 //! | `POST /updater/v1/request`             | "Update now", for a person on the server |
 //!
 //! They mean what the host daemon's `/internal/*` routes mean, and replace
@@ -39,6 +39,11 @@ use serde_json::{json, Value};
 
 /// The protocol's prefix, as the API sees it (Traefik strips `/api`).
 pub const PREFIX: &str = "/updater/v1";
+
+/// What this core understands beyond the calls above (quality-sdk decision
+/// 0009), so the agent refuses or hides what it would ignore. Each name is
+/// added with the calls or fields it stands for.
+pub const FEATURES: &[&str] = &[];
 
 /// "Scheduled soon" when the agent does not say: within 30 minutes.
 const DEFAULT_HORIZON: Duration = Duration::from_secs(30 * 60);
@@ -228,9 +233,9 @@ async fn request(
     (StatusCode::ACCEPTED, Json(json!(request))).into_response()
 }
 
-/// `GET /updater/v1/version`: `{version}`.
+/// `GET /updater/v1/version`: `{version, features}`.
 async fn version() -> Json<Value> {
-    Json(json!({ "version": domain::VERSION }))
+    Json(json!({ "version": domain::VERSION, "features": FEATURES }))
 }
 
 fn refusal(status: StatusCode, why: impl Into<String>) -> Response {
