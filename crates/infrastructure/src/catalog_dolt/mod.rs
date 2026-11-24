@@ -21,6 +21,7 @@ mod drafts;
 mod edits;
 mod gate;
 mod history;
+mod password;
 mod restart;
 
 pub use drafts::{Draft, Merged};
@@ -106,9 +107,18 @@ impl DoltCatalog {
         }
     }
 
-    /// From `DOLT_URL` (or its `_FILE`); `None` without it.
+    /// From `DOLT_URL` (or its `_FILE`); `None` without it. With
+    /// `DOLT_PASSWORD` (or its `_FILE`, as an installation has it), the URL
+    /// names the user only and the password is written into it.
     pub fn from_env() -> Result<Option<Self>, String> {
-        Ok(key_from_env("DOLT_URL")?.map(|url| Self::new(&url)))
+        let Some(url) = key_from_env("DOLT_URL")? else {
+            return Ok(None);
+        };
+        let url = match key_from_env("DOLT_PASSWORD")? {
+            Some(password) => password::with_password(&url, &password)?,
+            None => url,
+        };
+        Ok(Some(Self::new(&url)))
     }
 
     /// The pool of `database`, once the gate lets the operation in; the
