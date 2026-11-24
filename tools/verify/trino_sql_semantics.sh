@@ -21,7 +21,7 @@
 set -u
 export LC_ALL=C
 cd "$(dirname "$0")/../.."
-P=qs-verify-t1
+P=qd-verify-t1
 . tools/verify/trino_engine_lib.sh
 TRINO_PUBLISH=1 TRINO_CONFIG='regex-library=RE2J' te_trino || exit 1
 TRINO_URL=$(te_trino_url) uv run -q --no-project --with duckdb==2.0.0 \

@@ -23,7 +23,7 @@
 set -u
 export LC_ALL=C
 cd "$(dirname "$0")/../.."
-P=qs-verify-t18
+P=qd-verify-t18
 . tools/verify/trino_engine_lib.sh
 . tools/verify/trino_source_lib.sh
 VERSIONS=${*:-2017 2019}

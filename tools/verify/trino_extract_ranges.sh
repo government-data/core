@@ -18,7 +18,7 @@
 set -u
 export LC_ALL=C
 cd "$(dirname "$0")/../.."
-P=qs-verify-t20
+P=qd-verify-t20
 . tools/verify/trino_engine_lib.sh
 . tools/verify/trino_source_lib.sh
 N=${1:-4}

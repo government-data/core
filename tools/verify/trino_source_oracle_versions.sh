@@ -24,7 +24,7 @@
 set -u
 export LC_ALL=C
 cd "$(dirname "$0")/../.."
-P=qs-verify-t19
+P=qd-verify-t19
 . tools/verify/trino_engine_lib.sh
 . tools/verify/trino_source_lib.sh
 IMAGE=${ORACLE_IMAGE:-gvenzl/oracle-free:23-slim}

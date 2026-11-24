@@ -12,7 +12,7 @@ DYNAMIC=$'catalog.management=dynamic\ncatalog.store=memory'
 ms_start() {
   local v=$1 name="$P-ms$1" dir="$D/ms$1"
   mkdir -p "$dir"
-  printf 'MSSQL_SA_PASSWORD=Qs-%s!a1\nACCEPT_EULA=Y\nMSSQL_PID=Developer\n' "$(openssl rand -hex 12)" >"$dir/sa.env"
+  printf 'MSSQL_SA_PASSWORD=Qd-%s!a1\nACCEPT_EULA=Y\nMSSQL_PID=Developer\n' "$(openssl rand -hex 12)" >"$dir/sa.env"
   printf 'Qr-%s!b2' "$(openssl rand -hex 12)" >"$dir/reader.pw"
   openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=$name" -addext "subjectAltName=DNS:$name" \
     -addext "extendedKeyUsage=serverAuth" -keyout "$dir/tls.key" -out "$dir/tls.crt" 2>/dev/null
