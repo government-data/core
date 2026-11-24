@@ -54,6 +54,10 @@ files=(
   infra/postgres/scripts
   infra/postgres/app-machine.yml
   infra/postgres/updater-certificate.yml
+  infra/dolt/docker-compose.yml
+  infra/dolt/config.yaml
+  infra/dolt/init
+  infra/dolt/tls
 )
 
 out="${OUT_DIR:-dist}"

@@ -7,7 +7,7 @@ version: 0.0.0
 # Each must have a running container, besides their Compose healthchecks.
 # No `checks` until the API's image has a command that answers.
 health:
-  services: [traefik, postgres, api, node, web]
+  services: [traefik, postgres, api, node, web, dolt]
 
 # What a backup before every update covers (the critical pieces).
 data:
@@ -29,6 +29,13 @@ data:
       service: api
       path: /run/qd-metrics
       critical: false
+    # The catalog: its databases, users and grants (decision 0080's
+    # amendment); a copy of the running container's directory restores to
+    # the same catalog (tools/verify/dolt_volume_copy.sh).
+    - name: dolt-data
+      service: dolt
+      path: /var/lib/dolt
+      critical: true
   # Under /opt/quality-data/quality-data/: the installation's .env (its
   # passwords, names and image digests; restored with the database it
   # matches), its CA and the secrets (infra/package/compose.yml).
@@ -43,6 +50,16 @@ data:
       critical: true
     - path: secrets/postgres_superuser_password
       critical: true
+
+# Dolt's root and application user's passwords (decision 0080's
+# amendment): made by the update agent when missing, before the start (an
+# installation from before Dolt), owned by the API's user, which reads the
+# application's; Dolt runs as root. Backed up as critical keys.
+secrets:
+  uid: 65532
+  generate:
+    - name: dolt-root-password
+    - name: dolt-app-password
 
 # No `drain`: the core counts its own work (it is not one of the modules it
 # asks).
