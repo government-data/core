@@ -100,10 +100,22 @@ async fn an_extraction_gets_its_source_and_every_credential_given_is_recorded() 
     );
 }
 
-/// The bronze writes a job's policy (the Issuer's echo) allows.
-fn writes(access: &LakeAccess) -> serde_json::Value {
-    let policy: serde_json::Value = serde_json::from_str(&access.secret_key).unwrap();
-    policy["Statement"][1]["Resource"].clone()
+/// The grant a job was given (the Issuer's echo).
+fn grant(access: &LakeAccess) -> quality::lake::LakeGrant {
+    serde_json::from_str(&access.secret_key).unwrap()
+}
+
+/// Where a job's grant creates tables, and the tables whose files it
+/// writes, by namespace, name and location.
+fn writes(access: &LakeAccess) -> (Vec<String>, Vec<(String, String, String)>) {
+    let grant = grant(access);
+    let tables = grant.write_tables.into_iter();
+    let tables = tables.map(|t| (t.namespace, t.name, t.location)).collect();
+    (grant.create_tables_in, tables)
+}
+
+fn placed(namespace: &str, location: &str) -> (String, String, String) {
+    (namespace.into(), "clientes".into(), location.into())
 }
 
 #[tokio::test]
@@ -127,13 +139,10 @@ async fn an_extraction_creates_its_table_then_asks_again_for_its_files() {
         ["clientes_bronze", "clientes_silver"]
     );
     // No table yet: it may create one in each namespace, and write no file.
-    assert_eq!(
-        writes(&details.lake.unwrap()),
-        json!([
-            format!("arn:aws:s3:::{w}/.*/namespaces/clientes_bronze/*"),
-            format!("arn:aws:s3:::{w}/.*/namespaces/clientes_silver/*")
-        ])
-    );
+    let namespaces = vec!["clientes_bronze".to_string(), "clientes_silver".into()];
+    let access = details.lake.unwrap();
+    assert_eq!(grant(&access).warehouse, w);
+    assert_eq!(writes(&access), (namespaces.clone(), vec![]));
 
     // Created: asking again gives it those tables' files, as the catalog says.
     for (table, prefix) in [
@@ -156,15 +165,11 @@ async fn an_extraction_creates_its_table_then_asks_again_for_its_files() {
         .await;
     assert_eq!(status, StatusCode::OK);
     let again: LakeAccess = serde_json::from_slice(&body).unwrap();
-    assert_eq!(
-        writes(&again),
-        json!([
-            format!("arn:aws:s3:::{w}/.*/namespaces/clientes_bronze/*"),
-            format!("arn:aws:s3:::{w}/.*/namespaces/clientes_silver/*"),
-            format!("arn:aws:s3:::{w}/tables/u-1/*"),
-            format!("arn:aws:s3:::{w}/tables/u-2/*")
-        ])
-    );
+    let tables = vec![
+        placed("clientes_bronze", "tables/u-1"),
+        placed("clientes_silver", "tables/u-2"),
+    ];
+    assert_eq!(writes(&again), (namespaces, tables));
     let resource = format!("warehouse/{w}/clientes_bronze.clientes");
     let given = f.issued.given.lock().unwrap().clone();
     assert_eq!(
@@ -345,17 +350,12 @@ async fn a_maintenance_gets_its_datasets_tables_and_leaves_its_manifest() {
         .await;
     assert_eq!(status, StatusCode::OK);
     let details: JobDetails = serde_json::from_slice(&body).unwrap();
-    let policy: serde_json::Value =
-        serde_json::from_str(&details.lake.unwrap().secret_key).unwrap();
-    assert_eq!(
-        policy["Statement"][2]["Resource"],
-        json!([
-            format!("arn:aws:s3:::{w}/tables/u-1/*"),
-            format!("arn:aws:s3:::{w}/.*/namespaces/clientes_bronze/tables/clientes/*"),
-            format!("arn:aws:s3:::{w}/tables/u-2/*"),
-            format!("arn:aws:s3:::{w}/.*/namespaces/clientes_silver/tables/clientes/*")
-        ])
-    );
+    // Its tables' files where the catalog says they are; it creates nothing.
+    let tables = vec![
+        placed("clientes_bronze", "tables/u-1"),
+        placed("clientes_silver", "tables/u-2"),
+    ];
+    assert_eq!(writes(&details.lake.unwrap()), (vec![], tables));
     for namespace in ["clientes_bronze", "clientes_silver"] {
         assert!(f.issued.given.lock().unwrap().contains(&(
             job,

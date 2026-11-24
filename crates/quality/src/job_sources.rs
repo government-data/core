@@ -122,13 +122,8 @@ pub(crate) async fn read_access(
     issuer: &dyn LakeIssuer,
     job: Uuid,
 ) -> Result<LakeAccess, StatusCode> {
-    let warehouse = lake::WAREHOUSE.to_string();
     issuer
-        .issue(
-            &warehouse,
-            &format!("job-{job}"),
-            &lake::read_only_policy(&warehouse),
-        )
+        .issue(&format!("job-{job}"), &lake::read_grant(lake::WAREHOUSE))
         .await
         .map_err(|e| {
             tracing::error!("lake credentials: {e}");

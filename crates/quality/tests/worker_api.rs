@@ -37,10 +37,8 @@ async fn a_job_is_served_only_to_the_machine_holding_it_under_its_tenant() {
     let lake = details.lake.unwrap();
     assert_eq!(lake.warehouse, "qd-tenant-00000000000000000000000000000001");
     assert_eq!(lake.access_key, format!("job-{job}"));
-    assert_eq!(
-        lake.secret_key,
-        quality::lake::read_only_policy(&lake.warehouse)
-    );
+    let grant: quality::lake::LakeGrant = serde_json::from_str(&lake.secret_key).unwrap();
+    assert_eq!(grant, quality::lake::LakeGrant::read_only(&lake.warehouse));
     // The catalog's snapshot, read as the job's tenant.
     assert_eq!(details.catalog.unwrap().commit, "commit-of-main");
 

@@ -27,7 +27,6 @@ pub mod job_map;
 pub mod job_sources;
 pub mod job_span;
 pub mod lake;
-pub mod lake_policy;
 pub mod lake_tables;
 pub mod layers;
 pub mod manifest;

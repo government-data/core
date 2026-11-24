@@ -66,14 +66,15 @@ async fn a_lake_listing_reads_metadata_only_and_its_report_is_kept() {
         .await;
     assert_eq!(status, StatusCode::OK);
     let details: JobDetails = serde_json::from_slice(&body).unwrap();
-    // The test issuer echoes the policy as the secret.
-    let policy: serde_json::Value =
+    // The test issuer echoes the grant as the secret.
+    let grant: quality::lake::LakeGrant =
         serde_json::from_str(&details.lake.unwrap().secret_key).unwrap();
-    assert!(
-        policy.to_string().contains("/*/metadata/*") && !policy.to_string().contains("Put"),
-        "the tables' metadata, nothing to write: {policy}"
-    );
     let warehouse = "qd-tenant-00000000000000000000000000000001";
+    assert_eq!(
+        grant,
+        quality::lake::LakeGrant::metadata(warehouse),
+        "the tables' metadata, nothing to write"
+    );
     assert_eq!(
         *f.issued.given.lock().unwrap(),
         [(
