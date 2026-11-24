@@ -1,14 +1,14 @@
 """The percentile half of tools/verify/trino_sql_semantics.py (decision
-0090, T1): DuckDB's quantile_cont and median against one portable window
-SQL (distinct values, running counts, linear interpolation) run on both
-engines, compared bit for bit; then Trino's approx_percentile against the
+0090, T1): the portable window SQL that defines the percentiles (distinct
+values, running counts with an explicit frame, lo * (1 - d) + hi * d; the
+user's ruling of 2026-11-24, quantile_cont not used) run on both engines,
+compared bit for bit; then Trino's approx_percentile against the
 exact values on 10^6 and 10^7 generated values, and what it does to a PSI.
 Synthetic values only.
 """
 
 import math
 import random
-from fractions import Fraction
 
 PS = [k / 100 for k in range(101)]
 
@@ -63,60 +63,26 @@ def canon(h):
     return "nan" if int(h, 16) & 0x7FFFFFFFFFFFFFFF > 0x7FF0000000000000 else h
 
 
-def ulps(a, b):
-    def key(h):
-        i = int(h, 16)
-        return i if i < 1 << 63 else (1 << 63) - i
-    return abs(key(a) - key(b)) if "nan" not in (a, b) else (0 if a == b else -1)
-
-
-def fused(xs, bits):
-    """quantile_cont's value as lo * (1 - d) + hi * d with the last step fused (one rounding)."""
-    s, n, out = sorted(xs), len(xs), []
-    for p in PS:
-        h = (n - 1) * p
-        i, j = math.floor(h), math.ceil(h)
-        if i == j or not all(math.isfinite(v) for v in (s[i], s[j])):
-            out.append(None)
-            continue
-        d = h - i
-        out.append(canon(bits(float(Fraction(s[i]) * Fraction(1 - d) + Fraction(s[j] * d)))))
-    return out
-
-
 def exact(trino, duck, bits, failed):
-    print("== quantile_cont and median against the window SQL, bit for bit (NaN of either sign is one answer)")
+    print("== the window SQL, bit for bit on DuckDB and Trino (NaN of either sign is one answer)")
     p = ", ".join(f"(CAST({k} AS DOUBLE) / CAST(100 AS DOUBLE))" for k in range(101))
     duck(f"CREATE OR REPLACE TABLE p AS SELECT * FROM (VALUES {p}) s(p)")
     trino("DROP TABLE IF EXISTS p")
     trino(f"CREATE TABLE p AS SELECT * FROM (VALUES {p}) s(p)")
-    plist = "[" + ", ".join(repr(x) for x in PS) + "]"
     for name, xs in vectors().items():
         t = load(trino, duck, name, xs)
-        qc = [canon(bits(x)) for x in duck(f"SELECT quantile_cont(x, {plist}) FROM {t}")[0][0]]
-        med = canon(bits(duck(f"SELECT median(x) FROM {t}")[0][0]))
         dw = [canon(bits(r[1])) for r in duck(WINDOW.format(t=t, p="p"))]
         try:
             tw = [canon(r[0].lower()) for r in
                   trino(f"SELECT to_hex(to_ieee754_64(q)) FROM ({WINDOW.format(t=t, p='p')}) ORDER BY p")]
         except RuntimeError as e:
             tw = [f"ERROR {e}"]
-        engines = [i for i in range(101) if i >= len(dw) or i >= len(tw) or dw[i] != tw[i]]
-        tag = "OK  " if not engines else "FAIL"
-        print(f"[{tag}] {name}: window SQL, duckdb = trino on 101 percentiles"
-              f"{'' if not engines else f'; {len(engines)} differ, first p={PS[engines[0]]}'}")
-        if engines:
+        off = [i for i in range(101) if i >= len(dw) or i >= len(tw) or dw[i] != tw[i]]
+        tag = "OK  " if not off else "FAIL"
+        if off:
             failed.append(f"window SQL across engines, {name}")
-        off = [i for i in range(min(101, len(dw))) if qc[i] != dw[i]]
-        fu = fused(xs, bits)
-        explained = all(fu[i] == qc[i] for i in off if fu[i] is not None)
-        worst = max((ulps(qc[i], dw[i]) for i in off), default=0)
-        tag = "OK  " if not off and med == qc[50] else "FAIL"
-        if tag == "FAIL":
-            failed.append(f"quantile_cont against the window SQL, {name}")
-        print(f"[{tag}] {name}: quantile_cont = window SQL on {101 - len(off)} of 101"
-              f"{'' if not off else f' (largest gap {worst} ulp; quantile_cont equals the fused form on all of them: {explained})'}"
-              f"; median = quantile_cont(0.5): {med == qc[50]}")
+        print(f"[{tag}] {name}: window SQL, duckdb = trino on {101 - len(off)} of 101 percentiles"
+              f"{'' if not off else f'; first difference at p={PS[off[0]]}'}")
 
 
 GEN = """SELECT CAST(((i * 2654435761) % 4294967296) AS DOUBLE) / CAST(4294967296 AS DOUBLE)
@@ -147,7 +113,8 @@ def approximate(trino, duck):
         except RuntimeError as e:
             print(f"[FAIL] n={n}: trino: {e}")
             continue
-        ex = duck(f"SELECT quantile_cont(x, [{plist}]) FROM ref")[0][0]
+        duck(f"CREATE OR REPLACE TABLE pa AS SELECT unnest([{plist}]) AS p")
+        ex = [r[1] for r in duck(WINDOW.format(t="ref", p="pa"))]
         dcount = duck("SELECT count(*), sum(x) FROM ref")[0]
         print(f"[INFO] n={n}: same data in both engines: trino count {tcount[0]} sum {tcount[1]!r}, duckdb {dcount[0]} {dcount[1]!r}")
         rank = []
