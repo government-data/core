@@ -126,3 +126,30 @@ async fn a_renewed_certificate_is_read_again() {
     std::fs::remove_dir_all(&dir).unwrap();
     assert!(!Arc::ptr_eq(&before, &after), "renewed, read again");
 }
+
+#[tokio::test]
+async fn a_grant_is_translated_twice_alike_and_a_bad_one_refused() {
+    let ca = TestCa::new();
+    let url = adapter(Certs::from_pem(
+        &ca.pem,
+        &ca.machine("lake", "localhost").bundle(),
+    ))
+    .await;
+    let core = as_role(&url, &ca, CALLER_ROLE);
+    let grant = serde_json::to_value(contracts::LakeGrant::read_only("qd-tenant-a1")).unwrap();
+    let path = wire::paths::session_policy();
+    let first = core.call("POST", &path, Some(&grant)).await;
+    assert_eq!(first, core.call("POST", &path, Some(&grant)).await);
+    assert_eq!(first.0, 200, "{}", first.1);
+    let answer: wire::SessionPolicy = serde_json::from_value(first.1).unwrap();
+    assert!(answer.policy.contains("arn:aws:s3:::qd-tenant-a1/*"));
+
+    // The contract suite's error cases: a body that is no grant is `400
+    // invalid`; an unknown warehouse's replication, `404 unknown` (not
+    // served before step 11).
+    admin_wire::errors(&core, "qd-tenant-unknown").await;
+    let unsafe_grant = serde_json::json!({"warehouse": "qd-w", "write_objects_under": "../x"});
+    let (status, body) = core.call("POST", &path, Some(&unsafe_grant)).await;
+    assert_eq!(status, 400, "{body}");
+    assert_eq!(body["code"], "invalid");
+}

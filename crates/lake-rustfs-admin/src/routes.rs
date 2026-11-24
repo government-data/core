@@ -1,16 +1,19 @@
-//! `lake-admin/1`'s routes (decision 0078): the caller check, `GET /about`
-//! and the error shape. The operations on RustFS come with steps 7 (the
-//! session policy), 11 and 12; until then they answer `404 unknown`.
+//! `lake-admin/1`'s routes (decision 0078): the caller check, `GET /about`,
+//! `POST /policies/session` and the error shape. The operations on RustFS
+//! come with steps 11 and 12; until then they answer `404 unknown`.
 
 use axum::body::Body;
+use axum::body::Bytes;
 use axum::extract::{ConnectInfo, Request};
 use axum::http::{Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use contracts::lake_admin::{self as wire, ErrorBody, ErrorCode};
+use contracts::LakeGrant;
 
+use crate::policy;
 use crate::tls::Peer;
 
 /// The only role whose certificate is answered: the core server's (0066).
@@ -23,6 +26,7 @@ pub const IMPLEMENTATION: &str = "lake-rustfs";
 pub fn router() -> Router {
     Router::new()
         .route(&wire::paths::about(), get(about))
+        .route(&wire::paths::session_policy(), post(session_policy))
         .fallback(unserved)
         .layer(middleware::from_fn(caller_check))
 }
@@ -33,6 +37,19 @@ async fn about() -> Json<wire::About> {
         implementation: IMPLEMENTATION.into(),
         version: env!("CARGO_PKG_VERSION").into(),
     })
+}
+
+/// A grant in RustFS's dialect; changes nothing. The policy is answered,
+/// never logged.
+async fn session_policy(body: Bytes) -> Result<Json<wire::SessionPolicy>, Error> {
+    let what = "POST policies/session";
+    let grant: LakeGrant = serde_json::from_slice(&body)
+        .map_err(|e| Error::new(ErrorCode::Invalid, format!("{what}: not a grant: {e}")))?;
+    let policy = policy::session_policy(&grant).map_err(|e| {
+        let message = format!("{what} on {}: {}", grant.warehouse, e.0);
+        Error::new(ErrorCode::Invalid, message)
+    })?;
+    Ok(Json(wire::SessionPolicy { policy }))
 }
 
 async fn unserved(method: Method, request: Request<Body>) -> Error {
