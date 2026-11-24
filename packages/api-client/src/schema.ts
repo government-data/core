@@ -2860,7 +2860,7 @@ export interface components {
         SlaRefusal: {
             /**
              * @description `dimension`, `days`, `group`, `duplicate`, `too_many`, `not_found`,
-             *     `catalog_unavailable` or `forbidden`.
+             *     `catalog_not_configured`, `catalog_unavailable` or `forbidden`.
              */
             error: string;
         };
