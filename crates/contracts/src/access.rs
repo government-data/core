@@ -1,8 +1,7 @@
 //! Who calls a module's routes for people, as the composition root resolved
 //! it. A module never sees a session, a cookie or a token: `server`
 //! authenticates the request and puts a [`Caller`] in its extensions, and the
-//! module asks the caller what it may do and records what it did. The
-//! tenant is the request's already (`tenancy::within`).
+//! module asks the caller what it may do and records what it did.
 
 use std::fmt;
 use std::sync::Arc;

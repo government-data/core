@@ -22,7 +22,7 @@ use infrastructure::{
 
 use crate::background::{spawn_background, spawn_scheduler};
 use crate::config::{env_value, public_url_from_env, OAuthSettings};
-use crate::tenants::Tenancy;
+use crate::database::Database;
 use crate::{settings_wiring, updates_wiring};
 
 /// Where the settings key lives when `SETTINGS_ENCRYPTION_KEY` is not set (a
@@ -56,8 +56,8 @@ pub(crate) fn settings_key_file() -> String {
 /// The services. The health probe reflects live database connectivity;
 /// the login service verifies admin credentials with argon2id,
 /// constant-time equalization, and progressive account/IP lockout.
-pub(crate) async fn services(tenancy: &Tenancy, auth: &AuthConfig) -> Result<Services, Failure> {
-    let pool = tenancy.pool.clone();
+pub(crate) async fn services(db: &Database, auth: &AuthConfig) -> Result<Services, Failure> {
+    let pool = db.pool.clone();
     let health = HealthService::new(Arc::new(PgHealthCheck::new(pool.clone())));
     let admins: Arc<dyn auth_gateway::AdminRepository> =
         Arc::new(PgAdminRepository::new(pool.clone()));
@@ -93,7 +93,7 @@ pub(crate) async fn services(tenancy: &Tenancy, auth: &AuthConfig) -> Result<Ser
 
     let (oauth_service, redirects, settings) = settings(&pool, auth, &secret_box, &login).await?;
     let (captcha, _) = settings_wiring::captcha_from_env()?;
-    spawn_rounds(&settings, tenancy);
+    spawn_rounds(&settings, db);
     // Every new version and how each attempt ended, emailed to the
     // administrators (the daemon reports it through the internal routes).
     let updates = updates.with_notices(
@@ -133,9 +133,9 @@ pub(crate) async fn services(tenancy: &Tenancy, auth: &AuthConfig) -> Result<Ser
 
 /// The background round (the platform mail), once the settings are loaded,
 /// and the schedules (decision 0035): only the VM holding the lock fires.
-fn spawn_rounds(settings: &SettingsService, tenancy: &Tenancy) {
+fn spawn_rounds(settings: &SettingsService, db: &Database) {
     spawn_background(settings.clone());
-    spawn_scheduler(tenancy.pool.clone());
+    spawn_scheduler(db.pool.clone());
 }
 
 /// The platform: the actor and IAM, secrets and updates.

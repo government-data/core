@@ -5,15 +5,15 @@
 use infrastructure::PgConfig;
 
 /// The pool.
-pub(crate) struct Tenancy {
+pub(crate) struct Database {
     pub(crate) pool: infrastructure::PgPool,
 }
 
 /// Connect (eagerly, so a bad DSN or a down database fails now) and bring the
 /// schema up to date. `run_migrations` also validates the checksums of the
 /// migrations already applied, so schema drift is caught at startup.
-pub(crate) async fn connect(pg_config: &PgConfig) -> Result<Tenancy, Box<dyn std::error::Error>> {
+pub(crate) async fn connect(pg_config: &PgConfig) -> Result<Database, Box<dyn std::error::Error>> {
     let pool = infrastructure::connect(pg_config).await?;
     infrastructure::run_migrations(&pool).await?;
-    Ok(Tenancy { pool })
+    Ok(Database { pool })
 }

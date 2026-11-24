@@ -1,7 +1,6 @@
 //! Firing schedules (decision 0035): one transaction creates what a due
 //! schedule fires — a cut and its extraction, or a job without a cut — and
-//! advances its next fire. It runs as the application, inside the tenant's
-//! `tenancy::within`, so row security keeps it to that tenant; due rows are
+//! advances its next fire. It runs as the application; due rows are
 //! taken `FOR UPDATE SKIP LOCKED`, so two schedulers never fire one twice.
 
 use chrono::{DateTime, NaiveDate, Utc};

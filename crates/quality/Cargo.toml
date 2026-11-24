@@ -26,7 +26,6 @@ schedule-core.workspace = true
 # The workers' routes (src/worker_api.rs): the job's tenant for row security.
 axum.workspace = true
 async-trait.workspace = true
-tenancy.workspace = true
 tracing.workspace = true
 # The sources' routes in the OpenAPI document (src/source_api.rs).
 utoipa.workspace = true

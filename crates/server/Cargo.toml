@@ -24,7 +24,6 @@ http-kit.workspace = true
 iam.workspace = true
 platform.workspace = true
 infrastructure.workspace = true
-tenancy.workspace = true
 chrono.workspace = true
 contracts.workspace = true
 axum.workspace = true

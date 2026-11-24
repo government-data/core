@@ -1,5 +1,5 @@
 //! The sources' store (decision 0036), the module's own adapter as the queue
-//! is, inside the tenant's `tenancy::within`. The secret fields are sealed
+//! is. The secret fields are sealed
 //! by a [`Sealer`] as one JSON object, in two versions: writing a secret
 //! moves the current version to the previous one; a secret left out of an
 //! edit keeps its value. What is read back for people never has a secret,

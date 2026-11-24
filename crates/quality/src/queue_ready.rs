@@ -1,7 +1,6 @@
 //! Whether the queue keeps up (decision 0071, point 8): the jobs ready to
-//! be taken and how long the oldest has waited, by kind, in the current
-//! tenant (run inside `tenancy::within`, as the scheduler's round). Counts
-//! and seconds only: no dataset, job or tenant leaves here. [`QueueGauges`]
+//! be taken and how long the oldest has waited, by kind. Counts and seconds
+//! only: no dataset or job leaves here. [`QueueGauges`]
 //! holds them for the API's metrics file, every kind of [`KINDS`] and no
 //! other.
 

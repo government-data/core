@@ -181,7 +181,7 @@ pub fn routes(pool: PgPool, services: WorkerServices) -> Router {
 
 /// The tenant of every job of the installation (decision 0076).
 fn main_tenant() -> Uuid {
-    Uuid::parse_str(tenancy::MAIN_ID).unwrap_or_default()
+    Uuid::from_u128(1)
 }
 
 /// `GET /internal/jobs/{id}`.

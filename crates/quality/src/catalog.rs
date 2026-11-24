@@ -53,9 +53,6 @@ mod tests {
 
     #[test]
     fn the_catalog_keeps_the_main_tenants_database() {
-        assert_eq!(
-            DATABASE,
-            format!("tenant_{}", tenancy::MAIN_ID.replace('-', ""))
-        );
+        assert_eq!(DATABASE, "tenant_00000000000000000000000000000001");
     }
 }

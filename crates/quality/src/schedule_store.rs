@@ -1,5 +1,5 @@
-//! A tenant's schedules (decision 0035), the module's own adapter as the
-//! queue is, inside the tenant's `tenancy::within`. A schedule is saved
+//! The schedules (decision 0035), the module's own adapter as the queue
+//! is. A schedule is saved
 //! only if it holds together ([`ScheduleSpec::check`]: a cron of five
 //! fields, or a trigger, that fires again in its timezone, and a target the
 //! table can queue), with its next fire computed here, as the scheduler computes it.
