@@ -1,4 +1,4 @@
-//! The tenant's catalog as the drafts' routes see it (decisions 0021 and
+//! The catalog as the drafts' routes see it (decisions 0021 and
 //! 0038): the port `server` implements over Dolt, and what it reads and
 //! writes.
 
@@ -86,7 +86,7 @@ pub enum Approval {
     NotFound,
 }
 
-/// The tenant's catalog, for its drafts.
+/// The catalog, for its drafts.
 #[async_trait]
 pub trait DraftCatalog: Send + Sync {
     async fn list(&self, prefix: &str) -> Result<Vec<DraftInfo>, String>;

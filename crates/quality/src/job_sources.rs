@@ -117,7 +117,7 @@ pub async fn source_for(
     }))
 }
 
-/// Read-only credentials for the tenant's warehouse, named after the job.
+/// Read-only credentials for the warehouse, named after the job.
 pub(crate) async fn read_access(
     issuer: &dyn LakeIssuer,
     job: Uuid,

@@ -96,7 +96,7 @@ impl QualityModule {
         self
     }
 
-    /// With the drafts' routes for people, over the tenant's catalog.
+    /// With the drafts' routes for people, over the catalog.
     #[must_use]
     pub fn with_drafts(mut self, drafts: Arc<dyn DraftCatalog>) -> Self {
         self.drafts = Some(drafts);

@@ -1744,7 +1744,7 @@ export interface components {
             /** Format: date-time */
             fired_at: string;
             id: string;
-            /** @description Its evaluation's manifest in the tenant's bucket, once evaluated. */
+            /** @description Its evaluation's manifest in the warehouse bucket, once evaluated. */
             manifest?: string | null;
             /**
              * Format: int64
@@ -6496,7 +6496,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The tenant's schedules the caller may see */
+            /** @description The schedules the caller may see */
             200: {
                 headers: {
                     [name: string]: unknown;

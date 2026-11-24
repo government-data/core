@@ -1,4 +1,4 @@
-//! The console (decision 0054): a statement over the tenant's lake is
+//! The console (decision 0054): a statement over the lake is
 //! queued as a `query` job, which a worker runs on DuckDB with the lake
 //! locked down; its result is kept an hour for whoever asked only. Asking
 //! needs `quality:QueryData`; values are complete behind
@@ -43,7 +43,7 @@ pub fn routes(pool: PgPool) -> Router {
 #[openapi(
     paths(ask, read, reveal),
     components(schemas(ConsoleAsk, ConsoleAsked, ConsoleOut, ConsoleResult, RevealIn, ViewPurpose)),
-    tags((name = "console", description = "Statements over the tenant's lake")),
+    tags((name = "console", description = "Statements over the lake")),
 )]
 pub struct ConsoleDoc;
 

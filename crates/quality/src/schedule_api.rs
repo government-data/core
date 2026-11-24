@@ -1,4 +1,4 @@
-//! A tenant's schedules for people (decision 0035), in the module's
+//! The schedules for people (decision 0035), in the module's
 //! `user_router`: list, create, edit and delete. What a caller may do is
 //! asked of its [`Caller`]: `quality:ViewPipelines` and
 //! `quality:ManageSchedules` on `pipeline/<dataset>`, or on every pipeline
@@ -210,7 +210,7 @@ async fn audited(
     path = "/quality/schedules",
     operation_id = "quality_list_schedules",
     responses(
-        (status = 200, description = "The tenant's schedules the caller may see", body = [ScheduleOut]),
+        (status = 200, description = "The schedules the caller may see", body = [ScheduleOut]),
         (status = 401, description = "No valid session"),
         (status = 403, description = "May see no pipeline"),
     ),

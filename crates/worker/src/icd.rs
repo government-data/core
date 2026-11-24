@@ -1,6 +1,6 @@
 //! An evaluation's ICD as it is reported (decision 0057): each field's mean
 //! beside its profile, and each entity by the HMAC-SHA-256 of its
-//! normalized key with the tenant's entity key, so the key never leaves the
+//! normalized key with the installation's entity key, so the key never leaves the
 //! worker. Without the key (an older application) no entity is reported.
 
 use hmac::{Hmac, Mac};
@@ -67,7 +67,7 @@ mod tests {
             "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
         );
         let other = hashed(&[entity("1234")], Some(&EntityKey("k2".repeat(32))));
-        assert_ne!(rows[0].0, other[0].0, "another tenant, another hash");
+        assert_ne!(rows[0].0, other[0].0, "another key, another hash");
         assert!(hashed(&[entity("1234")], None).is_empty());
     }
 }

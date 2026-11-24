@@ -3243,7 +3243,7 @@
         "operationId": "quality_list_schedules",
         "responses": {
           "200": {
-            "description": "The tenant's schedules the caller may see",
+            "description": "The schedules the caller may see",
             "content": {
               "application/json": {
                 "schema": {
@@ -4470,7 +4470,7 @@
               "string",
               "null"
             ],
-            "description": "Its evaluation's manifest in the tenant's bucket, once evaluated."
+            "description": "Its evaluation's manifest in the warehouse bucket, once evaluated."
           },
           "records": {
             "type": [
@@ -7652,7 +7652,7 @@
     },
     {
       "name": "sources",
-      "description": "A tenant's sources and the driver catalog"
+      "description": "The sources and the driver catalog"
     },
     {
       "name": "cuts",
@@ -7672,7 +7672,7 @@
     },
     {
       "name": "console",
-      "description": "Statements over the tenant's lake"
+      "description": "Statements over the lake"
     },
     {
       "name": "queues",

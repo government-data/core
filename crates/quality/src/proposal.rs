@@ -104,7 +104,7 @@ pub struct TableProfile {
     pub columns: Vec<ColumnProfile>,
 }
 
-/// The texts the proposed rules carry, in the tenant's language.
+/// The texts the proposed rules carry, in the installation's language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Alerts {
     pub required: String,

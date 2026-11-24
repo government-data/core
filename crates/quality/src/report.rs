@@ -73,7 +73,7 @@ impl Report {
 
 /// An entity's ICD (decision 0057), compact as there is one per client:
 /// `[hash, icd, segment]`, the hash hex HMAC-SHA-256 of the normalized key
-/// with the tenant's entity key, never the key.
+/// with the entity key, never the key.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EntityIcdRow(pub String, pub Option<f64>, pub Option<String>);
 

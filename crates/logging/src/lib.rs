@@ -7,8 +7,8 @@
 //!
 //! - **JSON** (the default): one flat object per line. It starts with `time`
 //!   (RFC 3339, UTC), `level` (`INFO`, …), `service`, `vm` (from `OBS_VM`, as
-//!   Alloy reads it, else `dev`), `target` and `msg`; then `tenant`,
-//!   `request_id`, `run_id` and `job_id`, each lifted from the event or from
+//!   Alloy reads it, else `dev`), `target` and `msg`; then `request_id`,
+//!   `run_id` and `job_id`, each lifted from the event or from
 //!   the innermost span in scope that has it, and absent when none has; then
 //!   the event's other fields, then the spans' fields from the innermost out.
 //!   Numbers and booleans stay numbers and booleans; anything formatted with

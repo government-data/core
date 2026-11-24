@@ -198,7 +198,7 @@ fn columns(
     }
 }
 
-/// The tenant's schedules, oldest first.
+/// The schedules, oldest first.
 pub async fn list(pool: &PgPool) -> Result<Vec<StoredSchedule>, sqlx::Error> {
     let rows: Vec<Row> = sqlx::query_as(&format!(
         "SELECT {COLUMNS} FROM quality.schedules ORDER BY created_at, id"
@@ -208,7 +208,7 @@ pub async fn list(pool: &PgPool) -> Result<Vec<StoredSchedule>, sqlx::Error> {
     Ok(rows.into_iter().map(StoredSchedule::from).collect())
 }
 
-/// The schedule `id`, if it is the tenant's.
+/// The schedule `id`, if there is one.
 pub async fn get(pool: &PgPool, id: Uuid) -> Result<Option<StoredSchedule>, sqlx::Error> {
     let row: Option<Row> = sqlx::query_as(&format!(
         "SELECT {COLUMNS} FROM quality.schedules WHERE id = $1"

@@ -23,7 +23,7 @@ chrono-tz.workspace = true
 croner.workspace = true
 # Triggers in the style of the Windows Task Scheduler (decision 0035).
 schedule-core.workspace = true
-# The workers' routes (src/worker_api.rs): the job's tenant for row security.
+# The workers' routes (src/worker_api.rs).
 axum.workspace = true
 async-trait.workspace = true
 tracing.workspace = true
