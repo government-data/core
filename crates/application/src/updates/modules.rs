@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::module_menu::{self, ModuleMenu, Refusal};
+use super::module_permissions::{self, ModulePermissions};
 use super::{UpdatesError, UpdatesService};
 
 /// The longest name, version or drain path taken.
@@ -29,6 +30,9 @@ pub struct InstalledModule {
     /// Its entry in the apps menu, `None` without one.
     #[serde(default)]
     pub menu: Option<ModuleMenu>,
+    /// Its actions and managed policies, `None` when it declares none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permissions: Option<ModulePermissions>,
 }
 
 impl UpdatesService {
@@ -87,8 +91,40 @@ fn check(modules: &[InstalledModule]) -> Result<(), String> {
                 return Err(texts::tr!("app.updates.modules.badMenu", name = m.name))
             }
         }
+        let requires = m.menu.as_ref().and_then(|menu| menu.requires.as_deref());
+        module_permissions::check(&m.name, m.permissions.as_ref(), requires)
+            .map_err(|refusal| permissions_refusal(&m.name, refusal))?;
     }
     Ok(())
+}
+
+fn permissions_refusal(module: &str, refusal: module_permissions::Refusal) -> String {
+    use module_permissions::Refusal as R;
+    match refusal {
+        R::ForeignName(n) => {
+            texts::tr!("app.updates.modules.foreignName", name = module, action = n)
+        }
+        R::CoreAction(n) => texts::tr!("app.updates.modules.coreAction", name = module, action = n),
+        R::Repeated(n) => texts::tr!(
+            "app.updates.modules.repeatedAction",
+            name = module,
+            action = n
+        ),
+        R::BadDescription(n) => {
+            texts::tr!(
+                "app.updates.modules.badDescription",
+                name = module,
+                action = n
+            )
+        }
+        R::UnknownAction(n) => {
+            texts::tr!(
+                "app.updates.modules.unknownAction",
+                name = module,
+                action = n
+            )
+        }
+    }
 }
 
 fn is_name(name: &str) -> bool {
@@ -130,6 +166,7 @@ mod tests {
             drain_path: drain_path.map(Into::into),
             route_path: None,
             menu: None,
+            permissions: None,
         }
     }
 

@@ -209,6 +209,7 @@ mod tests {
             drain_path: drain_path.map(Into::into),
             route_path: None,
             menu: None,
+            permissions: None,
         }
     }
 

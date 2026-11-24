@@ -41,8 +41,9 @@ pub use settings::{
 };
 pub use updates::{
     DrainStatus, HistoryEntry, InLanguages, InstalledModule, Maintenance, MaintenanceError,
-    ModuleMenu, ModuleWork, ModulesWork, Requester, UpdatePolicy, UpdateRequest, UpdaterRow,
-    UpdatesError, UpdatesService, UpdatesStore, UpdatesView,
+    ModuleAction, ModuleMenu, ModulePermissions, ModulePolicy, ModuleWork, ModulesWork, Requester,
+    UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError, UpdatesService, UpdatesStore,
+    UpdatesView,
 };
 
 /// Application service exposing the health use case.

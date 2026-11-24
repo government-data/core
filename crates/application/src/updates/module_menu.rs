@@ -28,11 +28,15 @@ impl InLanguages {
     }
 }
 
-/// The entry of a module in the apps menu: its name and the page it opens.
+/// The entry of a module in the apps menu: its name, the page it opens and
+/// the action a person must hold on some resource to see it (quality-sdk
+/// decision 0009; `None`: everyone sees it).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModuleMenu {
     pub label: InLanguages,
     pub path: InLanguages,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires: Option<String>,
 }
 
 /// Why a module's route or menu is refused (the message's key).
@@ -120,6 +124,7 @@ mod tests {
                 en: en.into(),
                 es: es.into(),
             },
+            requires: None,
         }
     }
 
