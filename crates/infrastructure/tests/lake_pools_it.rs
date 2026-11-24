@@ -8,19 +8,11 @@ use domain::AdminId;
 use infrastructure::PgLakePools;
 use sqlx::postgres::PgPoolOptions;
 
-const MAIN: &str = "00000000-0000-0000-0000-000000000001";
 const ADMIN: &str = "00000000-0000-0000-0000-0000000000aa";
 const OTHER: &str = "00000000-0000-0000-0000-0000000000bb";
 
 fn at(secs: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000 + secs)
-}
-
-fn tenant(id: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: "t".into(),
-    }
 }
 
 fn layout(nodes: &[&str], drives: u16) -> PoolLayout {
@@ -39,7 +31,7 @@ async fn a_pool_is_kept_in_order_and_defined_again_in_place() {
     let store = PgLakePools::new(pool.clone());
     let first = layout(&["lake-d", "lake-a", "lake-c", "lake-b"], 2);
     let second = layout(&["lake-a", "lake-b", "lake-c", "lake-d", "lake-e"], 1);
-    tenancy::within(tenant(MAIN), async {
+    async {
         assert!(store.find("main").await.unwrap().is_none());
         assert!(store.all().await.unwrap().is_empty());
         let kept = store
@@ -56,9 +48,9 @@ async fn a_pool_is_kept_in_order_and_defined_again_in_place() {
             (second.clone(), OTHER)
         );
         assert_eq!(store.all().await.unwrap().len(), 1, "one row per pool");
-    })
+    }
     .await;
-    let three: Result<(i64,), _> = tenancy::within(tenant(MAIN), async {
+    let three: Result<(i64,), _> = async {
         sqlx::query_as(
             "INSERT INTO lake_pools (name, nodes, drives, defined_by, defined_at) \
              VALUES ('two', ARRAY['a','b','c'], 1, $1::uuid, now()) RETURNING 1::bigint",
@@ -66,7 +58,7 @@ async fn a_pool_is_kept_in_order_and_defined_again_in_place() {
         .bind(ADMIN)
         .fetch_one(&pool)
         .await
-    })
+    }
     .await;
     assert!(
         three.is_err(),

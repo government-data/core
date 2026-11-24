@@ -183,7 +183,7 @@ async fn a_rules_counts_keep_what_the_charts_group_them_by() {
     );
     let some = |s: &str| Some(s.to_string());
     assert_eq!(
-        f.grouping(B).await,
+        f.grouping().await,
         [
             (
                 "V-01".to_string(),
@@ -212,7 +212,7 @@ async fn a_report_lands_in_the_jobs_tenant_and_replaces_a_repeated_one() {
         StatusCode::NO_CONTENT
     );
     assert_eq!(
-        f.failures(B).await,
+        f.failures().await,
         [("V-01".to_string(), 5), ("V-02".to_string(), 0)]
     );
     // Each field's profile, once though reported twice; an older worker's
@@ -235,14 +235,14 @@ async fn a_report_lands_in_the_jobs_tenant_and_replaces_a_repeated_one() {
             Some(vec![0, 50, 20, 10, 10, 5, 4]),
         ),
     ];
-    assert_eq!(f.field_quality(B).await, profiles);
+    assert_eq!(f.field_quality().await, profiles);
     let mut older = report(5);
     older.as_object_mut().unwrap().remove("fields");
     assert_eq!(
         f.call("POST", &uri, "token-w1", Some(older)).await.0,
         StatusCode::NO_CONTENT
     );
-    assert!(f.field_quality(B).await.is_empty());
+    assert!(f.field_quality().await.is_empty());
 
     // Counts the tables refuse, a bad date, a rule twice: the worker's error.
     let mut bad = report(101);
@@ -263,7 +263,7 @@ async fn a_report_lands_in_the_jobs_tenant_and_replaces_a_repeated_one() {
         StatusCode::UNPROCESSABLE_ENTITY
     );
     assert_eq!(
-        f.failures(B).await.len(),
+        f.failures().await.len(),
         2,
         "a refused report changes nothing"
     );
@@ -297,16 +297,12 @@ async fn an_evaluation_leaves_its_manifest_once_and_its_results_point_to_it() {
         ),
         (job, "abc123", 3)
     );
-    let t = tenancy::Tenant {
-        id: B.into(),
-        slug: String::new(),
-    };
-    let stored: Option<String> = tenancy::within(t, async {
+    let stored: Option<String> = async {
         sqlx::query_scalar("SELECT manifest FROM quality.run_summary")
             .fetch_one(&f.app)
             .await
             .unwrap()
-    })
+    }
     .await;
     assert_eq!(stored, Some(key));
 }
@@ -314,7 +310,7 @@ async fn an_evaluation_leaves_its_manifest_once_and_its_results_point_to_it() {
 #[tokio::test]
 async fn an_extraction_publishes_its_cut_and_queues_its_evaluation_once() {
     let f = fixture().await;
-    let extract = f.cut(B).await;
+    let extract = f.cut().await;
     let uri = format!("/internal/jobs/{B}/{extract}/report");
     // Impossible counts, another date: refused, and nothing published.
     let mut wrong = extracted(-1);

@@ -14,9 +14,6 @@ use quality::source_store::{self, Put, Sealer, StoreError};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
-/// The installation's tenant, the main one (decision 0076).
-const A: &str = "00000000-0000-0000-0000-000000000001";
-
 /// Reverses the text behind a prefix: never the plain text in a column.
 struct Mirror;
 impl Sealer for Mirror {
@@ -64,13 +61,6 @@ async fn fixture() -> Fixture {
     Fixture { db, app }
 }
 
-fn tenant(id: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: String::new(),
-    }
-}
-
 fn map(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
     pairs
         .iter()
@@ -90,7 +80,7 @@ fn core(secrets: &[(&str, &str)]) -> Source {
 #[tokio::test]
 async fn secrets_are_sealed_kept_on_edit_and_rotated_in_two_versions() {
     let f = fixture().await;
-    tenancy::within(tenant(A), async {
+    async {
         let first = core(&[("user", "reader"), ("password", "first-synthetic")]);
         assert_eq!(
             source_store::put(&f.app, &Mirror, &first).await.unwrap(),
@@ -139,14 +129,14 @@ async fn secrets_are_sealed_kept_on_edit_and_rotated_in_two_versions() {
         assert_eq!(c.source.secrets["user"], "reader");
         assert_eq!(c.previous.unwrap()["password"], "first-synthetic");
         assert!(source_store::list(&f.app, &Mirror).await.unwrap()[0].previous);
-    })
+    }
     .await;
 }
 
 #[tokio::test]
 async fn a_source_that_does_not_hold_together_is_not_stored() {
     let f = fixture().await;
-    tenancy::within(tenant(A), async {
+    async {
         let missing = core(&[("user", "reader")]);
         assert!(matches!(
             source_store::put(&f.app, &Mirror, &missing).await,
@@ -160,7 +150,7 @@ async fn a_source_that_does_not_hold_together_is_not_stored() {
             source_store::credentials(&f.app, &Mirror, "core").await,
             Err(StoreError::NotFound)
         ));
-    })
+    }
     .await;
 }
 
@@ -168,7 +158,7 @@ async fn a_source_that_does_not_hold_together_is_not_stored() {
 async fn a_deletion_and_an_approval_of_the_same_source_go_one_after_the_other() {
     let f = fixture().await;
     let secrets = [("user", "reader"), ("password", "synthetic")];
-    tenancy::within(tenant(A), async {
+    async {
         source_store::put(&f.app, &Mirror, &core(&secrets))
             .await
             .unwrap();
@@ -189,6 +179,6 @@ async fn a_deletion_and_an_approval_of_the_same_source_go_one_after_the_other() 
             .await
             .unwrap()
             .is_none());
-    })
+    }
     .await;
 }

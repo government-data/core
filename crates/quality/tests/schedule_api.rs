@@ -307,7 +307,7 @@ async fn a_schedule_with_cuts_is_disabled_not_deleted() {
         "INSERT INTO quality.cuts (tenant_id, dataset, cut, schedule_id, due_at)
          VALUES ($1::uuid, 'loans', '2026-10-31', $2, now())",
     )
-    .bind(tenancy::MAIN_ID)
+    .bind("00000000-0000-0000-0000-000000000001")
     .bind(id)
     .execute(&f.db.pool)
     .await

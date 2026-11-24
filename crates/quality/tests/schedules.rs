@@ -13,9 +13,6 @@ use serde_json::json;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
-/// The installation's tenant, the main one (decision 0076).
-const A: &str = "00000000-0000-0000-0000-000000000001";
-
 struct Fixture {
     _db: testkit::TestDb,
     app: PgPool,
@@ -50,13 +47,6 @@ async fn fixture() -> Fixture {
     Fixture { _db: db, app }
 }
 
-fn tenant(id: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: String::new(),
-    }
-}
-
 /// 12:00 UTC on 31 October 2026: 07:00 in Bogotá.
 fn noon() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 10, 31, 12, 0, 0).unwrap()
@@ -69,7 +59,7 @@ fn spec(value: serde_json::Value) -> ScheduleSpec {
 #[tokio::test]
 async fn a_saved_schedule_is_what_the_scheduler_fires_and_an_edit_moves_its_next_fire() {
     let f = fixture().await;
-    tenancy::within(tenant(A), async {
+    async {
         let daily = spec(
             json!({ "cron": "0 6 * * *", "fires": "cut", "dataset": "loans", "rerun": "replace" }),
         );
@@ -117,14 +107,14 @@ async fn a_saved_schedule_is_what_the_scheduler_fires_and_an_edit_moves_its_next
             schedule_store::delete(&f.app, other).await.unwrap(),
             Deleted::NotFound
         );
-    })
+    }
     .await;
 }
 
 #[tokio::test]
 async fn a_trigger_is_saved_as_written_and_once_fires_once() {
     let f = fixture().await;
-    tenancy::within(tenant(A), async {
+    async {
         // Tomorrow at 06:00 in Bogotá, only that once; a cron sent along is
         // not kept.
         let once = spec(json!({
@@ -150,6 +140,6 @@ async fn a_trigger_is_saved_as_written_and_once_fires_once() {
             .await
             .unwrap()
             .is_empty());
-    })
+    }
     .await;
 }
