@@ -77,3 +77,8 @@ ring.workspace = true
 platform.workspace = true
 # The lake replica's state test checks the signature its stand-in gate got.
 sigv4.workspace = true
+# The lakes' admin adapters, served in process between the API and the
+# stand-in of their gate (decision 0078, step 11); a test dependency only:
+# the core's binary holds no RustFS code.
+lake-rustfs-admin = { path = "../lake-rustfs-admin" }
+reqwest.workspace = true

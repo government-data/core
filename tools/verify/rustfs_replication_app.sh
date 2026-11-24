@@ -13,8 +13,8 @@
 #     reached from the main lake's `replication` network by its name;
 #   - both gates' API check is stood in by whoami (every machine passes).
 #
-# infrastructure's tests/rustfs_replication_live.rs, the adapter the
-# application runs (RustfsLakeAdmin's LakeReplication), presenting an
+# lake-rustfs-admin's tests/rustfs_live.rs, the lake admin adapter's
+# replication (decision 0078, step 11), presenting an
 # `app` machine's certificate at both gates with each lake's admin keys,
 # configures a tenant's warehouse (made on the main lake beforehand, as
 # nothing in the application makes it yet) and is told a missing one is
@@ -159,7 +159,7 @@ adapter() { # RUN
   if LAKE_CA_FILE=$D/ca.crt LAKE_CLIENT_CERT_FILE=$D/app-1.pem QD_VERIFY_SOURCE="https://localhost:$SRC_PORT" \
     QD_VERIFY_REPLICA_PORT=$REP_PORT QD_VERIFY_NODE=localhost QD_VERIFY_PROXY=lake-1:9100 \
     QD_VERIFY_WAREHOUSE=$WAREHOUSE QD_VERIFY_MAIN_KEYS=$D/admin-source.env QD_VERIFY_REPLICA_KEYS=$D/admin-replica.env \
-    cargo test -j 2 -q -p infrastructure --test rustfs_replication_live -- --ignored --nocapture >"$D/rust.log" 2>&1; then
+    cargo test -j 2 -q -p lake-rustfs-admin --test rustfs_live the_adapter_configures -- --ignored --nocapture >"$D/rust.log" 2>&1; then
     grep -E '^(configured|a warehouse)' "$D/rust.log" | sed 's/^/[OK  ] /'
   else
     echo "[FAIL] the adapter:"

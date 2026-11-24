@@ -32,8 +32,8 @@
 #   (e) a second configuration run;
 #   (f) a delete on the source does not reach the replica;
 #   (g) the replica's gate down: what the source says, then the gate back;
-#   (h) the application's own adapter (RustfsLakeAdmin, run by cargo from
-#       crates/infrastructure/tests/rustfs_admin_live.rs) against the
+#   (h) the lake admin adapter's health (decision 0078, step 11; run by
+#       cargo from crates/lake-rustfs-admin/tests/rustfs_live.rs) against the
 #       replica's gate, published on this host's loopback alone
 #       (QD_VERIFY_GATE_PORT, 59020): its drives, a wrong secret, and no
 #       certificate. QD_VERIFY_SKIP_RUST=1 leaves it out.
@@ -177,7 +177,7 @@ if [ "${QD_VERIFY_SKIP_RUST:-0}" = 1 ]; then
   echo "[SKIP] QD_VERIFY_SKIP_RUST=1"
 elif LAKE_CA_FILE=$D/ca.crt LAKE_CLIENT_CERT_FILE=$D/app-1.pem QD_VERIFY_GATE_PORT=$GATE_PORT \
   QD_VERIFY_NODE=localhost QD_VERIFY_ADMIN_KEYS=$D/admin-replica.env \
-  cargo test -j 2 -q -p infrastructure --test rustfs_admin_live -- --ignored --nocapture >"$D/rust.log" 2>&1; then
+  cargo test -j 2 -q -p lake-rustfs-admin --test rustfs_live a_lake_behind_its_gate -- --ignored --nocapture >"$D/rust.log" 2>&1; then
   echo "[OK  ] RustfsLakeAdmin: drives answered, a wrong secret refused, no certificate refused"
   grep '^without a certificate' "$D/rust.log"
 else

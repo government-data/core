@@ -1,7 +1,8 @@
 //! The machines' routes over PostgreSQL, shared by `machines_it.rs` and
 //! `machines_lake_admin_it.rs`: the API with the real use cases, a CA made
 //! in each test, a signed-in browser, and a stand-in of a lake's gate on
-//! the loopback.
+//! the loopback, reached through the lakes' adapters served in process
+//! (decision 0078).
 
 #![allow(dead_code)]
 
@@ -15,8 +16,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use domain::{AdminId, Email, Role};
 use infrastructure::ca::{Ca, DEFAULT_CA_VALIDITY};
-use infrastructure::lake_http::LakeClient;
-use infrastructure::rustfs_admin::RustfsLakeAdmin;
+use infrastructure::lake_admins::AdapterLakeAdmins;
 use infrastructure::{
     Argon2Hasher, Argon2Params, EmbeddedInstallFiles, PgAdminRepository, PgAuditRepository,
     PgHealthCheck, PgIpLockoutStore, PgLakeAdminKeys, PgLakePools, PgMachines, PgSessionRepository,
@@ -34,8 +34,8 @@ pub(crate) struct World {
     pub(crate) app: axum::Router,
     pub(crate) machines: MachinesService,
     pub(crate) pool: sqlx::PgPool,
-    /// A stand-in of the lake replica's gate on the loopback, plain HTTP:
-    /// the lake's admin API asks a node named `localhost` here.
+    /// A stand-in of the lakes' gate on the loopback, plain HTTP: both
+    /// lakes' adapters ask it, the replica's machine named `localhost`.
     pub(crate) gate: std::net::TcpListener,
     pub(crate) _db: testkit::TestDb,
 }
@@ -87,10 +87,9 @@ pub(crate) async fn world(with_ca: bool, joins: u32) -> World {
     ));
     let pg = Arc::new(PgMachines::new(pool.clone()));
     let gate = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let lake = LakeClient::from_env(Duration::from_secs(5)).unwrap();
     let keys = Arc::new(PgLakeAdminKeys::new(pool.clone(), sealer()));
     let port = gate.local_addr().unwrap().port();
-    let lake_admin = Arc::new(RustfsLakeAdmin::new(lake, keys).at("http", port));
+    let lake_admin = Arc::new(adapters(port, keys).await);
     let mut machines = MachinesService::new(
         pg.clone(),
         Arc::new(RingJoinTokenMint::new()),
@@ -139,6 +138,38 @@ pub(crate) async fn world(with_ca: bool, joins: u32) -> World {
         gate,
         _db: db,
     }
+}
+
+/// The lakes' adapters, the main lake's and the replica's, served in
+/// process with a test CA, both asking the stand-in gate on `port`; and
+/// the core's client of them, with the kept `keys`.
+async fn adapters(port: u16, keys: Arc<PgLakeAdminKeys>) -> AdapterLakeAdmins {
+    let ca = testkit::tls::TestCa::new();
+    let serve = |role: &str| {
+        let certs = Arc::new(lake_rustfs_admin::Certs::from_pem(
+            &ca.pem,
+            &ca.machine(role, "localhost").bundle(),
+        ));
+        let at = format!("http://localhost:{port}");
+        let lake = lake_rustfs_admin::Rustfs::new(&at, "localhost", certs.clone()).with_client(
+            reqwest::Client::new(),
+            "http",
+            port,
+        );
+        async move {
+            let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let bound = tcp.local_addr().unwrap().port();
+            let serving =
+                lake_rustfs_admin::serve(tcp, certs, Arc::new(lake), std::future::pending());
+            tokio::spawn(serving);
+            bound
+        }
+    };
+    let main = serve("lake").await;
+    let replica = serve("lake-replica").await;
+    let core = ca.machine("app", "app-1").bundle();
+    let url = format!("https://localhost:{main}");
+    AdapterLakeAdmins::new(Some(&url), &ca.pem, &core, keys).replica_port(replica)
 }
 
 /// One tenant's warehouse, for the replication.
