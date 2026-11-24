@@ -20,6 +20,7 @@ use utoipa::{OpenApi, ToSchema};
 
 use crate::draft_api::{DraftCatalog, FileEdit, FileSaved, Refused, APPROVE, MANAGE};
 use crate::edit_api::{check, valid_file};
+use crate::refusal::refuse;
 use crate::rules_api::{self, MAIN};
 use crate::source::valid_name;
 
@@ -47,10 +48,6 @@ pub struct DeployBody {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DeployedOut {
     pub commit: String,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 /// Deploys a column's rules file to `main`.

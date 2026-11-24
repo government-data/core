@@ -14,13 +14,14 @@ use axum::routing::get;
 use axum::{Extension, Json, Router};
 use contracts::Caller;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use sqlx::PgPool;
 use utoipa::{OpenApi, ToSchema};
 
 use crate::catalog::Catalog;
 use crate::charts::{self, Chart, Parameters};
 use crate::mapping::Mapping;
+use crate::refusal::refuse;
 
 pub const VIEW: &str = "quality:ViewResults";
 /// The most recent evaluated cuts a dashboard offers.
@@ -71,10 +72,6 @@ pub struct ChartRows {
 pub struct CutQuery {
     /// `YYYY-MM-DD`.
     pub cut: Option<String>,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 fn failed(what: &str, e: impl std::fmt::Display) -> Response {

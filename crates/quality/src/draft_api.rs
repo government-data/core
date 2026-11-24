@@ -89,7 +89,7 @@ pub(crate) struct Refused(pub StatusCode, pub &'static str);
 
 impl IntoResponse for Refused {
     fn into_response(self) -> Response {
-        (self.0, Json(json!({ "error": self.1 }))).into_response()
+        crate::refusal::refuse(self.0, self.1)
     }
 }
 

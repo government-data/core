@@ -187,6 +187,12 @@ fn machines_and_modules(
     secret_box: &SecretBox,
 ) -> Result<(MachinesService, ModuleRegistry), Failure> {
     let dolt = crate::catalog_wiring::DoltSnapshots::from_env()?;
+    if dolt.is_none() {
+        tracing::warn!(
+            cause = "catalog_not_configured",
+            "no catalog: DOLT_URL is not set, the quality routes that read it answer 503"
+        );
+    }
     let machines = machines_wiring::service(&db.pool, secret_box.clone())?;
     let machines = match &dolt {
         Some(d) => machines.with_dolt(d.clone()),

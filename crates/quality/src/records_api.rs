@@ -22,6 +22,7 @@ use uuid::Uuid;
 
 use crate::catalog::Catalog;
 use crate::personal_data;
+use crate::refusal::refuse;
 use crate::reveal::{self, Refusal, RevealIn, Shown};
 use crate::source_api::VIEW;
 use crate::source_records::{AskError, RecordsAsk, RecordsPage};
@@ -71,10 +72,6 @@ pub struct RecordsOut {
     /// caller holds the permission that shows them whole.
     pub revealable: bool,
     pub page: Option<RecordsPage>,
-}
-
-fn refuse(code: StatusCode, error: &str) -> Response {
-    (code, Json(json!({ "error": error }))).into_response()
 }
 
 fn internal(e: sqlx::Error) -> Response {
