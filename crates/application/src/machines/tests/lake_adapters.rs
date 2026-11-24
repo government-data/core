@@ -27,6 +27,8 @@ pub(super) struct Adapters {
     pub(super) made: Mutex<Vec<(String, Result<WarehouseMade, LakeError>)>>,
     pub(super) replicated: Mutex<Vec<(String, Result<ReplicationState, LakeError>)>>,
     pub(super) asked: Mutex<Vec<Asked>>,
+    /// What the replication's read answers; `None` is "not asked here".
+    pub(super) synced: Mutex<Option<ReplicationSync>>,
     there: Mutex<Vec<String>>,
 }
 
@@ -110,7 +112,8 @@ impl LakeAdmin for At {
     }
 
     async fn replication(&self, _: &str) -> Result<ReplicationSync, LakeError> {
-        not_here()
+        let synced = self.all.synced.lock().unwrap().clone();
+        synced.map_or_else(not_here, Ok)
     }
 
     async fn set_managed_policies(&self, _: &[ManagedPolicy]) -> Result<(), LakeError> {

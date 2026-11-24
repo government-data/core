@@ -210,6 +210,7 @@ mod tests {
             route_path: None,
             menu: None,
             permissions: None,
+            provides: Vec::new(),
         }
     }
 

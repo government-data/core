@@ -14,6 +14,9 @@ use super::{UpdatesError, UpdatesService};
 /// The longest name, version or drain path taken.
 const MAX_LEN: usize = 200;
 
+/// The most capabilities a module may say it provides.
+const MAX_PROVIDES: usize = 16;
+
 /// An installed module.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstalledModule {
@@ -33,6 +36,11 @@ pub struct InstalledModule {
     /// Its actions and managed policies, `None` when it declares none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permissions: Option<ModulePermissions>,
+    /// The capabilities it provides (`lake`), as its manifest names them:
+    /// how the core knows a module's data is the one it replicates
+    /// without naming the module (decision 0078).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provides: Vec<String>,
 }
 
 impl UpdatesService {
@@ -102,6 +110,9 @@ fn check(modules: &[InstalledModule]) -> Result<(), String> {
                     name = m.name
                 ));
             }
+        }
+        if m.provides.len() > MAX_PROVIDES || !m.provides.iter().all(|c| is_name(c)) {
+            return Err(texts::tr!("app.updates.modules.badProvides", name = m.name));
         }
         match module_menu::check(m.route_path.as_deref(), m.menu.as_ref()) {
             Ok(()) => {}
@@ -197,6 +208,32 @@ mod tests {
             route_path: None,
             menu: None,
             permissions: None,
+            provides: Vec::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_module_says_the_capabilities_it_provides() {
+        let service = UpdatesService::new(Arc::new(MemoryMaintenance::default()));
+        let lake = InstalledModule {
+            provides: vec!["lake".into()],
+            ..module("lake-rustfs", None)
+        };
+        service.set_modules(vec![lake.clone()]).await.unwrap();
+        assert_eq!(service.installed_modules().await.unwrap(), [lake]);
+        let unread = serde_json::json!({"name": "docs", "version": "1.0.0"});
+        let older: InstalledModule = serde_json::from_value(unread).unwrap();
+        assert!(older.provides.is_empty(), "an agent that does not say them");
+        for bad in [vec!["Lake".to_string()], vec!["x".to_string(); 17]] {
+            let module = InstalledModule {
+                provides: bad,
+                ..module("lake-rustfs", None)
+            };
+            let refused = service.set_modules(vec![module]).await;
+            assert!(
+                matches!(refused, Err(UpdatesError::Invalid(..))),
+                "{refused:?}"
+            );
         }
     }
 

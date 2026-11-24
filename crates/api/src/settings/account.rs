@@ -183,6 +183,7 @@ mod tests {
             route_path: menu.as_ref().map(|_| format!("/{name}")),
             menu,
             permissions: None,
+            provides: Vec::new(),
         }
     }
 
