@@ -76,6 +76,8 @@ services:
       - --ssl-cert=/run/qd-node/machine.pem
       - --ssl-key=/run/qd-node/machine.pem
     environment:
-      MYSQL_PWD: ${DOLT_ROOT_PASSWORD:?set DOLT_ROOT_PASSWORD in .env}
+      # Empty in the core's package, whose root password is a file: run
+      # the one-shot there with DOLT_ROOT_PASSWORD set from it.
+      MYSQL_PWD: ${DOLT_ROOT_PASSWORD:-}
     volumes:
       - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro

@@ -11,7 +11,11 @@
 # branches included (`tenant_<id>/<branch>`): infra/dolt/tenant.sh.
 set -eu
 : "${DOLT_APP_USER:=qd_app}"
-: "${DOLT_APP_PASSWORD:?set DOLT_APP_PASSWORD in .env}"
+# From the file when given (the core's package, decision 0080).
+if [ -n "${DOLT_APP_PASSWORD_FILE:-}" ]; then
+  DOLT_APP_PASSWORD=$(cat "$DOLT_APP_PASSWORD_FILE")
+fi
+: "${DOLT_APP_PASSWORD:?set DOLT_APP_PASSWORD in .env (or DOLT_APP_PASSWORD_FILE)}"
 pw=$(printf %s "$DOLT_APP_PASSWORD" | sed "s/'/''/g")
 dolt sql <<SQL
 CREATE USER IF NOT EXISTS '$DOLT_APP_USER'@'%' IDENTIFIED BY '$pw';

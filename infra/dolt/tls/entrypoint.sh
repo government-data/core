@@ -22,6 +22,18 @@ WAIT=${QD_DOLT_TLS_WAIT:-300}
 
 log() { echo "dolt-tls: $*" >&2; }
 
+# The passwords from their files when given (the core's package, decision
+# 0080): the server makes root from DOLT_ROOT_PASSWORD at its first start,
+# and init/10-app-user.sh reads DOLT_APP_PASSWORD.
+for name in DOLT_ROOT_PASSWORD DOLT_APP_PASSWORD; do
+  file_var="${name}_FILE"
+  file=$(eval "printf %s \"\${$file_var:-}\"")
+  if [ -n "$file" ]; then
+    value=$(cat "$file") || { log "cannot read $file_var"; exit 1; }
+    export "$name=$value"
+  fi
+done
+
 present() { [ -s "$SRC/ca.crt" ] && [ -s "$SRC/machine.pem" ]; }
 
 waited=0
@@ -55,6 +67,8 @@ log "the machine's certificate copied for this start"
 DATA=/var/lib/dolt
 CONFIG=/etc/dolt/servercfg.d/config.yaml
 if [ ! -f "$DATA/.init_completed" ]; then
+  # Never a root without a password.
+  [ -n "${DOLT_ROOT_PASSWORD:-}" ] || { log "no DOLT_ROOT_PASSWORD (or _FILE) for the first init"; exit 1; }
   INIT=$(mktemp)
   sed -e 's/^  host: .*/  host: 127.0.0.1/' \
     -e '/^  tls_cert:/d' -e '/^  tls_key:/d' -e '/^  require_secure_transport:/d' \
