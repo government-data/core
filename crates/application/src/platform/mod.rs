@@ -8,10 +8,12 @@ use std::sync::Arc;
 
 use platform::{PlatformRepository, RepositoryError};
 
+mod module_policies;
 mod permissions;
 mod secrets;
 mod updates;
 
+pub use module_policies::{ModuleActionView, OfModule};
 pub use permissions::{CreatedServiceAccount, GroupChange, PolicyView};
 pub use platform::{MintedToken, TokenMint};
 

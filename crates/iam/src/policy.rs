@@ -100,6 +100,16 @@ pub fn valid_name(name: &str) -> bool {
 
 /// Check a custom policy's name and statements.
 pub fn validate(name: &str, statements: &[Statement]) -> Result<(), PolicyError> {
+    validate_with(name, statements, &[])
+}
+
+/// [`validate`], with `modules`: the actions installed modules declare, on
+/// the installation as a whole (quality-sdk decision 0009).
+pub fn validate_with(
+    name: &str,
+    statements: &[Statement],
+    modules: &[&str],
+) -> Result<(), PolicyError> {
     if !valid_name(name) {
         return Err(PolicyError::Name);
     }
@@ -114,7 +124,9 @@ pub fn validate(name: &str, statements: &[Statement]) -> Result<(), PolicyError>
             return Err(PolicyError::Empty);
         }
         for a in &s.actions {
-            if !ACTIONS.iter().any(|known| glob(a, known.name)) {
+            let known = ACTIONS.iter().any(|known| glob(a, known.name))
+                || modules.iter().any(|known| glob(a, known));
+            if !known {
                 return Err(PolicyError::UnknownAction(a.clone()));
             }
         }
@@ -126,7 +138,7 @@ pub fn validate(name: &str, statements: &[Statement]) -> Result<(), PolicyError>
                 return Err(PolicyError::BadResource(r.clone()));
             }
         }
-        kinds_match(s)?;
+        kinds_match(s, modules)?;
     }
     Ok(())
 }
@@ -135,14 +147,16 @@ pub fn validate(name: &str, statements: &[Statement]) -> Result<(), PolicyError>
 /// the catalog has them (decision 0064): each resource of a kind some action
 /// acts on, each action acting on some resource's kind. `*` is of every
 /// kind, and a global action's resource is `*`.
-fn kinds_match(s: &Statement) -> Result<(), PolicyError> {
+fn kinds_match(s: &Statement, modules: &[&str]) -> Result<(), PolicyError> {
     fn kind(r: &str) -> Option<&str> {
         r.split_once('/').map(|(k, _)| k)
     }
+    // A module's actions are global: they act on `*` only.
     let acts_on = |pattern: &str, kind: Option<&str>| {
         ACTIONS
             .iter()
             .any(|a| glob(pattern, a.name) && kind.is_none_or(|k| a.resource == Some(k)))
+            || (kind.is_none() && modules.iter().any(|a| glob(pattern, a)))
     };
     if let Some(r) = s
         .resources
@@ -259,7 +273,7 @@ mod tests {
         // What the managed policies hold stays valid.
         for p in crate::managed::all() {
             for s in &p.statements {
-                assert_eq!(kinds_match(s), Ok(()), "{}", p.name);
+                assert_eq!(kinds_match(s, &[]), Ok(()), "{}", p.name);
             }
         }
     }
@@ -272,5 +286,31 @@ mod tests {
         .unwrap();
         assert_eq!(s.effect, Effect::Deny);
         assert!(s.covers("quality:ViewPersonalData", "pipeline/x"));
+    }
+
+    #[test]
+    fn module_actions_are_known_and_global() {
+        let modules = ["bi-superset:Author", "bi-superset:Administer"];
+        let ok = |actions: &[&str], resources: &[&str]| {
+            validate_with("x", &[Statement::allow(actions, resources)], &modules)
+        };
+        assert_eq!(ok(&["bi-superset:Author"], &["*"]), Ok(()));
+        assert_eq!(ok(&["bi-superset:*"], &["*"]), Ok(()));
+        assert_eq!(
+            ok(&["bi-superset:Author", "quality:ViewRules"], &["*"]),
+            Ok(())
+        );
+        assert!(matches!(
+            ok(&["bi-superset:Author"], &["pipeline/p"]),
+            Err(PolicyError::KindMismatch(_))
+        ));
+        assert!(matches!(
+            ok(&["bi-superset:Fly"], &["*"]),
+            Err(PolicyError::UnknownAction(_))
+        ));
+        assert!(matches!(
+            validate("x", &[Statement::allow(&["bi-superset:Author"], &["*"])]),
+            Err(PolicyError::UnknownAction(_))
+        ));
     }
 }

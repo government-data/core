@@ -32,7 +32,7 @@ pub(crate) mod tests;
 pub use drain::{DrainStatus, ModuleWork, ModulesWork};
 pub use module_menu::{InLanguages, ModuleMenu};
 pub use module_permissions::{ModuleAction, ModulePermissions, ModulePolicy};
-pub use modules::InstalledModule;
+pub use modules::{DeclaredModule, InstalledModule};
 pub use policy::UpdatePolicy;
 pub use report::{DaemonReport, Outcome};
 pub use store::{

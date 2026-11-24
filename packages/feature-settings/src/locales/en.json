@@ -520,6 +520,7 @@
       "quality": "Data quality",
       "admin": "Administration"
     },
+    "removedModule": "removed module {{name}}",
     "addStatement": "Add statement",
     "removeStatement": "Remove statement",
     "saved": "Policy {{name}} saved.",

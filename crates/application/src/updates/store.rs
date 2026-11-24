@@ -116,10 +116,16 @@ pub trait UpdatesStore: Send + Sync {
     /// The platform's time zone as saved in Settings (decision 0079), `None`
     /// when it never was.
     async fn platform_timezone(&self) -> Result<Option<String>, String>;
-    /// Replace the installed modules (decision 0003).
+    /// Replace the installed modules (decision 0003), and keep each listed
+    /// module's permissions (none: empty) in place of its previous ones; a
+    /// module not listed keeps its own (quality-sdk decision 0009).
     async fn save_modules(&self, modules: &[super::InstalledModule]) -> Result<(), String>;
     /// The installed modules as last saved; none when they never were.
     async fn modules(&self) -> Result<Vec<super::InstalledModule>, String>;
+    /// Each module's permissions as kept, removed modules' included.
+    async fn module_permissions(
+        &self,
+    ) -> Result<std::collections::BTreeMap<String, super::ModulePermissions>, String>;
 }
 
 /// What an administrator sees in Settings → Updates.

@@ -50,6 +50,36 @@ impl UpdatesService {
     pub async fn installed_modules(&self) -> Result<Vec<InstalledModule>, String> {
         self.store.modules().await
     }
+
+    /// Every module's permissions the core keeps, a removed module's
+    /// included until it is purged (quality-sdk decision 0009).
+    pub async fn declared_modules(&self) -> Result<Vec<DeclaredModule>, String> {
+        let installed: std::collections::BTreeSet<String> = self
+            .store
+            .modules()
+            .await?
+            .into_iter()
+            .map(|m| m.name)
+            .collect();
+        let kept = self.store.module_permissions().await?;
+        Ok(kept
+            .into_iter()
+            .map(|(name, permissions)| DeclaredModule {
+                installed: installed.contains(&name),
+                name,
+                permissions,
+            })
+            .collect())
+    }
+}
+
+/// A module's actions and managed policies as the core keeps them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclaredModule {
+    pub name: String,
+    /// Whether the installed list names it now.
+    pub installed: bool,
+    pub permissions: ModulePermissions,
 }
 
 fn check(modules: &[InstalledModule]) -> Result<(), String> {
@@ -217,5 +247,22 @@ mod tests {
             );
         }
         assert_eq!(service.installed_modules().await.unwrap(), kept);
+    }
+
+    #[tokio::test]
+    async fn a_removed_modules_permissions_are_kept() {
+        let service = UpdatesService::new(Arc::new(MemoryMaintenance::default()));
+        let mut bi = module("bi-superset", None);
+        bi.permissions = Some(ModulePermissions::default());
+        service.set_modules(vec![bi]).await.unwrap();
+        let declared = service.declared_modules().await.unwrap();
+        assert_eq!(
+            (declared[0].name.as_str(), declared[0].installed),
+            ("bi-superset", true)
+        );
+        service.set_modules(vec![]).await.unwrap();
+        let declared = service.declared_modules().await.unwrap();
+        assert_eq!(declared.len(), 1);
+        assert!(!declared[0].installed, "removed, kept");
     }
 }

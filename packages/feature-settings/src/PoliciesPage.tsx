@@ -6,18 +6,10 @@ import { iamApi, SettingsApiError, type IamPolicy, type IamStatement } from "./a
 import { Field, lines, NoticeBox, Panel, useAction } from "./common";
 import { t } from "./i18n";
 import { CardIcon } from "./CardIcon";
-import { actionLabel, policyDescription } from "./iam";
+import { actionLabel } from "./iam";
+import { PoliciesTable } from "./PoliciesTable";
 
 const newStatement = (): IamStatement => ({ effect: "Allow", actions: [], resources: ["*"] });
-
-/** A statement in one line: «Permitir: Ver reglas, Ejecutar pipeline · en *». */
-function summary(s: IamStatement): string {
-  const verb = s.effect === "Allow" ? t("settings:policies.allow") : t("settings:policies.deny");
-  const actions = s.actions.includes("*")
-    ? t("settings:policies.everything")
-    : s.actions.map(actionLabel).join(", ");
-  return `${verb}: ${actions} · ${t("settings:policies.on")} ${s.resources.join(", ")}`;
-}
 
 /**
  * Settings → Policies (ADR 0016): the managed ones, which come with the
@@ -70,7 +62,17 @@ export const PoliciesPage: Component<{ embedded?: boolean }> = (props) => {
       .finally(() => setDeleting(undefined));
   };
 
-  /** The actions of a service (`quality`, `admin`), for the checkboxes. */
+  /** An action's name in the UI's language: a module's says what it does. */
+  const label = (action: string) =>
+    catalog()?.actions.find((a) => a.name === action)?.description ?? actionLabel(action);
+  /** A service's name (`quality`, `admin`); a module's, as it is named. */
+  const serviceLabel = (service: string) => {
+    const key = `settings:policies.service.${service}`;
+    const text = t(key);
+    return text === key || text === key.slice("settings:".length) ? service : text;
+  };
+
+  /** The actions of a service (`quality`, `admin`, a module), for the checkboxes. */
   const services = () => {
     const by = new Map<string, string[]>();
     for (const a of catalog()?.actions ?? []) {
@@ -107,63 +109,13 @@ export const PoliciesPage: Component<{ embedded?: boolean }> = (props) => {
       <NoticeBox notice={row.notice()} />
       <Show when={policies()}>
         {(list) => (
-          <div class="card">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>{t("settings:policies.name")}</th>
-                  <th>{t("settings:policies.statements")}</th>
-                  <th>{t("settings:policies.attached")}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                <For each={list()}>
-                  {(p) => (
-                    <tr>
-                      <td>
-                        <div>
-                          {p.name}{" "}
-                          <Show when={p.managed}>
-                            <span class="badge badge--muted">{t("settings:iam.managedBadge")}</span>
-                          </Show>
-                        </div>
-                        <Show when={policyDescription(p)}>
-                          <div class="table__muted">{policyDescription(p)}</div>
-                        </Show>
-                      </td>
-                      <td>
-                        <For each={p.statements}>
-                          {(s) => <div class="table__muted">{summary(s)}</div>}
-                        </For>
-                      </td>
-                      <td>{p.attached}</td>
-                      <td class="st-linked__actions">
-                        <Show when={!p.managed}>
-                          <button
-                            type="button"
-                            class="fk-btn fk-btn--sm"
-                            disabled={row.busy() || !catalog()}
-                            onClick={() => open(p)}
-                          >
-                            {t("settings:users.edit")}
-                          </button>{" "}
-                          <button
-                            type="button"
-                            class="fk-btn fk-btn--sm fk-btn--danger"
-                            disabled={row.busy()}
-                            onClick={() => setDeleting(p)}
-                          >
-                            {t("settings:users.delete")}
-                          </button>
-                        </Show>
-                      </td>
-                    </tr>
-                  )}
-                </For>
-              </tbody>
-            </table>
-          </div>
+          <PoliciesTable
+            policies={list()}
+            busy={row.busy()}
+            editable={!!catalog()}
+            onEdit={open}
+            onDelete={setDeleting}
+          />
         )}
       </Show>
 
@@ -231,9 +183,7 @@ export const PoliciesPage: Component<{ embedded?: boolean }> = (props) => {
                   <For each={services()}>
                     {([service, actions]) => (
                       <div class="st-action-group">
-                        <span class="st-field__label">
-                          {t(`settings:policies.service.${service}`)}
-                        </span>
+                        <span class="st-field__label">{serviceLabel(service)}</span>
                         <div class="st-policy-checks st-policy-checks--grid">
                           <For each={actions}>
                             {(a) => (
@@ -249,7 +199,7 @@ export const PoliciesPage: Component<{ embedded?: boolean }> = (props) => {
                                     })
                                   }
                                 />
-                                <span>{actionLabel(a)}</span>
+                                <span>{label(a)}</span>
                               </label>
                             )}
                           </For>

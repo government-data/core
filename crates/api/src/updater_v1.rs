@@ -43,7 +43,7 @@ pub const PREFIX: &str = "/updater/v1";
 /// What this core understands beyond the calls above (quality-sdk decision
 /// 0009), so the agent refuses or hides what it would ignore. Each name is
 /// added with the calls or fields it stands for.
-pub const FEATURES: &[&str] = &["menu-requires"];
+pub const FEATURES: &[&str] = &["menu-requires", "module-permissions"];
 
 /// "Scheduled soon" when the agent does not say: within 30 minutes.
 const DEFAULT_HORIZON: Duration = Duration::from_secs(30 * 60);
