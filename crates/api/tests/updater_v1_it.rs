@@ -171,7 +171,11 @@ async fn every_call_answers_the_update_agent() {
 
     let (status, body) = call(&w, "GET", "/updater/v1/version", agent, None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body, json!({ "version": domain::VERSION }));
+    let features = api::updater_v1::FEATURES;
+    assert_eq!(
+        body,
+        json!({ "version": domain::VERSION, "features": features })
+    );
 }
 
 #[tokio::test]
