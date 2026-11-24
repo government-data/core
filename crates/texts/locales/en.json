@@ -59,6 +59,7 @@
     },
     "updater": {
       "notTheAgent": "Only the update agent's certificate calls updater/v1.",
+      "noSuchModule": "no module {{name}} is installed",
       "unavailable": "The database does not answer."
     },
     "internal": {
@@ -188,6 +189,7 @@
       "modules": {
         "badDescription": "module {{name}}: {{action}} needs a description in each language",
         "badDrainPath": "module {{name}}: the drain path must start with «/» and stay under the module",
+        "badProvides": "module {{name}}: each capability it provides must be lower-case letters, digits and «-», at most 16",
         "badMenu": "module {{name}}: the menu entry needs a label in each language and paths under its route",
         "badName": "a module's name is lower-case letters, digits and «-»",
         "badRoutePath": "module {{name}}: the route path is «/» and one segment of lower-case letters, digits and «-»",

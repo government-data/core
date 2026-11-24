@@ -8,6 +8,7 @@
 //! | `PUT /updater/v1/maintenance`          | maintenance begins (`active`) or ends    |
 //! | `PUT /updater/v1/modules`              | the installed modules, the whole list    |
 //! | `GET /updater/v1/drain?horizon_secs=N` | what still runs, and whether it drained  |
+//! | `GET /updater/v1/modules/{name}/replica` | whether the replica of its data is in sync |
 //! | `GET /updater/v1/version`              | the version and the features it has      |
 //! | `POST /updater/v1/request`             | "Update now", for a person on the server |
 //!
@@ -26,7 +27,7 @@ use application::{
 };
 use auth_gateway::http::client_cert::{ClientCertificateError, ClientCertificates};
 use auth_gateway::{Machine, MachineRole};
-use axum::extract::{Query, Request, State};
+use axum::extract::{Path, Query, Request, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -78,6 +79,7 @@ pub fn routes(
         .route("/updater/v1/orders", get(orders))
         .route("/updater/v1/maintenance", put(maintenance))
         .route("/updater/v1/modules", put(modules))
+        .route("/updater/v1/modules/{name}/replica", get(replica))
         .route("/updater/v1/drain", get(drain))
         .route("/updater/v1/version", get(version))
         .route("/updater/v1/request", post(request))
@@ -232,6 +234,29 @@ async fn request(
         tracing::warn!("updater/v1 request: the audit could not be recorded: {e:?}");
     }
     (StatusCode::ACCEPTED, Json(json!(request))).into_response()
+}
+
+/// `GET /updater/v1/modules/{name}/replica`: `{"state": …}`, whether the
+/// replica of the installed module's data is in sync (decision 0078): no
+/// warehouse, bucket, endpoint, key or count. A module not installed is
+/// `404`.
+async fn replica(
+    State(updates): State<UpdatesService>,
+    Extension(caller): Extension<Caller>,
+    Path(name): Path<String>,
+) -> Response {
+    let installed = match updates.installed_modules().await {
+        Ok(installed) => installed,
+        Err(e) => return logged_unavailable("replica", &e),
+    };
+    let Some(module) = installed.into_iter().find(|m| m.name == name) else {
+        return refusal(
+            StatusCode::NOT_FOUND,
+            texts::tr!("api.updater.noSuchModule", name = name),
+        );
+    };
+    let state = caller.machines.replica_sync(&module.provides).await;
+    Json(json!({ "state": state.as_str() })).into_response()
 }
 
 /// `GET /updater/v1/version`: `{version, features}`.

@@ -29,7 +29,7 @@ pub const RECONCILER: &str = "qd-api";
 #[derive(Clone)]
 pub(super) struct Replication {
     state: Arc<dyn ReplicationStateStore>,
-    warehouses: Arc<dyn Warehouses>,
+    pub(super) warehouses: Arc<dyn Warehouses>,
 }
 
 /// Whether a run can configure anything, and with what.

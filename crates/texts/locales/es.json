@@ -59,6 +59,7 @@
     },
     "updater": {
       "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
+      "noSuchModule": "no hay ningún módulo {{name}} instalado",
       "unavailable": "La base de datos no responde."
     },
     "internal": {
@@ -188,6 +189,7 @@
       "modules": {
         "badDescription": "módulo {{name}}: {{action}} necesita una descripción en cada idioma",
         "badDrainPath": "módulo {{name}}: la ruta de drenaje debe empezar por «/» y quedarse bajo el módulo",
+        "badProvides": "módulo {{name}}: cada capacidad que provee debe ser de minúsculas, dígitos y «-», 16 a lo sumo",
         "badMenu": "módulo {{name}}: la entrada de menú necesita una etiqueta en cada idioma y rutas bajo su ruta",
         "badName": "el nombre de un módulo lleva minúsculas, dígitos y «-»",
         "badRoutePath": "módulo {{name}}: la ruta es «/» y un segmento de minúsculas, dígitos y «-»",

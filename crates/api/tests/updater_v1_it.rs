@@ -398,3 +398,35 @@ async fn the_agent_asks_for_an_update_for_a_person_on_the_server() {
     let (status, _) = call(&w, "POST", request, Some(&worker.cert), None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED, "only the agent");
 }
+
+#[tokio::test]
+async fn the_agent_asks_whether_a_modules_replica_is_in_sync() {
+    let w = world(true).await;
+    let cert = agent(&w.machines, "updater").await;
+    let agent = Some(cert.as_str());
+    let modules = json!({ "modules": [
+        { "name": "lake-rustfs", "version": "1.0.5", "provides": ["lake"] },
+        { "name": "docs", "version": "0.2.0" },
+    ] });
+    let (status, _) = call(&w, "PUT", "/updater/v1/modules", agent, Some(modules)).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let stored = w.updates.installed_modules().await.unwrap();
+    assert_eq!(stored[0].provides, ["lake"]);
+    let ask = |name: &str| format!("/updater/v1/modules/{name}/replica");
+    // Nothing the core replicates.
+    let (status, body) = call(&w, "GET", &ask("docs"), agent, None).await;
+    assert_eq!(
+        (status, body),
+        (StatusCode::OK, json!({ "state": "unknown" }))
+    );
+    // The lake's, with no adapter to ask here: not healthy, and no more said.
+    let (status, body) = call(&w, "GET", &ask("lake-rustfs"), agent, None).await;
+    assert_eq!(
+        (status, body),
+        (StatusCode::OK, json!({ "state": "unhealthy" }))
+    );
+    let (status, _) = call(&w, "GET", &ask("orchestrator"), agent, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = call(&w, "GET", &ask("lake-rustfs"), None, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "only the agent asks");
+}

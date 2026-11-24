@@ -794,5 +794,6 @@ mod lake_keys;
 mod lake_pools;
 mod lake_replica;
 mod lake_replication;
+mod lake_sync;
 mod lake_warehouse;
 mod series;
