@@ -8,7 +8,10 @@
 # with another role's, another CA's or a password; the API's role with its
 # password over TLS, verifying the server's name; the certificate the agent
 # renews is served after the watcher's next look, without a restart; the
-# backups go over TLS too.
+# backups go over TLS too. For modules (quality-sdk decision 0009): CONNECT
+# on the core's databases is revoked from PUBLIC, at first init and, for an
+# existing installation, at start; a module's role reaches its own database
+# from the network data-quality-db with verify-full, and not the core's.
 #
 # Its own Compose project (qd-verify-pg-tls), network and volumes, and port
 # 127.0.0.1:55433; nothing of the dev stack is touched. The repository's
@@ -35,6 +38,8 @@ cat >"$D/verify.yml" <<EOF
 networks:
   backend:
     name: $P-backend
+  db:
+    name: $P-db
 EOF
 export POSTGRES_SUPERUSER_PASSWORD APP_DB_PASSWORD
 POSTGRES_SUPERUSER_PASSWORD=$(openssl rand -hex 12)
@@ -154,6 +159,36 @@ echo "== The backups over TLS"
 dump=$(compose run --rm --no-deps -T --entrypoint sh postgres-backup -c \
   'pg_dump -Fc -f /tmp/dump && psql -XAtq -c "select ssl from pg_stat_ssl where pid = pg_backend_pid()"' 2>&1)
 expect "pg_dump and psql as the backup sidecar runs them (verify-full)" t "$(echo "$dump" | tail -1)"
+
+echo "== A module's role, from the modules' network"
+MODULE_PASSWORD=$(openssl rand -hex 12)
+admin "create role qs_module login password '$MODULE_PASSWORD'" >/dev/null
+admin "create database qs_module owner qs_module" >/dev/null
+admin "revoke connect on database qs_module from public" >/dev/null
+module_psql() {
+  docker run --rm --network "$P-db" -u "$(id -u):$(id -g)" -v "$D/client:/client:ro" \
+    postgres:16-alpine psql -XAtq "$1" -c "${2:-select current_user}" 2>&1
+}
+MODULE="host=$NAME user=qs_module password=$MODULE_PASSWORD sslmode=verify-full sslrootcert=/client/ca.crt"
+expect "its own database, over TLS, the server's name verified" "qs_module|t" \
+  "$(module_psql "$MODULE dbname=qs_module" "select current_user, ssl from pg_stat_ssl where pid = pg_backend_pid()")"
+like "the core's database" "permission denied for database" "$(module_psql "$MODULE dbname=quality_data")"
+like "the postgres database" "permission denied for database" "$(module_psql "$MODULE dbname=postgres")"
+expect "the API's role still opens the core's" quality_data_app \
+  "$(psql_as "host=$NAME sslmode=verify-full $APP")"
+expect "the metrics' role keeps CONNECT on postgres" t \
+  "$(admin "select has_database_privilege('qd_metrics', 'postgres', 'CONNECT')")"
+expect "the network has no way out" "no way out" \
+  "$(docker run --rm --network "$P-db" postgres:16-alpine sh -c \
+    'wget -q -T 3 -O /dev/null http://1.1.1.1/ 2>/dev/null && echo reached || echo no way out' 2>&1 | tail -1)"
+
+echo "== An existing installation gets the revoke at start"
+admin "grant connect on database quality_data to public" >/dev/null
+compose restart postgres >/dev/null 2>&1
+compose up -d --wait --wait-timeout 120 postgres >/dev/null 2>&1
+sleep 8
+like "the entrypoint revoked it again" "revoked from PUBLIC" "$(compose logs postgres 2>&1 | grep postgres-tls | tail -1)"
+like "the core's database, after the restart" "permission denied for database" "$(module_psql "$MODULE dbname=quality_data")"
 
 [ $FAILED = 0 ] && echo "ALL OK" || echo "SOME FAILED"
 exit $FAILED
