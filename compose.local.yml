@@ -1,4 +1,4 @@
-# The local (on-premise) edition's layer, over compose.yml and
+# The installation's local layer, over compose.yml and
 # compose.prod.yml: the API's internal routes for the host's update daemon
 # (quality-sdk's update agent). The documentation for the customers at /docs
 # is the docs module's (quality-sdk decision 0002).
