@@ -261,7 +261,7 @@ pub async fn fail_cuts(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let done = sqlx::query(
         "UPDATE quality.cuts c SET state = 'failed'
            FROM quality.jobs j
-          WHERE j.tenant_id = c.tenant_id AND j.state = 'failed'
+          WHERE j.state = 'failed'
             AND ((c.state = 'extracting' AND j.id = c.extract_job)
               OR (c.state = 'evaluating' AND j.id = c.evaluate_job))",
     )

@@ -179,7 +179,7 @@ async fn load(
 ) -> Result<(PageRow, Option<RecordsPage>, bool), Refusal> {
     let found: Result<Option<PageRow>, _> = sqlx::query_as(
         "SELECT j.state, j.error, r.page, j.parameters FROM quality.jobs j
-           LEFT JOIN quality.source_records r ON r.tenant_id = j.tenant_id AND r.job = j.id
+           LEFT JOIN quality.source_records r ON r.job = j.id
           WHERE j.id = $1 AND j.kind = $2 AND j.parameters->>'source' = $3
             AND j.parameters->>'by' = $4",
     )

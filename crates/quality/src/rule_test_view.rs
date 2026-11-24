@@ -34,7 +34,7 @@ async fn load(
 ) -> Result<(TestRow, Option<TestReport>, bool), Refusal> {
     let found: Result<Option<TestRow>, _> = sqlx::query_as(
         "SELECT j.dataset, j.state, j.error, t.report FROM quality.jobs j
-               LEFT JOIN quality.rule_tests t ON t.tenant_id = j.tenant_id AND t.job = j.id
+               LEFT JOIN quality.rule_tests t ON t.job = j.id
               WHERE j.id = $1 AND j.kind = 'test_rule' AND j.parameters->>'by' = $2",
     )
     .bind(job)
