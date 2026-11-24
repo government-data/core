@@ -15,9 +15,10 @@ workspace = true
 # service of its own serving `lake-admin/1` with mTLS, built in the core's
 # `crates/` until it moves to the module's repository (step 15). Never a
 # dependency of `server`: among the core's crates it depends on
-# `contracts` alone (and on `sigv4` once it calls RustFS, step 11).
+# `contracts` and `sigv4` alone.
 [dependencies]
 contracts.workspace = true
+sigv4.workspace = true
 axum.workspace = true
 tokio = { workspace = true, features = ["sync", "signal"] }
 rustls.workspace = true
@@ -28,9 +29,12 @@ serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+# RustFS's S3 and admin APIs (step 11): its errors' XML, the signing date.
+reqwest.workspace = true
+roxmltree.workspace = true
+chrono.workspace = true
 
 [dev-dependencies]
 # The contract suite's lake-admin/1 cases, and a test CA.
 lake-contract = { path = "../lake-contract" }
 testkit.workspace = true
-reqwest.workspace = true

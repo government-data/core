@@ -56,6 +56,32 @@ pub mod paths {
     }
 }
 
+/// The request headers that carry the keys an operation needs (decision
+/// 0078, the user's ruling of 2026-11-24): the adapter keeps none, so the
+/// core sends them with each call. Neither side logs them.
+pub mod headers {
+    use super::Credentials;
+
+    /// The lake's own admin keys.
+    pub const ADMIN_KEYS: &str = "x-lake-admin-keys";
+    /// The replica's admin keys, for `PUT /warehouses/{name}/replication`.
+    pub const REPLICA_KEYS: &str = "x-lake-replica-keys";
+
+    /// A header's value: `<access key>:<secret>`.
+    pub fn encode(keys: &Credentials) -> String {
+        format!("{}:{}", keys.access_key, keys.secret_key)
+    }
+
+    /// The keys of a header's value; `None` if it is not one.
+    pub fn decode(value: &str) -> Option<Credentials> {
+        let (access_key, secret_key) = value.split_once(':')?;
+        (!access_key.is_empty() && !secret_key.is_empty()).then(|| Credentials {
+            access_key: access_key.to_string(),
+            secret_key: secret_key.to_string(),
+        })
+    }
+}
+
 /// `GET /about`: the protocol versions served and the implementation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct About {
@@ -422,6 +448,19 @@ mod tests {
             &ErrorBody::new(ErrorCode::Lake, "PUT warehouse w"),
             json!({"error": "PUT warehouse w", "code": "lake", "retryable": true}),
         );
+    }
+
+    #[test]
+    fn keys_travel_in_a_header_and_back() {
+        let keys = Credentials {
+            access_key: "qd-platform-admin".into(),
+            secret_key: "ab".repeat(32),
+        };
+        let value = headers::encode(&keys);
+        assert_eq!(headers::decode(&value), Some(keys));
+        for bad in ["", "no-colon", ":secret", "access:"] {
+            assert_eq!(headers::decode(bad), None, "{bad}");
+        }
     }
 
     #[test]

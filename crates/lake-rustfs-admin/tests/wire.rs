@@ -6,14 +6,17 @@ use std::sync::Arc;
 use contracts::lake_admin::{self as wire, ErrorCode};
 use lake_contract::admin_wire::{self, AdminClient};
 use lake_rustfs_admin::routes::CALLER_ROLE;
-use lake_rustfs_admin::{serve, Certs};
+use lake_rustfs_admin::{serve, Certs, Rustfs};
 use testkit::tls::TestCa;
 
 /// The adapter on a free port of localhost: its `https://localhost:<port>`.
 async fn adapter(certs: Certs) -> String {
     let tcp = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = tcp.local_addr().unwrap().port();
-    tokio::spawn(serve(tcp, Arc::new(certs), std::future::pending()));
+    let certs = Arc::new(certs);
+    // A lake nothing answers at: these cases ask it nothing.
+    let lake = Arc::new(Rustfs::new("https://127.0.0.1:9", "lake-1", certs.clone()));
+    tokio::spawn(serve(tcp, certs, lake, std::future::pending()));
     format!("https://localhost:{port}")
 }
 
@@ -145,8 +148,8 @@ async fn a_grant_is_translated_twice_alike_and_a_bad_one_refused() {
     assert!(answer.policy.contains("arn:aws:s3:::qd-tenant-a1/*"));
 
     // The contract suite's error cases: a body that is no grant is `400
-    // invalid`; an unknown warehouse's replication, `404 unknown` (not
-    // served before step 11).
+    // invalid`; an unknown warehouse's replication, `404 unknown` (its
+    // `GET` is not served yet).
     admin_wire::errors(&core, "qd-tenant-unknown").await;
     let unsafe_grant = serde_json::json!({"warehouse": "qd-w", "write_objects_under": "../x"});
     let (status, body) = core.call("POST", &path, Some(&unsafe_grant)).await;

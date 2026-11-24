@@ -1,20 +1,27 @@
 //! `lake-admin/1`'s routes (decision 0078): the caller check, `GET /about`,
-//! `POST /policies/session` and the error shape. The operations on RustFS
-//! come with steps 11 and 12; until then they answer `404 unknown`.
+//! `GET /health`, `PUT /warehouses/{name}` and its replication, `POST
+//! /policies/session` and the error shape. The keys an operation needs
+//! come in its headers (`contracts::lake_admin::headers`), held for that
+//! call alone and never logged. The other operations (the managed
+//! policies, the replication's `GET`, the credentials and the pools) answer
+//! `404 unknown` until their steps.
+
+use std::sync::Arc;
 
 use axum::body::Body;
 use axum::body::Bytes;
-use axum::extract::{ConnectInfo, Request};
-use axum::http::{Method, StatusCode};
+use axum::extract::{ConnectInfo, Path, Request, State};
+use axum::http::{HeaderMap, Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
-use contracts::lake_admin::{self as wire, ErrorBody, ErrorCode};
+use contracts::lake_admin::{self as wire, headers, Credentials, ErrorBody, ErrorCode};
 use contracts::LakeGrant;
 
-use crate::policy;
+use crate::rustfs::Rustfs;
 use crate::tls::Peer;
+use crate::{health, policy, replication, warehouse};
 
 /// The only role whose certificate is answered: the core server's (0066).
 pub const CALLER_ROLE: &str = "app";
@@ -22,13 +29,23 @@ pub const CALLER_ROLE: &str = "app";
 /// The implementation's name, as `GET /about` gives it.
 pub const IMPLEMENTATION: &str = "lake-rustfs";
 
-/// Every route of the adapter, behind the caller check.
-pub fn router() -> Router {
+/// Every route of the adapter for the lake `lake`, behind the caller check.
+pub fn router(lake: Arc<Rustfs>) -> Router {
     Router::new()
         .route(&wire::paths::about(), get(about))
+        .route(&wire::paths::health(), get(lake_health).fallback(unserved))
+        .route(
+            &wire::paths::warehouse("{name}"),
+            put(ensure_warehouse).fallback(unserved),
+        )
+        .route(
+            &wire::paths::replication("{name}"),
+            put(replicate).fallback(unserved),
+        )
         .route(&wire::paths::session_policy(), post(session_policy))
         .fallback(unserved)
         .layer(middleware::from_fn(caller_check))
+        .with_state(lake)
 }
 
 async fn about() -> Json<wire::About> {
@@ -37,6 +54,88 @@ async fn about() -> Json<wire::About> {
         implementation: IMPLEMENTATION.into(),
         version: env!("CARGO_PKG_VERSION").into(),
     })
+}
+
+/// The keys in `header`, if it came; a value that is not keys is `400`.
+fn keys(map: &HeaderMap, header: &str, what: &str) -> Result<Option<Credentials>, Error> {
+    let Some(value) = map.get(header) else {
+        return Ok(None);
+    };
+    let keys = value.to_str().ok().and_then(headers::decode);
+    let invalid = || Error::new(ErrorCode::Invalid, format!("{what}: {header} is not keys"));
+    keys.map(Some).ok_or_else(invalid)
+}
+
+/// The keys in `header`, which the operation needs.
+fn needed(map: &HeaderMap, header: &str, what: &str) -> Result<Credentials, Error> {
+    let missing = || Error::new(ErrorCode::Invalid, format!("{what}: no {header}"));
+    keys(map, header, what)?.ok_or_else(missing)
+}
+
+/// A warehouse's name as a bucket's: 3 to 63 of `a-z`, `0-9`, `-`, `.`.
+fn checked(name: &str, what: &str) -> Result<(), Error> {
+    let fits = (3..=63).contains(&name.len())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'.');
+    if fits {
+        Ok(())
+    } else {
+        Err(Error::new(
+            ErrorCode::Invalid,
+            format!("{what}: not a warehouse's name"),
+        ))
+    }
+}
+
+fn body<T: serde::de::DeserializeOwned>(bytes: &Bytes, what: &str) -> Result<T, Error> {
+    serde_json::from_slice(bytes)
+        .map_err(|e| Error::new(ErrorCode::Invalid, format!("{what}: {e}")))
+}
+
+/// The lake's health, with the admin keys if they came.
+async fn lake_health(
+    State(lake): State<Arc<Rustfs>>,
+    map: HeaderMap,
+) -> Result<Json<wire::Health>, Error> {
+    let keys = keys(&map, headers::ADMIN_KEYS, "GET health")?;
+    health::health(&lake, keys.as_ref()).await.map(Json)
+}
+
+/// The warehouse made unless it is there: `201` made, else `200`.
+async fn ensure_warehouse(
+    State(lake): State<Arc<Rustfs>>,
+    Path(name): Path<String>,
+    map: HeaderMap,
+    bytes: Bytes,
+) -> Result<Response, Error> {
+    let what = format!("PUT warehouses/{name}");
+    checked(&name, &what)?;
+    let _: wire::RetentionRules = body(&bytes, &what)?;
+    let keys = needed(&map, headers::ADMIN_KEYS, &what)?;
+    let outcome = warehouse::ensure(&lake, &name, &keys).await;
+    let status = match outcome {
+        wire::WarehouseOutcome::Made => StatusCode::CREATED,
+        _ => StatusCode::OK,
+    };
+    Ok((status, Json(outcome)).into_response())
+}
+
+/// The warehouse replicated into the replica, with both lakes' keys.
+async fn replicate(
+    State(lake): State<Arc<Rustfs>>,
+    Path(name): Path<String>,
+    map: HeaderMap,
+    bytes: Bytes,
+) -> Result<Json<wire::ReplicationState>, Error> {
+    let what = format!("PUT warehouses/{name}/replication");
+    checked(&name, &what)?;
+    let target: wire::ReplicaTarget = body(&bytes, &what)?;
+    let source = needed(&map, headers::ADMIN_KEYS, &what)?;
+    let replica = needed(&map, headers::REPLICA_KEYS, &what)?;
+    let outcome = replication::configure(&lake, &name, &target, &source, &replica).await;
+    let unknown = || Error::new(ErrorCode::Unknown, format!("{what}: no such warehouse"));
+    outcome.state().map(Json).ok_or_else(unknown)
 }
 
 /// A grant in RustFS's dialect; changes nothing. The policy is answered,
