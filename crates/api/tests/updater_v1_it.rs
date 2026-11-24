@@ -309,6 +309,49 @@ async fn the_agent_tells_the_installed_modules_whole() {
     assert!(w.updates.installed_modules().await.unwrap().is_empty());
 }
 
+/// `bi-superset` as its manifest tells it: a menu entry for authors, and
+/// its actions and managed policies; `prefix` names its actions.
+fn analytics(prefix: &str) -> Value {
+    let author = format!("{prefix}:Author");
+    json!({ "modules": [{ "name": "bi-superset", "version": "1.0.0", "route_path": "/bi",
+        "menu": { "label": { "en": "Analytics", "es": "Análisis" },
+                  "path": { "en": "/bi/", "es": "/bi/" }, "requires": "bi-superset:Author" },
+        "permissions": {
+            "actions": [{ "name": author,
+                "description": { "en": "Create charts", "es": "Crear gráficos" } }],
+            "policies": [{ "name": "bi-superset:Authors",
+                "description": { "en": "BI authors", "es": "Autores de BI" },
+                "actions": [author, "quality:ViewResults"] }] } }] })
+}
+
+#[tokio::test]
+async fn a_module_tells_its_menu_condition_and_its_permissions() {
+    let w = world(true).await;
+    let cert = agent(&w.machines, "updater").await;
+    let agent = Some(cert.as_str());
+    let modules = analytics("bi-superset");
+    let (status, _) = call(&w, "PUT", "/updater/v1/modules", agent, Some(modules)).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let stored = w.updates.installed_modules().await.unwrap();
+    let menu = stored[0].menu.as_ref().unwrap();
+    assert_eq!(menu.requires.as_deref(), Some("bi-superset:Author"));
+    let permissions = stored[0].permissions.as_ref().unwrap();
+    assert_eq!(
+        permissions.actions[0].description.get("es"),
+        "Crear gráficos"
+    );
+    assert_eq!(permissions.policies[0].actions.len(), 2);
+
+    // An action under another module's prefix is refused, the list kept.
+    let foreign = analytics("lake-rustfs");
+    let (status, body) = call(&w, "PUT", "/updater/v1/modules", agent, Some(foreign)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"]
+        .as_str()
+        .is_some_and(|e| e.contains("lake-rustfs:Author")));
+    assert_eq!(w.updates.installed_modules().await.unwrap(), stored, "kept");
+}
+
 #[tokio::test]
 async fn the_agent_asks_for_an_update_for_a_person_on_the_server() {
     let w = world(true).await;

@@ -186,13 +186,18 @@
       "maintenanceDuration": "maintenance lasts between 1 s and {{as_secs}} h",
       "maintenanceReasonMissing": "the maintenance reason is missing",
       "modules": {
+        "badDescription": "module {{name}}: {{action}} needs a description in each language",
         "badDrainPath": "module {{name}}: the drain path must start with «/» and stay under the module",
         "badMenu": "module {{name}}: the menu entry needs a label in each language and paths under its route",
         "badName": "a module's name is lower-case letters, digits and «-»",
         "badRoutePath": "module {{name}}: the route path is «/» and one segment of lower-case letters, digits and «-»",
         "badVersion": "module {{name}}: the version is missing",
+        "coreAction": "module {{name}}: {{action}} is an action of the core, not of the module",
+        "foreignName": "module {{name}}: {{action}} is not «{{name}}:» and a name that starts with a capital letter",
         "menuWithoutRoute": "module {{name}}: a menu entry needs a route",
-        "repeated": "module {{name}} is named twice"
+        "repeated": "module {{name}} is named twice",
+        "repeatedAction": "module {{name}}: {{action}} is named twice, or there are too many",
+        "unknownAction": "module {{name}}: {{action}} is not an action of the core or of the module"
       },
       "noUpdateService": "this installation does not have the update service: repeat the installation or run «orquestador actualizar» on the server",
       "objectExpected": "an object was expected",

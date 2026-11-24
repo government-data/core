@@ -186,13 +186,18 @@
       "maintenanceDuration": "el mantenimiento dura entre 1 s y {{as_secs}} h",
       "maintenanceReasonMissing": "falta el motivo del mantenimiento",
       "modules": {
+        "badDescription": "módulo {{name}}: {{action}} necesita una descripción en cada idioma",
         "badDrainPath": "módulo {{name}}: la ruta de drenaje debe empezar por «/» y quedarse bajo el módulo",
         "badMenu": "módulo {{name}}: la entrada de menú necesita una etiqueta en cada idioma y rutas bajo su ruta",
         "badName": "el nombre de un módulo lleva minúsculas, dígitos y «-»",
         "badRoutePath": "módulo {{name}}: la ruta es «/» y un segmento de minúsculas, dígitos y «-»",
         "badVersion": "módulo {{name}}: falta la versión",
+        "coreAction": "módulo {{name}}: {{action}} es una acción del núcleo, no del módulo",
+        "foreignName": "módulo {{name}}: {{action}} no es «{{name}}:» y un nombre que empieza por mayúscula",
         "menuWithoutRoute": "módulo {{name}}: una entrada de menú necesita una ruta",
-        "repeated": "el módulo {{name}} aparece dos veces"
+        "repeated": "el módulo {{name}} aparece dos veces",
+        "repeatedAction": "módulo {{name}}: {{action}} aparece dos veces, o hay demasiadas",
+        "unknownAction": "módulo {{name}}: {{action}} no es una acción del núcleo ni del módulo"
       },
       "noUpdateService": "esta instalación no tiene el servicio de actualizaciones: repite la instalación o corre «orquestador actualizar» en el servidor",
       "objectExpected": "se esperaba un objeto",
