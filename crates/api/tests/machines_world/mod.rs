@@ -99,11 +99,9 @@ pub(crate) async fn world(with_ca: bool, joins: u32) -> World {
     )
     .with_lake_admin_keys(Arc::new(PgLakeAdminKeys::new(pool.clone(), sealer())))
     .with_lake_pools(Arc::new(PgLakePools::new(pool.clone())))
-    .with_lake_admin(lake_admin.clone())
+    .with_lake_admin(lake_admin)
     .with_main_lake(Some(format!("http://localhost:{port}")))
     .with_replication(
-        lake_admin.clone(),
-        lake_admin,
         Arc::new(infrastructure::PgReplicationState::new(pool.clone())),
         Arc::new(OneWarehouse),
     );

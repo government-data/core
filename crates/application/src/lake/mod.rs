@@ -3,11 +3,12 @@
 //! Iceberg REST, STS); [`LakeAdmin`] is the provisioning, whose one
 //! implementation in the core is the client of the lake's adapter
 //! (`lake-admin/1`). What a job may do is a [`LakeGrant`], never a policy.
-//! Nothing is wired to them yet.
+//! [`LakeAdmins`] gives each lake's adapter (point 9: one per lake).
 
 mod properties;
 mod wire;
 
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
@@ -307,6 +308,12 @@ pub trait LakeAdmin: Send + Sync {
     ) -> Result<LakeKeys, LakeError>;
     /// The lake's health now.
     async fn health(&self) -> Result<LakeHealth, LakeError>;
+}
+
+/// Port: each lake's provisioning, by the lake and where the core finds
+/// it: the main lake's address, or the replica's machine by its name.
+pub trait LakeAdmins: Send + Sync {
+    fn for_lake(&self, lake: &auth_gateway::Lake, node: &str) -> Arc<dyn LakeAdmin>;
 }
 
 #[cfg(test)]

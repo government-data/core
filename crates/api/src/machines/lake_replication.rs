@@ -54,8 +54,8 @@ pub struct ReplicationOut {
     readiness: &'static str,
     /// With `no_keys`: `main` or `replica`.
     lake: Option<&'static str>,
-    /// With `ready`: the main lake, the replica's node and the proxy the
-    /// main lake reaches it through.
+    /// With `ready`: the main lake and the replica's node; `proxy` is no
+    /// longer said (the lake's adapter works it out) and stays null.
     source: Option<String>,
     replica: Option<String>,
     proxy: Option<String>,
@@ -114,7 +114,6 @@ impl From<ReplicationStatus> for ReplicationOut {
             ReplicationReadiness::Ready(lakes) => {
                 out.source = Some(lakes.source);
                 out.replica = Some(lakes.replica);
-                out.proxy = Some(lakes.proxy);
             }
             ReplicationReadiness::NoAddress => out.readiness = "no_address",
             ReplicationReadiness::NoReplica(_) => out.readiness = "no_replica",

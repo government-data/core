@@ -328,7 +328,9 @@ async fn the_main_lakes_keys_make_the_warehouse_and_the_replicas_replicate_it() 
     assert_eq!(body["readiness"], json!("ready"), "{body}");
     assert_eq!(body["warehouses"][0]["state"], json!("configured"));
     let port = w.gate.local_addr().unwrap().port();
-    assert_eq!(body["proxy"], json!("localhost:9100"));
+    // Where the replication reaches the replica is the lake's to work out
+    // (decision 0078): no longer said by the core.
+    assert_eq!(body["proxy"], json!(null));
     assert_eq!(body["source"], json!(format!("http://localhost:{port}")));
     let heads = seen.join().unwrap();
     assert_eq!(heads.len(), 9);

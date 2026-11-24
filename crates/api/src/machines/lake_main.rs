@@ -7,8 +7,8 @@
 //! | ---------------------- | ---------------------------------------- |
 //! | `GET /lake/main/state` | where the main lake is, and what it says |
 
+use application::lake::LakeProbe;
 use application::{LakeAdminError, MachinesService, MainLakeState};
-use auth_gateway::LakeProbe;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};

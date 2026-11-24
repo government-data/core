@@ -8,7 +8,9 @@
 
 use std::sync::Arc;
 
-use auth_gateway::{Lake, LakeAdmin, LakeProbe};
+use auth_gateway::Lake;
+
+use crate::lake::{LakeAdmins, LakeProbe};
 
 use super::{LakeAdminError, MachinesService};
 
@@ -26,8 +28,8 @@ pub enum ReplicaState {
 }
 
 impl MachinesService {
-    /// With the lakes' admin API, which reads the kept keys itself.
-    pub fn with_lake_admin(mut self, api: Arc<dyn LakeAdmin>) -> Self {
+    /// With each lake's adapter, whose client reads the kept keys itself.
+    pub fn with_lake_admin(mut self, api: Arc<dyn LakeAdmins>) -> Self {
         self.lake_api = Some(api);
         self
     }
@@ -36,12 +38,12 @@ impl MachinesService {
     /// kept keys. Nothing is changed or audited: it is a read.
     pub async fn replica_state(&self) -> Result<ReplicaState, LakeAdminError> {
         let api = self.lake_api.as_ref().ok_or(LakeAdminError::Unavailable)?;
-        let backend = |e: domain::RepositoryError| LakeAdminError::Backend(e.to_string());
         let machine = match self.replica_machine().await? {
             Ok(machine) => machine,
             Err(state) => return Ok(state),
         };
-        let probe = api.probe(&Lake::Replica, &machine).await.map_err(backend)?;
+        let health = api.for_lake(&Lake::Replica, &machine).health().await;
+        let probe = LakeProbe::from(health);
         Ok(ReplicaState::Probed { machine, probe })
     }
 }

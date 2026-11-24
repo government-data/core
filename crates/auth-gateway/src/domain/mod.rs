@@ -30,15 +30,14 @@ pub use auth::{
     PasswordPolicyError, PasswordRequirement, ProfilePicture,
 };
 pub use directory::{DirectoryAccounts, DirectoryAuthenticator, DirectoryError, DirectoryUser};
-pub use lake_admin::{LakeAdmin, LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept, LakeProbe};
+pub use lake_admin::{LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept};
 pub use lake_pool::{
     LakePool, LakePoolStore, PoolLayout, PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES,
     MIN_POOL_NODES, REPLICATION_ALIAS, RUSTFS_PEER_PORT,
 };
 pub use lake_replication::{
-    LakeReplication, LakeWarehouses, ReplicationOutcome, ReplicationStateStore, ReplicationStep,
-    WarehouseOutcome, WarehouseReplication, WarehouseState, Warehouses, REPLICATION_PROXY_PORT,
-    REPLICA_RETENTION_DAYS, SOURCE_NONCURRENT_DAYS,
+    ReplicationOutcome, ReplicationStateStore, ReplicationStep, WarehouseState, Warehouses,
+    REPLICATION_PROXY_PORT, REPLICA_RETENTION_DAYS, SOURCE_NONCURRENT_DAYS,
 };
 pub use machine::{
     is_join_token, CertificateSigner, CertificateTerm, JoinTokenMint, Machine, MachineChange,

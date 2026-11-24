@@ -156,7 +156,7 @@ async fn a_nodes_token_names_it_and_joining_under_another_name_is_refused() {
 }
 
 #[tokio::test]
-async fn a_pools_replication_goes_through_the_alias_every_node_maps_to_itself() {
+async fn the_main_lake_is_said_a_pool_once_its_pool_is_defined() {
     let r = super::lake_replication::run(Some("https://lake-a:9000"), vec!["qd-tenant-a"]);
     let service =
         r.w.service
@@ -170,7 +170,7 @@ async fn a_pools_replication_goes_through_the_alias_every_node_maps_to_itself() 
     let ReplicationReadiness::Ready(lakes) = ready else {
         panic!("ready: {ready:?}");
     };
-    assert_eq!(lakes.proxy, "lake-a:9100", "a single node's own name");
+    assert!(!lakes.source_pool, "a single node");
     service
         .define_pool("main", &nodes(&FOUR), 1, &by, &from)
         .await
@@ -179,5 +179,5 @@ async fn a_pools_replication_goes_through_the_alias_every_node_maps_to_itself() 
     let ReplicationReadiness::Ready(lakes) = ready else {
         panic!("ready: {ready:?}");
     };
-    assert_eq!(lakes.proxy, "qd-lake-replication:9100");
+    assert!(lakes.source_pool, "the main pool");
 }

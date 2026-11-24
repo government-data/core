@@ -10,8 +10,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use application::lake::LakeProbe;
 use async_trait::async_trait;
-use auth_gateway::{Lake, LakeAdmin, LakeAdminKeys, LakeProbe};
+use auth_gateway::{Lake, LakeAdminKeys};
 use chrono::{DateTime, Utc};
 use domain::RepositoryError;
 
@@ -92,9 +93,10 @@ impl RustfsLakeAdmin {
     }
 }
 
-#[async_trait]
-impl LakeAdmin for RustfsLakeAdmin {
-    async fn probe(&self, lake: &Lake, node: &str) -> Result<LakeProbe, RepositoryError> {
+impl RustfsLakeAdmin {
+    /// Asks `node` of `lake` for its `info`: a node's name, reached on its
+    /// gate's port, or the lake's base URL (the main lake's).
+    pub async fn probe(&self, lake: &Lake, node: &str) -> Result<LakeProbe, RepositoryError> {
         let Some(keys) = self.keys.open(lake).await? else {
             return Ok(LakeProbe::NoKeys);
         };

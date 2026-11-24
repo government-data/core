@@ -8,11 +8,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use auth_gateway::{
-    Lake, LakeAdminKeys, LakeReplication, ReplicationOutcome, WarehouseReplication,
-};
+use auth_gateway::{Lake, LakeAdminKeys, ReplicationOutcome};
 use domain::RepositoryError;
 use infrastructure::rustfs_admin::{AdminKeySource, RustfsLakeAdmin};
+use infrastructure::rustfs_replication::WarehouseReplication;
 
 fn var(name: &str) -> String {
     std::env::var(name)

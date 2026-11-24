@@ -4,12 +4,13 @@
 //! key.
 
 use auth_gateway::{
-    Lake, LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept, LakeReplication, LakeWarehouses,
-    ReplicationOutcome, ReplicationStateStore, ReplicationStep, WarehouseOutcome,
-    WarehouseReplication, WarehouseState, Warehouses,
+    Lake, LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept, ReplicationOutcome,
+    ReplicationStateStore, ReplicationStep, WarehouseState, Warehouses,
 };
 
+use super::lake_adapters::{Adapters, Shared};
 use super::*;
+use crate::lake::{ReplicaTarget, ReplicationState};
 
 /// Which lakes have keys kept.
 #[derive(Default)]
@@ -39,57 +40,6 @@ impl LakeAdminKeyStore for Kept {
             set_by: admin(),
             set_at: SystemTime::UNIX_EPOCH,
         }))
-    }
-}
-
-/// An adapter that answers `outcome` per warehouse and records each plan.
-#[derive(Default)]
-pub(super) struct Api {
-    outcomes: Mutex<Vec<(String, ReplicationOutcome)>>,
-    pub(super) asked: Mutex<Vec<WarehouseReplication>>,
-}
-
-/// A main lake that makes a missing warehouse and keeps it, or answers
-/// `outcomes` per warehouse; it records each one asked, and its source.
-#[derive(Default)]
-pub(super) struct Maker {
-    pub(super) outcomes: Mutex<Vec<(String, WarehouseOutcome)>>,
-    pub(super) asked: Mutex<Vec<(String, String)>>,
-    there: Mutex<Vec<String>>,
-}
-
-#[async_trait]
-impl LakeWarehouses for Maker {
-    async fn ensure(
-        &self,
-        source: &str,
-        warehouse: &str,
-    ) -> Result<WarehouseOutcome, RepositoryError> {
-        let asked = (source.to_string(), warehouse.to_string());
-        self.asked.lock().unwrap().push(asked);
-        let outcomes = self.outcomes.lock().unwrap();
-        if let Some((_, o)) = outcomes.iter().find(|(name, _)| name == warehouse) {
-            return Ok(o.clone());
-        }
-        let mut there = self.there.lock().unwrap();
-        if there.iter().any(|w| w == warehouse) {
-            return Ok(WarehouseOutcome::Present);
-        }
-        there.push(warehouse.to_string());
-        Ok(WarehouseOutcome::Made)
-    }
-}
-
-#[async_trait]
-impl LakeReplication for Api {
-    async fn configure(
-        &self,
-        w: &WarehouseReplication,
-    ) -> Result<ReplicationOutcome, RepositoryError> {
-        self.asked.lock().unwrap().push(w.clone());
-        let outcomes = self.outcomes.lock().unwrap();
-        let found = outcomes.iter().find(|(name, _)| *name == w.warehouse);
-        Ok(found.map_or(ReplicationOutcome::Configured, |(_, o)| o.clone()))
     }
 }
 
@@ -139,16 +89,14 @@ impl Warehouses for Tenants {
 pub(super) struct Run {
     pub(super) w: World,
     keys: Arc<Kept>,
-    pub(super) api: Arc<Api>,
-    pub(super) maker: Arc<Maker>,
+    pub(super) lakes: Arc<Adapters>,
     pub(super) state: Arc<State>,
 }
 
 pub(super) fn run(endpoint: Option<&str>, warehouses: Vec<&'static str>) -> Run {
-    let (keys, api, maker, state) = (
+    let (keys, lakes, state) = (
         Arc::new(Kept::default()),
-        Arc::new(Api::default()),
-        Arc::new(Maker::default()),
+        Arc::new(Adapters::default()),
         Arc::new(State::default()),
     );
     let w = world();
@@ -156,12 +104,8 @@ pub(super) fn run(endpoint: Option<&str>, warehouses: Vec<&'static str>) -> Run 
         .service
         .with_lake_admin_keys(keys.clone())
         .with_main_lake(endpoint.map(str::to_string))
-        .with_replication(
-            api.clone(),
-            maker.clone(),
-            state.clone(),
-            Arc::new(Tenants(warehouses)),
-        );
+        .with_lake_admin(Arc::new(Shared(lakes.clone())))
+        .with_replication(state.clone(), Arc::new(Tenants(warehouses)));
     let w = World {
         service,
         audit: w.audit,
@@ -170,8 +114,7 @@ pub(super) fn run(endpoint: Option<&str>, warehouses: Vec<&'static str>) -> Run 
     Run {
         w,
         keys,
-        api,
-        maker,
+        lakes,
         state,
     }
 }
@@ -230,7 +173,7 @@ async fn nothing_runs_until_both_lakes_are_known_and_both_keys_kept() {
         status.readiness,
         ReplicationReadiness::NoKeys { lake: Lake::main() }
     );
-    assert!(status.warehouses.is_empty() && r.maker.asked.lock().unwrap().is_empty());
+    assert!(status.warehouses.is_empty() && r.lakes.warehouses_asked().is_empty());
     r.keep(Lake::main());
     let status = s.replicate(None).await.unwrap();
     assert_eq!(
@@ -239,7 +182,7 @@ async fn nothing_runs_until_both_lakes_are_known_and_both_keys_kept() {
             lake: Lake::Replica
         }
     );
-    assert!(r.api.asked.lock().unwrap().is_empty());
+    assert!(r.lakes.replications_asked().is_empty());
     assert!(r.replication_events().is_empty());
     let made: Vec<_> = status.warehouses.iter().map(|w| &w.outcome).collect();
     assert_eq!(
@@ -250,7 +193,7 @@ async fn nothing_runs_until_both_lakes_are_known_and_both_keys_kept() {
 }
 
 #[tokio::test]
-async fn every_warehouse_is_configured_through_the_sources_proxy_and_audited_once() {
+async fn every_warehouse_is_configured_by_the_main_lakes_adapter_and_audited_once() {
     let r = run(Some("https://lake-1:9000/"), vec![B, A, A]);
     r.replica("replica-1").await;
     r.keep(Lake::main());
@@ -261,15 +204,25 @@ async fn every_warehouse_is_configured_through_the_sources_proxy_and_audited_onc
     let lakes = Lakes {
         source: "https://lake-1:9000".into(),
         replica: "replica-1".into(),
-        proxy: "lake-1:9100".into(),
+        source_pool: false,
     };
     assert_eq!(status.readiness, ReplicationReadiness::Ready(lakes));
-    let asked = r.api.asked.lock().unwrap().clone();
-    let names: Vec<&str> = asked.iter().map(|p| p.warehouse.as_str()).collect();
-    assert_eq!(names, [A, B], "each once, in order");
-    assert!(asked
-        .iter()
-        .all(|p| p.proxy == "lake-1:9100" && p.replica == "replica-1"));
+    let target = ReplicaTarget {
+        endpoint: "replica-1".into(),
+        source_pool: false,
+    };
+    let at = |w: &str| {
+        (
+            "https://lake-1:9000".to_string(),
+            w.to_string(),
+            target.clone(),
+        )
+    };
+    assert_eq!(
+        r.lakes.replications_asked(),
+        [at(A), at(B)],
+        "each once, in order, of the main lake"
+    );
     assert_eq!(status.warehouses.len(), 2);
     assert!(status
         .warehouses
@@ -288,7 +241,7 @@ async fn every_warehouse_is_configured_through_the_sources_proxy_and_audited_onc
     // The reconcile again: asked again, nothing new audited.
     r.w.advance(Duration::from_secs(3600));
     let again = s.replicate(None).await.unwrap();
-    assert_eq!(r.api.asked.lock().unwrap().len(), 4);
+    assert_eq!(r.lakes.replications_asked().len(), 4);
     assert_eq!(r.replication_events().len(), 2);
     let first = status.warehouses[0].configured_at;
     assert_eq!(
@@ -311,10 +264,16 @@ async fn a_failure_is_kept_audited_by_the_application_and_a_missing_warehouse_is
         step: ReplicationStep::RemoteTarget,
         detail: "HTTP 502".into(),
     };
-    r.api.outcomes.lock().unwrap().extend([
-        (A.to_string(), failed.clone()),
-        (B.to_string(), ReplicationOutcome::NoWarehouse),
-    ]);
+    let answered = ReplicationState::Failed {
+        step: "remote_target".into(),
+        detail: "HTTP 502".into(),
+    };
+    let unknown = crate::lake::LakeError::Unknown(format!("PUT {B}: no such warehouse"));
+    r.lakes
+        .replicated
+        .lock()
+        .unwrap()
+        .extend([(A.to_string(), Ok(answered)), (B.to_string(), Err(unknown))]);
     let s = &r.w.service;
     let status = s.replicate(None).await.unwrap();
     let outcomes: Vec<_> = status

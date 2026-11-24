@@ -53,16 +53,15 @@ pub use self::domain::{
     InstallFile, InstallFiles, JoinGrant, JoinTokenCheck, Lake, LakeRootKeyStore, LakeRootKeys,
     MAIN_POOL,
 };
-pub use self::domain::{LakeAdmin, LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept, LakeProbe};
+pub use self::domain::{LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept};
 pub use self::domain::{
     LakePool, LakePoolStore, PoolLayout, PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES,
     MIN_POOL_NODES, REPLICATION_ALIAS, RUSTFS_PEER_PORT,
 };
 pub use self::domain::{
-    LakeReplication, LakeWarehouses, ReplicationOutcome, ReplicationStateStore, ReplicationStep,
-    WarehouseOutcome, WarehouseReplication, WarehouseState, Warehouses, REPLICATION_PROXY_PORT,
-    REPLICA_RETENTION_DAYS, SOURCE_NONCURRENT_DAYS,
+    Line, MachineCharts, MachineSeries, SeriesRange, SeriesUnavailable, SeriesWindow,
 };
 pub use self::domain::{
-    Line, MachineCharts, MachineSeries, SeriesRange, SeriesUnavailable, SeriesWindow,
+    ReplicationOutcome, ReplicationStateStore, ReplicationStep, WarehouseState, Warehouses,
+    REPLICATION_PROXY_PORT, REPLICA_RETENTION_DAYS, SOURCE_NONCURRENT_DAYS,
 };
