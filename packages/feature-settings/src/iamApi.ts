@@ -9,6 +9,17 @@ import { request } from "./http";
 export interface IamAction {
   name: string;
   resource: string | null;
+  /** Of a module's action: what it does, in the UI's language. */
+  description?: string;
+  /** Of a module's action or managed policy: the module. */
+  module?: IamModule;
+}
+
+/** The module an action or a managed policy belongs to; a removed module's
+ * stay until it is purged. */
+export interface IamModule {
+  name: string;
+  installed: boolean;
 }
 
 export interface IamCatalog {
@@ -30,6 +41,8 @@ export interface IamPolicy {
   managed: boolean;
   /** How many accounts, groups and service accounts have it. */
   attached: number;
+  /** Of a module's managed policy: the module. */
+  module?: IamModule;
 }
 
 export interface IamGroupMember {

@@ -14,9 +14,12 @@ export function actionLabel(action: string): string {
   return label === key || label === key.slice("settings:".length) ? action : label;
 }
 
-/** A managed policy's description in the UI's language; a custom one's, as written. */
-export function policyDescription(p: Pick<IamPolicy, "name" | "description" | "managed">): string {
-  return p.managed ? t(`settings:iam.managed.${p.name}`) : p.description;
+/** A managed policy's description in the UI's language; a module's comes in
+ * it; a custom one's, as written. */
+export function policyDescription(
+  p: Pick<IamPolicy, "name" | "description" | "managed" | "module">,
+): string {
+  return p.managed && !p.module ? t(`settings:iam.managed.${p.name}`) : p.description;
 }
 
 /** The policies, as chips. */

@@ -3,7 +3,7 @@
 //!
 //! | Route                                | Does                                                  |
 //! | ------------------------------------ | ----------------------------------------------------- |
-//! | `GET /iam/catalog`                   | the actions (with their kind of resource) and kinds   |
+//! | `GET /iam/catalog`                   | the actions (the modules' too) and the kinds          |
 //! | `GET /iam/policies`                  | the managed and custom policies, with their use       |
 //! | `PUT /iam/policies/{name}`           | create or change a custom one                         |
 //! | `DELETE /iam/policies/{name}`        | remove a custom one                                   |
@@ -65,15 +65,22 @@ pub fn routes(platform: PlatformService, sessions: SessionService) -> Router {
 }
 
 /// The actions in display order, with the kind of resource each acts on
-/// (`null`: the installation as a whole).
-async fn catalog() -> Json<Value> {
-    Json(json!({
-        "actions": ACTIONS
-            .iter()
-            .map(|a| json!({ "name": a.name, "resource": a.resource }))
-            .collect::<Vec<_>>(),
+/// (`null`: the installation as a whole), then the modules' (quality-sdk
+/// decision 0009), each global, with its description in the request's
+/// language and its module (`{name, installed}`).
+async fn catalog(State(platform): State<PlatformService>) -> ApiResult<Json<Value>> {
+    let core = ACTIONS
+        .iter()
+        .map(|a| json!({ "name": a.name, "resource": a.resource }));
+    let modules = platform.module_actions().await.map_err(to_api)?;
+    let of_modules = modules.into_iter().map(|a| {
+        json!({ "name": a.name, "resource": null, "description": a.description,
+                "module": a.module })
+    });
+    Ok(Json(json!({
+        "actions": core.chain(of_modules).collect::<Vec<_>>(),
         "resource_kinds": RESOURCE_KINDS,
-    }))
+    })))
 }
 
 async fn list_policies(

@@ -11,15 +11,18 @@ use iam::{managed, Actor, Permissions, Policy, Statement};
 use platform::{Group, GroupFields, NewServiceAccount, PrincipalKind, ServiceAccount, UserAccess};
 use serde::Serialize;
 
+use super::module_policies::{self, OfModule};
 use super::{require, PlatformError, PlatformService, R};
 
-/// A policy as Settings shows it: managed or custom, and how many principals
-/// have it.
+/// A policy as Settings shows it: managed or custom, how many principals
+/// have it and, of a module's managed policy, the module.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PolicyView {
     #[serde(flatten)]
     pub policy: Policy,
     pub attached: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub module: Option<OfModule>,
 }
 
 /// A group to create or change: its fields, its people added by hand and its
@@ -83,17 +86,21 @@ impl PlatformService {
         self.actors.invalidate();
     }
 
-    /// The policies named `names`: managed ones from the code, custom ones
-    /// from storage. Unknown names (a removed policy) grant nothing.
+    /// The policies named `names`: managed ones from the code, an installed
+    /// module's from what the agent told, custom ones from storage. Unknown
+    /// names (a removed policy, a removed module's) grant nothing.
     async fn resolve(&self, names: &[String]) -> R<Permissions> {
         if names.is_empty() {
             return Ok(Permissions::default());
         }
         let custom = self.repo.list_policies().await?;
+        let modules = self.declared_modules().await?;
         let policies: Vec<Policy> = names
             .iter()
             .filter_map(|n| {
-                managed::find(n).or_else(|| custom.iter().find(|p| &p.name == n).cloned())
+                managed::find(n)
+                    .or_else(|| module_policies::granting(&modules, n))
+                    .or_else(|| custom.iter().find(|p| &p.name == n).cloned())
             })
             .collect();
         Ok(Permissions::from_policies(&policies))
@@ -136,11 +143,16 @@ impl PlatformService {
         }
     }
 
-    /// That every name is a policy, managed or custom.
+    /// That every name is a policy: managed, a module's (a removed one's
+    /// included: its assignments stay) or custom.
     async fn known_policies(&self, names: &[String]) -> R<()> {
         let custom = self.repo.list_policies().await?;
+        let modules = self.declared_modules().await?;
         for n in names {
-            if managed::find(n).is_none() && !custom.iter().any(|p| &p.name == n) {
+            let known = managed::find(n).is_some()
+                || module_policies::is_module_policy(&modules, n)
+                || custom.iter().any(|p| &p.name == n);
+            if !known {
                 return Err(PlatformError::Invalid(format!(
                     "policies: {n} does not exist"
                 )));
@@ -151,18 +163,32 @@ impl PlatformService {
 
     // --- Policies ------------------------------------------------------------
 
-    /// The managed policies, then the custom ones, with how many have each.
+    /// The managed policies, the modules' (in the request's language), then
+    /// the custom ones, with how many have each.
     pub async fn list_policies(&self, actor: &Actor) -> R<Vec<PolicyView>> {
         if !actor.may(MANAGE_POLICIES) && !actor.may(MANAGE_USERS) {
             return Err(PlatformError::Forbidden);
         }
         let usage: HashMap<String, i64> = self.repo.policy_usage().await?;
-        Ok(managed::all()
+        let modules = self.declared_modules().await?;
+        let language = texts::current().code();
+        let core = managed::all().into_iter().map(|p| (p, None));
+        let of_modules = module_policies::policies(&modules, language)
             .into_iter()
-            .chain(self.repo.list_policies().await?)
-            .map(|policy| PolicyView {
+            .map(|(p, m)| (p, Some(m)));
+        let custom = self
+            .repo
+            .list_policies()
+            .await?
+            .into_iter()
+            .map(|p| (p, None));
+        Ok(core
+            .chain(of_modules)
+            .chain(custom)
+            .map(|(policy, module)| PolicyView {
                 attached: usage.get(&policy.name).copied().unwrap_or(0),
                 policy,
+                module,
             })
             .collect())
     }
@@ -177,7 +203,9 @@ impl PlatformService {
     ) -> R<()> {
         Self::require(actor, MANAGE_POLICIES)?;
         let name = name.trim();
-        iam::policy::validate(name, &statements).map_err(invalid)?;
+        let modules = self.declared_modules().await?;
+        let module_actions = module_policies::action_names(&modules);
+        iam::policy::validate_with(name, &statements, &module_actions).map_err(invalid)?;
         let description = description.trim();
         require(
             description.chars().count() <= 500,
@@ -199,7 +227,8 @@ impl PlatformService {
     /// Remove a custom policy; whoever had it loses what it gave.
     pub async fn delete_policy(&self, actor: &Actor, name: &str) -> R<()> {
         Self::require(actor, MANAGE_POLICIES)?;
-        if managed::find(name).is_some() {
+        let modules = self.declared_modules().await?;
+        if managed::find(name).is_some() || module_policies::is_module_policy(&modules, name) {
             return Err(invalid(iam::PolicyError::Reserved));
         }
         self.repo.delete_policy(name).await?;

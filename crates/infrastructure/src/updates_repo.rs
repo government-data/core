@@ -140,13 +140,24 @@ impl PgMaintenanceStore {
         Ok(())
     }
 
-    /// Replace the installed modules (a JSON list, decision 0003).
-    pub async fn save_modules(&self, modules: &serde_json::Value) -> Result<(), String> {
+    /// Replace the installed modules (a JSON list, decision 0003), and merge
+    /// `permissions` (an object by module name) into the modules'
+    /// permissions kept: a module it does not name keeps its entry
+    /// (quality-sdk decision 0009).
+    pub async fn save_modules(
+        &self,
+        modules: &serde_json::Value,
+        permissions: &serde_json::Value,
+    ) -> Result<(), String> {
         sqlx::query(
-            "INSERT INTO orq_updater (modules, modules_at) VALUES ($1, now())
-             ON CONFLICT (id) DO UPDATE SET modules = EXCLUDED.modules, modules_at = now()",
+            "INSERT INTO orq_updater (modules, modules_at, module_permissions)
+             VALUES ($1, now(), $2)
+             ON CONFLICT (id) DO UPDATE SET modules = EXCLUDED.modules, modules_at = now(),
+                 module_permissions =
+                     COALESCE(orq_updater.module_permissions, '{}'::jsonb) || $2",
         )
         .bind(modules)
+        .bind(permissions)
         .execute(&self.pool)
         .await
         .map_err(db)?;
@@ -161,6 +172,17 @@ impl PgMaintenanceStore {
                 .await
                 .map_err(db)?;
         Ok(modules.flatten())
+    }
+
+    /// The modules' permissions kept (an object by module name), `None`
+    /// when none were ever told.
+    pub async fn module_permissions(&self) -> Result<Option<serde_json::Value>, String> {
+        let kept: Option<Option<serde_json::Value>> =
+            sqlx::query_scalar("SELECT module_permissions FROM orq_updater")
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(db)?;
+        Ok(kept.flatten())
     }
 
     pub async fn save_policy(

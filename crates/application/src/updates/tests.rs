@@ -13,6 +13,7 @@ pub(crate) struct MemoryMaintenance {
     pub(crate) row: Mutex<UpdaterRow>,
     pub(crate) history: Mutex<Vec<HistoryEntry>>,
     pub(crate) modules: Mutex<Vec<InstalledModule>>,
+    pub(crate) permissions: Mutex<std::collections::BTreeMap<String, ModulePermissions>>,
 }
 
 #[async_trait::async_trait]
@@ -56,10 +57,19 @@ impl UpdatesStore for MemoryMaintenance {
     }
     async fn save_modules(&self, modules: &[InstalledModule]) -> Result<(), String> {
         *self.modules.lock().unwrap() = modules.to_vec();
+        let mut kept = self.permissions.lock().unwrap();
+        for m in modules {
+            kept.insert(m.name.clone(), m.permissions.clone().unwrap_or_default());
+        }
         Ok(())
     }
     async fn modules(&self) -> Result<Vec<InstalledModule>, String> {
         Ok(self.modules.lock().unwrap().clone())
+    }
+    async fn module_permissions(
+        &self,
+    ) -> Result<std::collections::BTreeMap<String, ModulePermissions>, String> {
+        Ok(self.permissions.lock().unwrap().clone())
     }
     async fn save_report(&self, report: &serde_json::Value) -> Result<(), String> {
         self.row.lock().unwrap().report = Some((report.clone(), Utc::now()));

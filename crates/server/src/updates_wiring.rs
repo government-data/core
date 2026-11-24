@@ -3,8 +3,11 @@
 //!
 //! [`UpdatesService`]: application::UpdatesService
 
+use std::collections::BTreeMap;
+
 use application::{
-    HistoryEntry, InstalledModule, Maintenance, Requester, UpdateRequest, UpdaterRow, UpdatesStore,
+    HistoryEntry, InstalledModule, Maintenance, ModulePermissions, Requester, UpdateRequest,
+    UpdaterRow, UpdatesStore,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -63,8 +66,20 @@ impl UpdatesStore for Store {
     }
 
     async fn save_modules(&self, modules: &[InstalledModule]) -> Result<(), String> {
+        let permissions: BTreeMap<&str, ModulePermissions> = modules
+            .iter()
+            .map(|m| (m.name.as_str(), m.permissions.clone().unwrap_or_default()))
+            .collect();
+        let permissions = serde_json::to_value(permissions).map_err(|e| e.to_string())?;
         let modules = serde_json::to_value(modules).map_err(|e| e.to_string())?;
-        self.0.save_modules(&modules).await
+        self.0.save_modules(&modules, &permissions).await
+    }
+
+    async fn module_permissions(&self) -> Result<BTreeMap<String, ModulePermissions>, String> {
+        match self.0.module_permissions().await? {
+            Some(kept) => serde_json::from_value(kept).map_err(|e| e.to_string()),
+            None => Ok(BTreeMap::new()),
+        }
     }
 
     async fn modules(&self) -> Result<Vec<InstalledModule>, String> {

@@ -520,6 +520,7 @@
       "quality": "Calidad de datos",
       "admin": "Administración"
     },
+    "removedModule": "módulo {{name}} quitado",
     "addStatement": "Agregar regla",
     "removeStatement": "Quitar regla",
     "saved": "Política {{name}} guardada.",
