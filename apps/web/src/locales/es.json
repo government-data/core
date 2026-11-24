@@ -72,11 +72,6 @@
     "settings": "Configuración",
     "signOut": "Cerrar sesión",
     "apps": "Aplicaciones",
-    "switchApp": "Cambiar de aplicación",
-    "app": {
-      "gestion": "Gestión",
-      "gestionDetail": "El panel de la plataforma"
-    },
     "language": "Idioma",
     "notFound": {
       "title": "Página no encontrada",
@@ -96,7 +91,6 @@
     },
     "backHome": "Volver al inicio",
     "opening": "Abriendo {{app}}…",
-    "openingAccount": "Abriendo tu cuenta…",
     "account": "Mi cuenta",
     "backToApp": "Volver a la aplicación",
     "theme": "Tema"

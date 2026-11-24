@@ -6,7 +6,7 @@ import { SettingsNavIcon } from "@knime-orchestador/feature-settings";
 import { Leaving } from "@knime-orchestador/feature-kit/ui";
 import { signedOut } from "@knime-orchestador/feature-kit";
 import { useSession } from "../auth/session";
-import { accountApps, accountUrl, logout, saveLocale } from "../auth/api";
+import { accountApps, logout, saveLocale } from "../auth/api";
 import { AppsMenu } from "./AppsMenu";
 import { LangSwitch } from "./LangSwitch";
 import { AccountIcon, MENU_ICON, MenuIcon } from "./MenuIcon";
@@ -161,14 +161,8 @@ export function ProfileMenu() {
   const navigate = useNavigate();
   const displayName = () => session.display_name ?? session.role;
 
-  // Sign out server-side, then hard-redirect. The full reload clears every
-  // cached query so no authenticated data lingers after logout.
-  // With the common account, through its /signout: it closes that session too
-  // and goes back to the site.
-  const [account] = createResource(() => accountUrl().catch(() => null));
-  // The other applications: this installation's (RustFS…) and the account's;
-  // `null` when they did not answer (with the account, the menu then offers
-  // its own list).
+  // The other applications: this installation's (RustFS…) and its modules';
+  // `null` when they did not answer.
   const [apps] = createResource(() => accountApps().catch(() => null));
   // Going to another application: until it paints (with the sign-in round
   // trip it can take seconds), the wait animation and where to. Opening it in
@@ -183,12 +177,13 @@ export function ProfileMenu() {
   const onPageShow = (e: PageTransitionEvent) => e.persisted && setLeaving(undefined);
   window.addEventListener("pageshow", onPageShow);
   onCleanup(() => window.removeEventListener("pageshow", onPageShow));
+  // Sign out server-side, then hard-redirect. The full reload clears every
+  // cached query so no authenticated data lingers after logout.
   const signOut = async () => {
     // What the features kept in the tab (a view's reason, 0069) goes first.
     signedOut();
     await logout().catch(() => undefined);
-    const base = account() ?? (await accountUrl().catch(() => null));
-    window.location.assign(base ? `${base}/signout` : "/login");
+    window.location.assign("/login");
   };
 
   // Close profile popover on click-outside or ESC.
@@ -250,7 +245,7 @@ export function ProfileMenu() {
         <Show when={profileOpen()}>
           <div class="profile-popover" role="menu">
             <ProfileCard onNavigate={navigateTo} />
-            <AppsMenu account={account()} apps={apps()} onClose={closeMenu} onLeave={leaveTo} />
+            <AppsMenu apps={apps()} onClose={closeMenu} onLeave={leaveTo} />
             <MenuFoot signOut={() => void signOut()} />
           </div>
         </Show>

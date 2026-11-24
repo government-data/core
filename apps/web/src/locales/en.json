@@ -72,11 +72,6 @@
     "settings": "Settings",
     "signOut": "Sign out",
     "apps": "Applications",
-    "switchApp": "Switch application",
-    "app": {
-      "gestion": "Management",
-      "gestionDetail": "The platform panel"
-    },
     "language": "Language",
     "notFound": {
       "title": "Page not found",
@@ -96,7 +91,6 @@
     },
     "backHome": "Back to the start page",
     "opening": "Opening {{app}}…",
-    "openingAccount": "Opening your account…",
     "account": "My account",
     "backToApp": "Back to the application",
     "theme": "Theme"
