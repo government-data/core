@@ -75,6 +75,10 @@ impl UpdatesStore for Store {
         self.0.save_modules(&modules, &permissions).await
     }
 
+    async fn forget_module_permissions(&self, module: &str) -> Result<(), String> {
+        self.0.forget_module_permissions(module).await
+    }
+
     async fn module_permissions(&self) -> Result<BTreeMap<String, ModulePermissions>, String> {
         match self.0.module_permissions().await? {
             Some(kept) => serde_json::from_value(kept).map_err(|e| e.to_string()),

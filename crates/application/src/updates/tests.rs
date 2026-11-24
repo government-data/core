@@ -71,6 +71,10 @@ impl UpdatesStore for MemoryMaintenance {
     ) -> Result<std::collections::BTreeMap<String, ModulePermissions>, String> {
         Ok(self.permissions.lock().unwrap().clone())
     }
+    async fn forget_module_permissions(&self, module: &str) -> Result<(), String> {
+        self.permissions.lock().unwrap().remove(module);
+        Ok(())
+    }
     async fn save_report(&self, report: &serde_json::Value) -> Result<(), String> {
         self.row.lock().unwrap().report = Some((report.clone(), Utc::now()));
         Ok(())

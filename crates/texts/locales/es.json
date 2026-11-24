@@ -58,10 +58,12 @@
       "roleForbids": "Tu rol en esta área no permite esta acción."
     },
     "updater": {
+      "badEvent": "el evento es uno de ModuleAdded, ModuleRemoved, ModulePurgeStarted, ModulePurged, ModuleSecretsRotated, con un módulo, una versión y un resultado",
       "clientTaken": "el cliente {{client}} se registró a mano o por otro módulo: un módulo no lo toma",
       "noProvider": "el proveedor OIDC de esta instalación no está configurado (OIDC_SIGNING_KEY)",
       "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
       "noSuchModule": "no hay ningún módulo {{name}} instalado",
+      "purgeInstalled": "el módulo {{name}} está instalado: quítalo antes de purgarlo",
       "unavailable": "La base de datos no responde."
     },
     "internal": {

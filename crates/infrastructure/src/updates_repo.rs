@@ -174,6 +174,16 @@ impl PgMaintenanceStore {
         Ok(modules.flatten())
     }
 
+    /// Forget a module's permissions (its purge, quality-sdk decision 0009).
+    pub async fn forget_module_permissions(&self, module: &str) -> Result<(), String> {
+        sqlx::query("UPDATE orq_updater SET module_permissions = module_permissions - $1")
+            .bind(module)
+            .execute(&self.pool)
+            .await
+            .map_err(db)?;
+        Ok(())
+    }
+
     /// The modules' permissions kept (an object by module name), `None`
     /// when none were ever told.
     pub async fn module_permissions(&self) -> Result<Option<serde_json::Value>, String> {

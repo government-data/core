@@ -59,6 +59,33 @@ impl PlatformService {
     }
 }
 
+impl PlatformService {
+    /// Purge `module`'s permissions (quality-sdk decision 0009): its
+    /// managed policies and every assignment of them, then its actions
+    /// from the catalog. Only the update agent's purge calls it; the module
+    /// is no longer installed. The policies deleted, by name.
+    pub async fn purge_module_permissions(&self, module: &str) -> R<Vec<String>> {
+        let Some(updates) = &self.updates else {
+            return Ok(Vec::new());
+        };
+        let modules = self.declared_modules().await?;
+        let names: Vec<String> = modules
+            .iter()
+            .filter(|m| m.name == module)
+            .flat_map(|m| m.permissions.policies.iter().map(|p| p.name.clone()))
+            .collect();
+        for name in &names {
+            self.repo.detach_policy(name).await?;
+        }
+        updates
+            .forget_module_permissions(module)
+            .await
+            .map_err(PlatformError::Internal)?;
+        self.actors.invalidate();
+        Ok(names)
+    }
+}
+
 /// The module `m` as an owner.
 pub(super) fn of(m: &DeclaredModule) -> OfModule {
     OfModule {

@@ -63,6 +63,9 @@ pub trait PlatformRepository: Send + Sync {
     async fn put_policy(&self, policy: &Policy) -> R<()>;
     /// Remove a custom policy and its attachments.
     async fn delete_policy(&self, name: &str) -> R<()>;
+    /// Remove every attachment of a policy that is not stored here (a
+    /// module's managed one, at its purge); how many.
+    async fn detach_policy(&self, name: &str) -> R<u64>;
     /// How many principals each policy is attached to, by name.
     async fn policy_usage(&self) -> R<HashMap<String, i64>>;
     /// The policies attached to a principal.

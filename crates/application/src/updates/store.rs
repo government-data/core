@@ -126,6 +126,8 @@ pub trait UpdatesStore: Send + Sync {
     async fn module_permissions(
         &self,
     ) -> Result<std::collections::BTreeMap<String, super::ModulePermissions>, String>;
+    /// Forget a module's permissions (its purge, quality-sdk decision 0009).
+    async fn forget_module_permissions(&self, module: &str) -> Result<(), String>;
 }
 
 /// What an administrator sees in Settings → Updates.

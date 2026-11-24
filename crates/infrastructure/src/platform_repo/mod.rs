@@ -100,6 +100,14 @@ impl PlatformRepository for PgPlatformRepository {
     async fn delete_policy(&self, name: &str) -> R<()> {
         PgPlatformRepository::delete_policy(self, name).await
     }
+    async fn detach_policy(&self, name: &str) -> R<u64> {
+        let done = sqlx::query("DELETE FROM iam_attachments WHERE policy = $1")
+            .bind(name)
+            .execute(&self.pool)
+            .await
+            .map_err(db)?;
+        Ok(done.rows_affected())
+    }
     async fn policy_usage(&self) -> R<HashMap<String, i64>> {
         PgPlatformRepository::policy_usage(self).await
     }
