@@ -105,7 +105,7 @@ RUSTFS_UID=10001
 # Most seconds this server's clock may be off the installation's (a lake).
 MAX_SKEW=30
 # A lake replica's platform admin user (decision 0028, point 2) and its
-# policy: every action on the tenants' warehouses and the admin API.
+# policy: every action on the warehouse buckets and the admin API.
 ADMIN_USER=qd-platform-admin
 ADMIN_POLICY='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::qd-tenant-*","arn:aws:s3:::qd-tenant-*/*"]},{"Effect":"Allow","Action":["admin:*"],"Resource":["arn:aws:s3:::*"]}]}'
 # Most seconds to wait for RustFS to answer once started (its entrypoint

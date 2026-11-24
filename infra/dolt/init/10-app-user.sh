@@ -7,7 +7,7 @@
 # The user starts with no database at all. Dolt 2.6 has no wildcard grants
 # (`tenant\_%`.* matches nothing) and CREATE DATABASE needs a global grant,
 # which in Dolt also opens the `mysql` database (users, grants) to writes;
-# so each tenant's database is created by root and granted to this user,
+# so the catalog database is created by root and granted to this user,
 # branches included (`tenant_<id>/<branch>`): infra/dolt/tenant.sh.
 set -eu
 : "${DOLT_APP_USER:=qd_app}"

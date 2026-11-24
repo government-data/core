@@ -35,7 +35,7 @@ fn generate() -> String {
 
 /// The installation's key, created the
 /// first time; two evaluations asking at once get the same one.
-pub async fn of_tenant(pool: &PgPool, sealer: &dyn Sealer) -> Result<EntityKey, String> {
+pub async fn of_installation(pool: &PgPool, sealer: &dyn Sealer) -> Result<EntityKey, String> {
     let sealed = sealer.seal(&generate())?;
     sqlx::query("INSERT INTO quality.entity_keys (sealed) VALUES ($1) ON CONFLICT DO NOTHING")
         .bind(sealed)
@@ -69,8 +69,11 @@ pub(crate) async fn for_job(
     };
     let log = api.services.issues.as_deref();
     job_sources::record(log, job, kind, client, headers, "entity_key").await?;
-    of_tenant(&api.pool, sealer).await.map(Some).map_err(|e| {
-        tracing::error!("entity key: {e}");
-        StatusCode::SERVICE_UNAVAILABLE
-    })
+    of_installation(&api.pool, sealer)
+        .await
+        .map(Some)
+        .map_err(|e| {
+            tracing::error!("entity key: {e}");
+            StatusCode::SERVICE_UNAVAILABLE
+        })
 }

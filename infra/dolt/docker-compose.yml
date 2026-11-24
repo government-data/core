@@ -1,15 +1,15 @@
 # Dolt (MySQL-compatible, Apache-2.0): the versioned catalog (decision 0021),
-# one database per tenant (`tenant_<id>`), drafts as branches, approvals as
-# merges. Its own stack, not part of the application's compose: in
-# production it runs next to PostgreSQL on the application VM; in
-# development it stands for it.
+# one catalog database (`tenant_<id>`, its stored name), drafts as
+# branches, approvals as merges. Its own stack, not part of the
+# application's compose: in production it runs next to PostgreSQL on the
+# application VM; in development it stands for it.
 #
 # Only the application talks to it, by URL (`DOLT_URL`), as `qd_app`: no UI,
 # no Traefik route, no sign-in for people. Root stays inside the container
 # (`localhost` only), for the init script and the backups.
 #
 #   task catalog:up | catalog:down | catalog:logs
-#   infra/dolt/tenant.sh add <id>   a tenant's database, granted to qd_app
+#   infra/dolt/tenant.sh add <id>   the catalog database, granted to qd_app
 #   infra/dolt/backup.sh            Dolt backups, then copied to the lake
 #
 # Required environment (in the repo `.env`):
@@ -22,7 +22,7 @@ name: data-quality-dolt # `-p` in the tasks: .env sets COMPOSE_PROJECT_NAME for 
 volumes:
   dolt-data:
     name: ${APP_STACK:-data-quality}_dolt-data
-  # Dolt's own backups (`file://`), one directory per tenant database.
+  # Dolt's own backups (`file://`), one directory per database.
   dolt-backups:
     name: ${APP_STACK:-data-quality}_dolt-backups
 
