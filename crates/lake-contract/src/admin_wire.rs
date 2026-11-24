@@ -38,9 +38,23 @@ impl AdminClient {
 
     /// `method` on `path` (one of `wire::paths`) with `body` if any.
     pub async fn call(&self, method: &str, path: &str, body: Option<&Value>) -> Answer {
+        self.call_with(method, path, body, &[]).await
+    }
+
+    /// The same, with `headers` (the keys an operation needs).
+    pub async fn call_with(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+        headers: &[(&str, String)],
+    ) -> Answer {
         let url = format!("{}{path}", self.base);
         let method = reqwest::Method::from_bytes(method.as_bytes()).expect("a method");
         let mut request = self.http.request(method, &url);
+        for (name, value) in headers {
+            request = request.header(*name, value);
+        }
         if let Some(body) = body {
             request = request.json(body);
         }

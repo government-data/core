@@ -2162,12 +2162,15 @@ name = "lake-rustfs-admin"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "contracts",
  "lake-contract",
  "reqwest",
+ "roxmltree",
  "rustls",
  "serde",
  "serde_json",
+ "sigv4",
  "testkit",
  "tokio",
  "tokio-rustls",

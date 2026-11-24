@@ -90,6 +90,17 @@ impl Certs {
     }
 }
 
+impl Certs {
+    /// The CA's certificate and the adapter's own (certificate then key),
+    /// as they are now: what the adapter presents when it calls RustFS.
+    pub fn pems(&self) -> Result<(String, String), String> {
+        match &self.source {
+            Source::Dir(dir) => Ok((read(&dir.join("ca.crt"))?, read(&dir.join("machine.pem"))?)),
+            Source::Pem { ca, bundle } => Ok((ca.clone(), bundle.clone())),
+        }
+    }
+}
+
 fn modified(path: &Path) -> Result<SystemTime, String> {
     std::fs::metadata(path)
         .and_then(|m| m.modified())

@@ -6,7 +6,11 @@
 //! - `QD_LAKE_ADMIN_ADDR`: where it listens (`0.0.0.0:9020`);
 //! - `QD_LAKE_ADMIN_TLS_DIR`: the node agent's directory (`/run/qd-node`),
 //!   with `ca.crt` and `machine.pem` (the certificate then the key), read
-//!   again whenever they change;
+//!   again whenever they change; it presents them to RustFS's gate too;
+//! - `QD_MACHINE_NAME`: its machine's name, as the replication reaches it
+//!   (required);
+//! - `QD_LAKE_ADMIN_LAKE_URL`: its RustFS, through the gate
+//!   (`https://<QD_MACHINE_NAME>:9000`);
 //! - `RUST_LOG`: the level (`info`). Lines are JSON; none holds a key, a
 //!   secret, a policy or a body.
 //!
@@ -14,7 +18,7 @@
 
 use std::sync::Arc;
 
-use lake_rustfs_admin::{serve, Certs};
+use lake_rustfs_admin::{serve, Certs, Rustfs};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -30,6 +34,16 @@ async fn main() -> std::process::ExitCode {
         tracing::error!(error = %e, "the adapter's certificate");
         return std::process::ExitCode::FAILURE;
     }
+    let Some(node) = std::env::var("QD_MACHINE_NAME")
+        .ok()
+        .filter(|n| !n.is_empty())
+    else {
+        tracing::error!("QD_MACHINE_NAME is not set");
+        return std::process::ExitCode::FAILURE;
+    };
+    let source = std::env::var("QD_LAKE_ADMIN_LAKE_URL")
+        .unwrap_or_else(|_| format!("https://{node}:{}", lake_rustfs_admin::rustfs::GATE_PORT));
+    let lake = Arc::new(Rustfs::new(&source, &node, certs.clone()));
     let tcp = match tokio::net::TcpListener::bind(&addr).await {
         Ok(tcp) => tcp,
         Err(e) => {
@@ -38,7 +52,7 @@ async fn main() -> std::process::ExitCode {
         }
     };
     tracing::info!(%addr, "serving lake-admin/1");
-    match serve(tcp, certs, stopped()).await {
+    match serve(tcp, certs, lake, stopped()).await {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!(error = %e, "serving");
