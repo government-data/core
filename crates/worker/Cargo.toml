@@ -28,7 +28,7 @@ serde.workspace = true
 serde_json.workspace = true
 # Each rules file's SHA-256, for the run's manifest (decision 0035).
 sha2.workspace = true
-# Each entity's hash with the tenant's entity key (decision 0057).
+# Each entity's hash with the installation's entity key (decision 0057).
 hmac.workspace = true
 # A maintain job's requests to the catalog and the bucket (decision 0039).
 chrono.workspace = true

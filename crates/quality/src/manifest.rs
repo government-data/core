@@ -1,6 +1,6 @@
 //! A cut's files (decision 0035, point 5): what an extraction and an
 //! evaluation read, with what, and what came out, written once next to the
-//! tenant's tables so an audit needs no database. Names, hashes, snapshot ids, compiled SQL and
+//! lake's tables so an audit needs no database. Names, hashes, snapshot ids, compiled SQL and
 //! counts: never a value from a source.
 
 use async_trait::async_trait;
@@ -143,7 +143,7 @@ impl EvaluateManifest {
     }
 }
 
-/// Where manifests are written: the tenant's warehouse bucket.
+/// Where manifests are written: the warehouse bucket.
 #[async_trait]
 pub trait ManifestStore: Send + Sync {
     /// Writes `body` at `key` unless something is there already; `false`

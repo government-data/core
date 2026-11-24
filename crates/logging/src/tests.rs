@@ -84,21 +84,20 @@ fn ids_are_lifted_from_the_spans_in_scope() {
     let line = json_line(|| {
         let outer = tracing::info_span!("job", job_id = "job-1", run_id = "run-1", run = 2_u64);
         let _outer = outer.enter();
-        let inner = tracing::info_span!("request", request_id = "req-1", tenant = "tenant-1");
+        let inner = tracing::info_span!("request", request_id = "req-1");
         let _inner = inner.enter();
         tracing::info!("inside");
     });
     assert_eq!(line["job_id"], "job-1");
     assert_eq!(line["run_id"], "run-1");
     assert_eq!(line["request_id"], "req-1");
-    assert_eq!(line["tenant"], "tenant-1");
     assert_eq!(line["run"], 2);
 }
 
 #[test]
 fn absent_ids_are_absent_not_null() {
     let line = json_line(|| tracing::warn!("alone"));
-    for id in ["tenant", "request_id", "run_id", "job_id"] {
+    for id in ["request_id", "run_id", "job_id"] {
         assert!(!line.contains_key(id), "{id} in {line:?}");
     }
     assert_eq!(line["level"], "WARN");

@@ -1,7 +1,7 @@
 //! The lake listed as a source (decision 0043, point 1): a `lake_tables`
-//! job lists the tenant's warehouse, its namespaces as schemas and each
+//! job lists the warehouse, its namespaces as schemas and each
 //! table with its columns, from the tables' metadata with credentials that
-//! read no data file (`lake::metadata_policy`), never a row; the tenant
+//! read no data file (`lake::metadata_policy`), never a row; the installation
 //! keeps its last listing, which a late report of an older job never
 //! replaces. `GET /quality/lake/tables` gives it to whoever may view some
 //! rules; `POST` lists again, behind `quality:ManageSources` on some

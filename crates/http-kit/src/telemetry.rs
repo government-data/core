@@ -66,14 +66,7 @@ pub async fn request_context(request: Request, next: Next) -> Response {
         .map(str::to_string)
         .unwrap_or_else(new_id);
 
-    // `tenant` is recorded where the request's company is resolved.
-    let span = tracing::info_span!(
-        "request",
-        %method,
-        path = %path,
-        request_id = %id,
-        tenant = tracing::field::Empty,
-    );
+    let span = tracing::info_span!("request", %method, path = %path, request_id = %id);
 
     // Run the stack inside the span and the request-id task-local, then emit one
     // structured completion line per request — carrying the span's `request_id`,

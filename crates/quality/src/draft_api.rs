@@ -1,4 +1,4 @@
-//! A tenant's drafts for people (decisions 0021 and 0038), in the module's
+//! The drafts for people (decisions 0021 and 0038), in the module's
 //! `user_router`: list the proposals, read one, approve it into `main` or
 //! discard it. A draft is `proposal/<dataset>/<id>`. Reading needs
 //! `quality:ViewRules` on `catalog/<dataset>`; approving, both

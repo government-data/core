@@ -20,7 +20,7 @@ const RESERVED: &[&str] = &["time", "level", "service", "vm", "target", "msg"];
 
 /// The ids lifted to the top level, from the event or the innermost span in
 /// scope that has them.
-const IDS: &[&str] = &["tenant", "request_id", "run_id", "job_id"];
+const IDS: &[&str] = &["request_id", "run_id", "job_id"];
 
 /// What a `log` record bridged into `tracing` carries besides its message.
 const LOG_FIELDS: &[&str] = &["log.target", "log.module_path", "log.file", "log.line"];

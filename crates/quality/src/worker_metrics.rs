@@ -8,7 +8,7 @@
 //! gauges ([`crate::queue_ready`]), with the same list of kinds.
 //!
 //! A job is labelled by its **kind**, one of [`KINDS`], and its **result**,
-//! one of [`JobResult`]'s: never its dataset, source, cut, tenant or id
+//! one of [`JobResult`]'s: never its dataset, source, cut or id
 //! (point 10).
 
 use std::time::Instant;

@@ -1,4 +1,4 @@
-//! The `lake_tables` job (decision 0043, point 1): the tenant's lake,
+//! The `lake_tables` job (decision 0043, point 1): the lake,
 //! attached with credentials that read the tables' metadata and no data
 //! file, its namespaces as schemas and each table with its columns, never
 //! a row. Only the stage it failed in is kept: the platform reads it as a

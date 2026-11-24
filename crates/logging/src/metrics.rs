@@ -17,8 +17,8 @@
 //! `service` label, since two services on one machine share Alloy's folder.
 //!
 //! What goes in a registry is each service's own: a label takes a value
-//! from a fixed list (a route's template, a job's kind), never a tenant's,
-//! a person's or a path. [`samples`] reads a file back, for the tests that
+//! from a fixed list (a route's template, a job's kind), never a person's
+//! or a path. [`samples`] reads a file back, for the tests that
 //! check it.
 
 mod process;

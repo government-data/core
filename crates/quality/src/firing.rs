@@ -73,7 +73,7 @@ impl Due {
     }
 }
 
-/// Fires this tenant's schedules due at `now`.
+/// Fires the schedules due at `now`.
 pub async fn fire_due(
     pool: &PgPool,
     now: DateTime<Utc>,
@@ -253,7 +253,7 @@ pub(crate) async fn queue_job(
     .await
 }
 
-/// Marks failed the tenant's cuts whose extraction or evaluation failed
+/// Marks failed the cuts whose extraction or evaluation failed
 /// for good (decision 0035, point 3): the queue fails the job, and its cut
 /// follows on the scheduler's next round. How many it marked.
 pub async fn fail_cuts(pool: &PgPool) -> Result<u64, sqlx::Error> {

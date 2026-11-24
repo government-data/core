@@ -1,4 +1,4 @@
-//! The `query` job (decision 0054): a console statement over the tenant's
+//! The `query` job (decision 0054): a console statement over the
 //! lake, attached with the job's read-only credentials and locked down, run
 //! wrapped as one query of at most 200 rows. Its rows, or the engine's
 //! message when it fails, go to the API only, which masks and audits them;

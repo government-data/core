@@ -1,4 +1,4 @@
-//! The tenant's entity key (decision 0057): the HMAC key with which a
+//! The installation's entity key (decision 0057): the HMAC key with which a
 //! worker turns a client's normalized document into the hash `entity_icd`
 //! keeps, so the same client has the same hash in every cut and dataset and
 //! no result holds a document. Generated once from the system's random

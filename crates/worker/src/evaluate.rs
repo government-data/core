@@ -1,6 +1,6 @@
 //! The `evaluate` job (decisions 0019, 0031, 0061): a dataset's rules, from
 //! the catalog snapshot the job came with, over one cut of its silver table
-//! (or its bronze one, typed as mapped) in the tenant's lake, attached with
+//! (or its bronze one, typed as mapped) in the lake, attached with
 //! the job's own credentials. Counts per rule, each field's profile, the
 //! ICD (decision 0057) and the remediation queues (decision 0059) come out,
 //! never a value: an entity and a record only by their hashes
@@ -168,7 +168,7 @@ fn silver_at(job: &JobDetails, pinned: Option<i64>) -> Result<Option<SilverAt>, 
     }
 }
 
-/// An engine with the tenant's lake attached.
+/// An engine with the lake attached.
 fn attach(lake: &LakeAccess, ca_file: Option<&str>) -> Result<Runner, Failed> {
     let mut runner = Runner::new().map_err(engine("starting"))?;
     runner

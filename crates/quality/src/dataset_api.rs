@@ -143,7 +143,7 @@ pub struct CutOut {
     pub fired_at: DateTime<Utc>,
     /// The records its evaluation read, once evaluated.
     pub records: Option<i64>,
-    /// Its evaluation's manifest in the tenant's bucket, once evaluated.
+    /// Its evaluation's manifest in the warehouse bucket, once evaluated.
     pub manifest: Option<String>,
     /// Failed: at `extract` or `evaluate`, and what its job said (the
     /// worker's words, which name no value).

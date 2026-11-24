@@ -1,5 +1,5 @@
 //! An evaluation's remediation queues (decision 0059): its findings, each
-//! record by the keyed hash of its key with the tenant's entity key, and
+//! record by the keyed hash of its key with the installation's entity key, and
 //! each queue's open findings by the cut they opened at. Only the counts
 //! are reported; without the key (an older application) there are none.
 

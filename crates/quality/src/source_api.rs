@@ -1,5 +1,5 @@
 //! Sources for people (decision 0036), in the module's `user_router`: the
-//! driver catalog for the form, a tenant's sources without their secrets,
+//! driver catalog for the form, the sources without their secrets,
 //! and creating or editing one. What a caller may do is asked of its
 //! [`Caller`] (`quality:ViewSources`, `quality:ManageSources` on
 //! `source/<name>`), and every change is audited through it, secrets as
@@ -59,7 +59,7 @@ pub fn routes(pool: PgPool, sealer: Arc<dyn Sealer>, catalog: Option<Arc<dyn Cat
     paths(drivers, list, put_source, delete_source),
     components(schemas(DriverOut, EngineOut, DriverFieldOut, FieldKindOut, SourceView,
         SourceBody, Refusal, Refusals, InUse)),
-    tags((name = "sources", description = "A tenant's sources and the driver catalog")),
+    tags((name = "sources", description = "The sources and the driver catalog")),
 )]
 pub struct SourceDoc;
 

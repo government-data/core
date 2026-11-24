@@ -179,7 +179,7 @@ fn view(r: Row, sealer: &dyn Sealer) -> Result<SourceView, StoreError> {
     })
 }
 
-/// The tenant's sources, by name, without their secrets.
+/// The sources, by name, without their secrets.
 pub async fn list(pool: &PgPool, sealer: &dyn Sealer) -> Result<Vec<SourceView>, StoreError> {
     let rows: Vec<Row> = sqlx::query_as(&format!(
         "SELECT {COLUMNS} FROM quality.sources ORDER BY name"

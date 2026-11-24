@@ -32,7 +32,7 @@ pub fn routes(pool: PgPool) -> Router {
 #[openapi(
     paths(listing, refresh),
     components(schemas(ListingView, ListingState, ListingReason, SourceTable, ListingQueued)),
-    tags((name = "sources", description = "A tenant's sources and the driver catalog")),
+    tags((name = "sources", description = "The sources and the driver catalog")),
 )]
 pub struct TablesDoc;
 

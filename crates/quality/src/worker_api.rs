@@ -123,7 +123,7 @@ pub struct JobDetails {
     pub parameters: serde_json::Value,
     pub engine: String,
     pub attempts: i32,
-    /// The job's own credentials for its tenant's warehouse.
+    /// The job's own credentials for the warehouse.
     pub lake: Option<LakeAccess>,
     /// The dataset's mapping and rules on the catalog's `main` (`None` if
     /// the catalog has none for it).

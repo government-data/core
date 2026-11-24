@@ -36,7 +36,7 @@ async fn place(
 }
 
 /// An evaluation's, a rule test's or a console statement's credentials:
-/// reading its tenant's warehouse, recorded first. None without an issuer.
+/// reading the warehouse, recorded first. None without an issuer.
 pub(crate) async fn read_access(
     api: &WorkerApi,
     job: Uuid,

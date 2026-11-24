@@ -50,7 +50,7 @@ struct Readers(Option<Arc<dyn Catalog>>);
 #[openapi(
     paths(ask, read, reveal),
     components(schemas(RecordsAsk, RecordsAsked, RecordsOut, RecordsPage, RevealIn, ViewPurpose)),
-    tags((name = "sources", description = "A tenant's sources and the driver catalog")),
+    tags((name = "sources", description = "The sources and the driver catalog")),
 )]
 pub struct RecordsDoc;
 
