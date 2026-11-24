@@ -26,6 +26,8 @@ roxmltree = "0.21"
 #   application → contracts                        (its pure types: a lake's grant)
 #   infrastructure → auth-gateway, domain
 #   server (composition root) → api, application, infrastructure, contracts, modules
+#   lake-rustfs-admin → contracts                 (a binary of its own, never a
+#                                                   dependency of server: 0078)
 # `auth-gateway` is identity (signing in, sessions, OAuth, the directory); it
 # builds on `domain`'s shared kernel (ids, email, role, repository error, clock).
 # `contracts` is the shared plugin contract; feature modules implement it and are mounted by the server, never depending on one another.

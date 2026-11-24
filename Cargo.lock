@@ -2161,6 +2161,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "lake-rustfs-admin"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "contracts",
+ "lake-contract",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "testkit",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+ "tracing-subscriber",
+ "x509-parser",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
