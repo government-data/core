@@ -140,7 +140,8 @@ fn internal(what: impl std::fmt::Display) -> Refused {
 
 const FORBIDDEN: Refused = Refused(StatusCode::FORBIDDEN, "forbidden");
 const NOT_FOUND: Refused = Refused(StatusCode::NOT_FOUND, "not_found");
-const NO_CATALOG: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+const NO_CATALOG: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_not_configured");
+const CATALOG_FAILED: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
 
 /// The platform's time zone, for a schedule that names none (decision 0079).
 async fn platform_timezone(pool: &PgPool) -> Result<String, Refused> {
@@ -180,7 +181,7 @@ impl ScheduleApi {
             Ok(None) => Err(Refused(StatusCode::UNPROCESSABLE_ENTITY, "unknown_dataset")),
             Err(e) => {
                 tracing::error!("schedules: catalog: {e}");
-                Err(NO_CATALOG)
+                Err(CATALOG_FAILED)
             }
         }
     }

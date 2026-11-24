@@ -181,8 +181,7 @@ async fn datasets(
         return refuse(StatusCode::FORBIDDEN, "forbidden");
     }
     let Some(catalog) = &api.catalog else {
-        let (code, cause) = ("catalog_unavailable", "catalog_not_configured");
-        return refuse_because(StatusCode::SERVICE_UNAVAILABLE, code, cause);
+        return crate::refusal::no_catalog();
     };
     let last: Result<Vec<(String, String)>, sqlx::Error> =
         sqlx::query_as("SELECT dataset, max(cut)::text FROM quality.cuts GROUP BY dataset")

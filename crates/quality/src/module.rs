@@ -31,6 +31,7 @@ use crate::source_api;
 use crate::source_store::Sealer;
 use crate::split_api;
 use crate::tables_api;
+use crate::unconfigured::Unconfigured;
 use crate::worker_api::{self, WorkerServices};
 
 /// The quality module. [`Default`] carries only its schema (migrations);
@@ -194,28 +195,29 @@ impl Module for QualityModule {
     }
 
     fn user_router(&self) -> Router {
-        let drafts = match &self.drafts {
-            Some(d) => draft_api::routes(d.clone(), self.sources.as_ref().map(|s| s.pool.clone()))
-                .merge(rules_api::routes(d.clone()))
-                .merge(edit_api::routes(d.clone()))
-                .merge(deploy_api::routes(d.clone()))
-                .merge(split_api::routes(d.clone()))
-                .merge(field_api::routes(d.clone()))
-                .merge(draft_history::routes(d.clone())),
-            None => Router::new(),
+        // Without a catalog the drafts' routes are still served, and say
+        // so: `503 catalog_not_configured` (decision 0026).
+        let d: Arc<dyn DraftCatalog> = match &self.drafts {
+            Some(d) => d.clone(),
+            None => Arc::new(Unconfigured),
         };
+        let drafts = draft_api::routes(d.clone(), self.sources.as_ref().map(|s| s.pool.clone()))
+            .merge(rules_api::routes(d.clone()))
+            .merge(edit_api::routes(d.clone()))
+            .merge(deploy_api::routes(d.clone()))
+            .merge(split_api::routes(d.clone()))
+            .merge(field_api::routes(d.clone()))
+            .merge(draft_history::routes(d.clone()));
         // A rule's test reads the catalog (to lint) and queues a job;
         // deleting reaches the catalog, PostgreSQL and the lake (0055).
-        let tests = match (&self.drafts, &self.sources) {
-            (Some(d), Some(s)) => {
-                rule_test::routes(s.pool.clone(), d.clone()).merge(delete_api::routes(
-                    s.pool.clone(),
-                    d.clone(),
-                    s.catalog.clone(),
-                    self.workers.as_ref().and_then(|(_, w)| w.tables.clone()),
-                ))
-            }
-            _ => Router::new(),
+        let tests = match &self.sources {
+            Some(s) => rule_test::routes(s.pool.clone(), d.clone()).merge(delete_api::routes(
+                s.pool.clone(),
+                d,
+                s.catalog.clone(),
+                self.workers.as_ref().and_then(|(_, w)| w.tables.clone()),
+            )),
+            None => Router::new(),
         };
         drafts.merge(tests).merge(match &self.sources {
             Some(s) => source_api::routes(s.pool.clone(), s.sealer.clone(), s.catalog.clone())

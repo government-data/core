@@ -150,7 +150,7 @@ async fn ask(
     }
     // A map publishes on `main`: never over a dataset that is there.
     let Some(catalog) = catalog else {
-        return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+        return crate::refusal::no_catalog();
     };
     match catalog.snapshot(&body.dataset).await {
         Ok(None) => {}

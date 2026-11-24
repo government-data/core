@@ -26,6 +26,32 @@ pub(crate) fn refuse_because(
     (status, Json(json!({ "error": error }))).into_response()
 }
 
+/// The code of a catalog that failed with `error`: `catalog_not_configured`
+/// when the installation has none ([`crate::catalog::NOT_CONFIGURED`]),
+/// `catalog_unavailable` when it is there and fails (decision 0026).
+pub(crate) fn catalog_code(error: &str) -> &'static str {
+    if error == crate::catalog::NOT_CONFIGURED {
+        NOT_CONFIGURED
+    } else {
+        UNAVAILABLE
+    }
+}
+
+/// The code when the installation has no catalog.
+pub(crate) const NOT_CONFIGURED: &str = "catalog_not_configured";
+/// The code when the catalog is there and fails.
+pub(crate) const UNAVAILABLE: &str = "catalog_unavailable";
+
+/// `503` with the code of a catalog that failed with `error`.
+pub(crate) fn catalog_failed(error: &str) -> Response {
+    refuse(StatusCode::SERVICE_UNAVAILABLE, catalog_code(error))
+}
+
+/// `503` when the installation has no catalog.
+pub(crate) fn no_catalog() -> Response {
+    refuse(StatusCode::SERVICE_UNAVAILABLE, NOT_CONFIGURED)
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Map, Value};
@@ -62,6 +88,15 @@ mod tests {
     #[test]
     fn a_clients_error_logs_nothing() {
         assert!(lines(StatusCode::FORBIDDEN, "forbidden", "forbidden").is_empty());
+    }
+
+    #[test]
+    fn no_catalog_and_a_failing_one_have_their_own_codes() {
+        assert_eq!(
+            catalog_code(crate::catalog::NOT_CONFIGURED),
+            "catalog_not_configured"
+        );
+        assert_eq!(catalog_code("connection refused"), "catalog_unavailable");
     }
 
     #[tokio::test]

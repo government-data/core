@@ -182,7 +182,7 @@ async fn add(
             tracing::error!("fields: catalog: {e}");
             return refuse(refusal(
                 StatusCode::SERVICE_UNAVAILABLE,
-                "catalog_unavailable",
+                crate::refusal::catalog_code(&e),
             ));
         }
     };

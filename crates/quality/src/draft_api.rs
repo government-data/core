@@ -94,8 +94,12 @@ impl IntoResponse for Refused {
 }
 
 fn unavailable(e: impl std::fmt::Display) -> Refused {
+    let e = e.to_string();
     tracing::error!("drafts: {e}");
-    Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable")
+    Refused(
+        StatusCode::SERVICE_UNAVAILABLE,
+        crate::refusal::catalog_code(&e),
+    )
 }
 
 /// The branch of `dataset`'s draft `id`, if both are names a branch may

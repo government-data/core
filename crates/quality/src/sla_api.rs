@@ -100,7 +100,7 @@ pub struct SlasOut {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SlaRefusal {
     /// `dimension`, `days`, `group`, `duplicate`, `too_many`, `not_found`,
-    /// `catalog_unavailable` or `forbidden`.
+    /// `catalog_not_configured`, `catalog_unavailable` or `forbidden`.
     pub error: String,
 }
 
@@ -119,7 +119,8 @@ fn internal(what: impl std::fmt::Display) -> Refused {
 }
 
 const FORBIDDEN: Refused = Refused(StatusCode::FORBIDDEN, "forbidden");
-const NO_CATALOG: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+const NO_CATALOG: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_not_configured");
+const CATALOG_FAILED: Refused = Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
 
 fn invalid(code: &'static str) -> Refused {
     Refused(StatusCode::UNPROCESSABLE_ENTITY, code)
@@ -175,7 +176,7 @@ impl SlaApi {
             Ok(snapshot) => Ok(snapshot.map(|s| dimensions(&s.mapping))),
             Err(e) => {
                 tracing::error!("slas: catalog: {e}");
-                Err(NO_CATALOG)
+                Err(CATALOG_FAILED)
             }
         }
     }

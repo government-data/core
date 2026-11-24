@@ -98,7 +98,10 @@ pub struct HistoryDoc;
 
 fn unavailable(e: String) -> Refused {
     tracing::error!("draft history: {e}");
-    Refused(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable")
+    Refused(
+        StatusCode::SERVICE_UNAVAILABLE,
+        crate::refusal::catalog_code(&e),
+    )
 }
 
 /// The draft's branch and history, if the caller may read it.
