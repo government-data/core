@@ -5,8 +5,9 @@
 //! comes back, anything else gets `401`. `?role=admin` also requires that
 //! role (`403` otherwise).
 //!
-//! `/auth/docs` is the same gate for the documentation (`/docs`), which
-//! comes back only to pages under `/docs/`.
+//! It is also the gate of the modules with `auth: forward` (the user guide
+//! at `/docs`), as the core's `module-forward-auth` middleware (quality-sdk
+//! decision 0002).
 
 use std::sync::Arc;
 
@@ -41,13 +42,12 @@ impl std::fmt::Debug for VerifyState {
     }
 }
 
-/// Mount `/auth/verify` and `/auth/docs`. Both go without
+/// Mount `/auth/verify`. It goes without
 /// [`crate::http::session::require_session`], which would answer `401`
 /// instead of sending a page to sign in.
 pub fn routes(sessions: SessionService, admins: Arc<dyn AdminRepository>) -> Router {
     Router::new()
         .route("/auth/verify", get(verify_handler))
-        .route("/auth/docs", get(docs_handler))
         .with_state(VerifyState { sessions, admins })
 }
 
@@ -78,19 +78,6 @@ async fn verify_handler(
             redirect(&headers, &sign_in_then_back(forwarded_uri(&headers)))
         }
         None => no_store(StatusCode::UNAUTHORIZED.into_response()),
-    }
-}
-
-/// `GET /auth/docs`: the documentation's pages and their assets alike go to
-/// sign in, and come back to the page asked for.
-async fn docs_handler(
-    State(state): State<VerifyState>,
-    jar: CookieJar,
-    headers: HeaderMap,
-) -> Response {
-    match current_session(&state.sessions, &jar).await {
-        Some(_) => StatusCode::NO_CONTENT.into_response(),
-        None => redirect(&headers, &docs_sign_in(forwarded_uri(&headers))),
     }
 }
 
@@ -157,16 +144,6 @@ fn sign_in_then_back(asked: Option<&str>) -> String {
     format!("/login?next={}&page=1", encode(back))
 }
 
-/// The sign-in that comes back to that documentation page. Only a path under
-/// `/docs/`: anything else goes back to the documentation's start (so `next`
-/// cannot send anywhere else).
-fn docs_sign_in(requested: Option<&str>) -> String {
-    let target = requested
-        .filter(|u| u.starts_with("/docs/") && !u.contains("//") && !u.contains('\\'))
-        .unwrap_or("/docs/");
-    format!("/login?next={}", encode(target))
-}
-
 fn encode(path: &str) -> String {
     let mut encoded = String::with_capacity(path.len());
     for b in path.bytes() {
@@ -214,32 +191,6 @@ fn no_store(mut response: Response) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn comes_back_to_the_documentation_page() {
-        assert_eq!(
-            docs_sign_in(Some("/docs/instalacion/instalar/")),
-            "/login?next=/docs/instalacion/instalar/"
-        );
-        assert_eq!(
-            docs_sign_in(Some("/docs/uso/?q=a b#x")),
-            "/login?next=/docs/uso/%3Fq%3Da%20b%23x"
-        );
-    }
-
-    #[test]
-    fn only_inside_the_documentation() {
-        for outside in [
-            None,
-            Some("/settings"),
-            Some("https://other.site/docs/"),
-            Some("/docs//other.site"),
-            Some("/docs/\\other.site"),
-            Some("/docs"),
-        ] {
-            assert_eq!(docs_sign_in(outside), "/login?next=/docs/", "{outside:?}");
-        }
-    }
 
     #[test]
     fn verify_comes_back_to_a_path_of_this_site_only() {

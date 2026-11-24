@@ -1,5 +1,6 @@
 //! The gate Traefik asks before serving an application (`/auth/verify`) and
-//! the documentation (`/auth/docs`), against a real Postgres: with a session
+//! a module's static site (`auth: forward`, the user guide at `/docs`),
+//! against a real Postgres: with a session
 //! it hands over who it is, without one a page goes to sign in and a script
 //! gets 401, and `?role=` keeps out the other roles. Requires Docker.
 
@@ -159,22 +160,12 @@ async fn without_a_session_a_page_goes_to_sign_in_and_a_script_gets_401() {
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(headers.get(header::LOCATION).is_none());
 
-    // The documentation keeps its gate: always to sign in, back under /docs/.
-    let (status, headers) = send(
-        &app,
-        asked("/auth/docs", "/docs/uso/")
-            .body(Body::empty())
-            .unwrap(),
-    )
-    .await;
-    assert_eq!(status, StatusCode::FOUND);
-    assert_eq!(headers[header::LOCATION], "/login?next=/docs/uso/");
-
     // Behind Traefik, the redirect names the site: Traefik would resolve a
     // relative one against the gate's address (http://api:8080).
     let (status, headers) = send(
         &app,
-        asked("/auth/docs", "/docs/uso/")
+        asked("/auth/verify", "/docs/uso/")
+            .header(header::ACCEPT, "text/html")
             .header("x-forwarded-proto", "https")
             .header("x-forwarded-host", "quality.example.com")
             .body(Body::empty())
@@ -184,7 +175,7 @@ async fn without_a_session_a_page_goes_to_sign_in_and_a_script_gets_401() {
     assert_eq!(status, StatusCode::FOUND);
     assert_eq!(
         headers[header::LOCATION],
-        "https://quality.example.com/login?next=/docs/uso/"
+        "https://quality.example.com/login?next=/docs/uso/&page=1"
     );
 }
 

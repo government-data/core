@@ -61,7 +61,7 @@ tasks:
       - node_modules/.bin/vite --host 0.0.0.0 --strictPort
 
   dev:check:
-    desc: Check that watch mode's API, web and docs answer, directly and through Traefik
+    desc: Check that watch mode's API and web answer, directly and through Traefik
     cmds:
       - tools/verify/dev_watch_check.sh
 
