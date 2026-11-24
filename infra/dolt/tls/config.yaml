@@ -28,7 +28,7 @@ listener:
   # Inside the container; what is published is decided by the compose files.
   host: 0.0.0.0
   port: 3306
-  # One small pool per tenant database in the application: plenty for a catalog.
+  # One small pool for the catalog database in the application: plenty.
   max_connections: ${DOLT_MAX_CONNECTIONS}
   back_log: 50
   max_connections_timeout_millis: 60000
@@ -53,7 +53,7 @@ metrics:
   tls_key: /run/dolt-tls/machine.pem
   tls_ca: /run/dolt-tls/ca.crt
 
-# Databases (one per tenant), users and grants, all in the data volume.
+# Databases, users and grants, all in the data volume.
 data_dir: /var/lib/dolt
 cfg_dir: /var/lib/dolt/.doltcfg
 privilege_file: /var/lib/dolt/.doltcfg/privileges.db

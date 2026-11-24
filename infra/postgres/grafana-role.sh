@@ -116,4 +116,4 @@ query --set app_db="$POSTGRES_DB" --set rotate="$rotate" >/dev/null <<-'SQL'
 	GRANT SELECT (tenant_id, dataset, dimension, grp, days) ON quality.remediation_slas TO qd_grafana;
 	COMMIT;
 	SQL
-echo "grafana-role: qd_grafana reads tenant $tenant, read-only"
+echo "grafana-role: qd_grafana is read-only"

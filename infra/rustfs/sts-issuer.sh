@@ -1,8 +1,8 @@
 #!/bin/sh
 # The platform's own RustFS issuer (decision 0030): the user the API calls
 # STS AssumeRole with, to hand each job credentials narrowed by a session
-# policy to its tenant's warehouse. Its own policy (issuer/policy.json) is
-# the ceiling: the tenants' warehouses (`qd-tenant-*`) and their tables,
+# policy to the warehouse. Its own policy (issuer/policy.json) is the
+# ceiling: the warehouse buckets (`qd-tenant-*`) and their tables,
 # never the admin API nor another bucket. An installation step, run once
 # with RustFS up, with the root credentials of .env (as the installer has
 # them); it appends the issuer's keys to .env without printing them

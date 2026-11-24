@@ -9,7 +9,7 @@
 # It does for today's single RustFS what infra/join/join.sh does for the
 # replica (its step 6), with the same user and policy (a test keeps the two
 # in step): once RustFS answers, it sets the policy qd-platform-admin
-# (every action on the tenants' warehouses and the admin API), asks whether
+# (every action on the warehouse buckets and the admin API), asks whether
 # the user exists and only if not makes it, its secret 64 hex digits from
 # the system's CSPRNG, and shows its keys ONCE, on this terminal alone, to
 # be pasted in Settings → Lake under the main lake; then attaches the

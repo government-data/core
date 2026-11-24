@@ -1,6 +1,6 @@
 #!/bin/sh
 # Back up the catalog (decision 0021, point 8): Dolt's own backup of every
-# tenant database (all branches, tags and working sets) into the
+# catalog database (`tenant_*`; all branches, tags and working sets) into the
 # `dolt-backups` volume, one directory per database, then a copy of that
 # volume to the lake's backup bucket. Run it from the repository root, with
 # the stack up; until the application schedules it, a cron or systemd timer
