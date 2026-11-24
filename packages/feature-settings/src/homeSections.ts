@@ -12,8 +12,6 @@ export interface SettingsSection {
   label: string;
   description: string;
   status: (s: AllSettings) => { on: boolean; text: string };
-  /** Handled by gestión (the cloud): not shown here. */
-  managed?: (s: AllSettings) => boolean;
 }
 
 const fromEnv = (kind: string) => (kind === "environment" ? t("settings:home.fromEnv") : "");
@@ -44,21 +42,17 @@ export const SECTIONS: SettingsSection[] = [
     get description() {
       return t("settings:home.mail.desc");
     },
-    // In the cloud the mail is gestión's. In an own installation there is no
-    // other, so without it no notice goes out.
+    // There is no other mail, so without it no notice goes out.
     status: (s) =>
-      s.mail.value.platform
-        ? { on: s.mail.value.enabled, text: t("settings:home.mail.platform") }
-        : s.mail.value.enabled
-          ? {
-              on: true,
-              text:
-                s.mail.value.transport === "graph"
-                  ? t("settings:home.onGraph")
-                  : t("settings:home.onSmtp"),
-            }
-          : { on: false, text: t("settings:home.mail.required") },
-    managed: (s) => !!s.platform_mail_from,
+      s.mail.value.enabled
+        ? {
+            on: true,
+            text:
+              s.mail.value.transport === "graph"
+                ? t("settings:home.onGraph")
+                : t("settings:home.onSmtp"),
+          }
+        : { on: false, text: t("settings:home.mail.required") },
   },
   {
     path: "/settings/oauth",
@@ -78,8 +72,6 @@ export const SECTIONS: SettingsSection[] = [
           fromEnv(s.oauth.source.kind),
       };
     },
-    // With the common account gestión handles the access.
-    managed: (s) => !!s.platform_account,
   },
   {
     path: "/settings/platform",

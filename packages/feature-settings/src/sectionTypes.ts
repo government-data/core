@@ -92,7 +92,4 @@ export interface AllSettings {
   /** The platform's sender for whoever does not configure their own mail
    * (the management panel's); `null` if there is none. */
   platform_mail_from?: string | null;
-  /** The common account the instance signs in with; `null` if there is none.
-   * With it OAuth2 is not configured here: gestión handles the access. */
-  platform_account?: string | null;
 }

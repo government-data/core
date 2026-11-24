@@ -66,9 +66,6 @@ export const OAuthPage: Component = () => {
   const [providers, setProviders] = createStore<OAuthProvider[]>([]);
   const [source, setSource] = createSignal<Source>();
   const [template, setTemplate] = createSignal("");
-  // The common account the instance signs in with (`null` without it; not
-  // read yet, `undefined`): with it gestión handles the access.
-  const [account, setAccount] = createSignal<string | null>();
   const [tenant, setTenant] = createSignal("");
   const [discovering, setDiscovering] = createSignal<number>();
   // Which provider the last discovery notice belongs to (none: the notice is
@@ -86,7 +83,6 @@ export const OAuthPage: Component = () => {
     const all = await settingsApi.all();
     load(all.oauth.value.providers, all.oauth.source);
     setTemplate(all.oauth_redirect_template);
-    setAccount(all.platform_account ?? null);
     return all;
   });
 
@@ -145,10 +141,7 @@ export const OAuthPage: Component = () => {
       <Show when={settings.error}>
         <p class="st-notice st-notice--error">{t("settings:oauth.readError")}</p>
       </Show>
-      <Show when={account()}>
-        <p class="st-notice">{t("settings:oauth.managedByAccount")}</p>
-      </Show>
-      <Show when={account() === null}>
+      <Show when={settings()}>
         <Show when={source()}>
           {(src) => (
             <SourceNote
