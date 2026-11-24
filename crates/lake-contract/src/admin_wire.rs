@@ -57,8 +57,13 @@ impl AdminClient {
 }
 
 /// Every operation of `lake-admin/1`, each run twice: both answers alike
-/// and successful. `warehouse` is made by the case.
+/// and successful. `warehouse` is made by the case: `201` and `made` the
+/// first time, then `200` and `present`.
 pub async fn operations_twice(client: &AdminClient, warehouse: &str) {
+    let path = wire::paths::warehouse(warehouse);
+    let rules = json!({"versioning": true});
+    let made = client.call("PUT", &path, Some(&rules)).await;
+    assert_eq!(made, (201, json!({"state": "made"})), "PUT {path}");
     let grant = serde_json::to_value(LakeGrant::read_only(warehouse)).expect("a grant");
     let calls: Vec<(&str, String, Option<Value>)> = vec![
         ("GET", wire::paths::about(), None),
@@ -71,7 +76,7 @@ pub async fn operations_twice(client: &AdminClient, warehouse: &str) {
         (
             "PUT",
             wire::paths::replication(warehouse),
-            Some(json!({"endpoint": "https://replica.lake.test"})),
+            Some(json!({"endpoint": "https://replica.lake.test", "source_pool": false})),
         ),
         ("GET", wire::paths::replication(warehouse), None),
         (
@@ -89,6 +94,9 @@ pub async fn operations_twice(client: &AdminClient, warehouse: &str) {
     ];
     for (method, path, body) in &calls {
         let first = client.call(method, path, body.as_ref()).await;
+        if path == &wire::paths::warehouse(warehouse) {
+            assert_eq!(first.1, json!({"state": "present"}), "PUT {path} again");
+        }
         let second = client.call(method, path, body.as_ref()).await;
         assert!((200..300).contains(&first.0), "{method} {path}: {first:?}");
         assert_eq!(first, second, "{method} {path} twice answers the same");

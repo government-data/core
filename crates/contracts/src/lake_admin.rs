@@ -64,14 +64,20 @@ pub struct About {
     pub version: String,
 }
 
-/// `GET /health`: the lake's health, as far as it says it.
+/// `GET /health`: the lake's health, as far as it says it, asked with the
+/// admin keys the core sent; or that it had none, or the lake refused them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Health {
-    pub healthy: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub drives_online: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub drives_offline: Option<u32>,
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum Health {
+    /// The lake answered: its drives, online and not.
+    Answered {
+        drives_online: u32,
+        drives_offline: u32,
+    },
+    /// No admin keys came with the call: nothing was asked.
+    NoKeys,
+    /// The lake refused the keys: its own error code.
+    KeysRefused { code: String },
 }
 
 /// `PUT /warehouses/{name}`: how long the warehouse keeps what is written.
@@ -85,11 +91,24 @@ pub struct RetentionRules {
     pub noncurrent_expire_days: Option<u32>,
 }
 
+/// `PUT /warehouses/{name}`'s answer: made now (`201`), there already, or
+/// a step that failed (`200`), as the replication's answer says its state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum WarehouseOutcome {
+    Made,
+    Present,
+    Failed { step: String, detail: String },
+}
+
 /// `PUT /warehouses/{name}/replication`: the replica lake, as the lake
-/// reaches it.
+/// reaches it, and whether the source lake is a pool (the adapter works
+/// out how its replication reaches the replica from it).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplicaTarget {
     pub endpoint: String,
+    #[serde(default)]
+    pub source_pool: bool,
 }
 
 /// A warehouse's replication, as the lake reports it.
@@ -321,12 +340,33 @@ mod tests {
             json!({"protocols": ["lake-admin/1"], "implementation": "lake-rustfs", "version": "0.1.0"}),
         );
         round_trip(
-            &Health {
-                healthy: true,
-                drives_online: Some(4),
-                drives_offline: None,
+            &Health::Answered {
+                drives_online: 4,
+                drives_offline: 0,
             },
-            json!({"healthy": true, "drives_online": 4}),
+            json!({"state": "answered", "drives_online": 4, "drives_offline": 0}),
+        );
+        round_trip(&Health::NoKeys, json!({"state": "no_keys"}));
+        round_trip(
+            &Health::KeysRefused {
+                code: "InvalidAccessKeyId".into(),
+            },
+            json!({"state": "keys_refused", "code": "InvalidAccessKeyId"}),
+        );
+        round_trip(&WarehouseOutcome::Made, json!({"state": "made"}));
+        round_trip(
+            &WarehouseOutcome::Failed {
+                step: "warehouse_tables".into(),
+                detail: "HTTP 403".into(),
+            },
+            json!({"state": "failed", "step": "warehouse_tables", "detail": "HTTP 403"}),
+        );
+        round_trip(
+            &ReplicaTarget {
+                endpoint: "lake-replica-1".into(),
+                source_pool: true,
+            },
+            json!({"endpoint": "lake-replica-1", "source_pool": true}),
         );
         round_trip(
             &RetentionRules {

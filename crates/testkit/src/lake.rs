@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 use application::lake::{
     CatalogPrefix, Lake, LakeAdmin, LakeCredentialKind, LakeCredentials, LakeError, LakeGrant,
     LakeHealth, LakeKeys, LakeProperties, ManagedPolicy, ReplicaTarget, ReplicationState,
-    RetentionRules, SessionPolicy, UrlStyle, WriteOnce,
+    RetentionRules, SessionPolicy, UrlStyle, WarehouseMade, WriteOnce,
 };
 use async_trait::async_trait;
 
@@ -168,10 +168,17 @@ impl Lake for InMemoryLake {
 
 #[async_trait]
 impl LakeAdmin for InMemoryLake {
-    async fn ensure_warehouse(&self, name: &str, rules: &RetentionRules) -> Result<(), LakeError> {
+    async fn ensure_warehouse(
+        &self,
+        name: &str,
+        rules: &RetentionRules,
+    ) -> Result<WarehouseMade, LakeError> {
         let mut state = self.state.lock().unwrap();
-        state.warehouses.insert(name.to_string(), rules.clone());
-        Ok(())
+        let was = state.warehouses.insert(name.to_string(), rules.clone());
+        Ok(match was {
+            None => WarehouseMade::Made,
+            Some(_) => WarehouseMade::Present,
+        })
     }
 
     async fn replicate(
@@ -226,10 +233,9 @@ impl LakeAdmin for InMemoryLake {
     }
 
     async fn health(&self) -> Result<LakeHealth, LakeError> {
-        Ok(LakeHealth {
-            healthy: true,
-            drives_online: Some(4),
-            drives_offline: Some(0),
+        Ok(LakeHealth::Answered {
+            drives_online: 4,
+            drives_offline: 0,
         })
     }
 }
@@ -270,6 +276,7 @@ mod tests {
         let lake = with_warehouse().await;
         let replica = ReplicaTarget {
             endpoint: "https://replica.test".into(),
+            source_pool: false,
         };
         lake.replicate(WH, &replica).await.unwrap();
         let once = lake.snapshot();
@@ -278,6 +285,10 @@ mod tests {
             .unwrap();
         lake.replicate(WH, &replica).await.unwrap();
         assert_eq!(lake.snapshot(), once);
+        assert_eq!(
+            lake.ensure_warehouse(WH, &RetentionRules::default()).await,
+            Ok(WarehouseMade::Present)
+        );
         assert_eq!(
             lake.replication(WH).await.unwrap(),
             ReplicationState::Configured

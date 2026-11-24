@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use application::lake::{
     LakeAdmin, LakeCredentialKind, LakeError, LakeGrant, LakeHealth, LakeKeys, ManagedPolicy,
-    ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy,
+    ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
 };
 use async_trait::async_trait;
 use contracts::lake_admin::{self as wire, paths};
@@ -176,11 +176,16 @@ fn to_value<T: serde::Serialize>(value: &T) -> Value {
 
 #[async_trait]
 impl LakeAdmin for LakeAdminClient {
-    async fn ensure_warehouse(&self, name: &str, rules: &RetentionRules) -> Result<(), LakeError> {
+    async fn ensure_warehouse(
+        &self,
+        name: &str,
+        rules: &RetentionRules,
+    ) -> Result<WarehouseMade, LakeError> {
         let body = to_value(&wire::RetentionRules::from(rules));
-        self.call("PUT", &paths::warehouse(name), Some(body))
-            .await
-            .map(|_| ())
+        let made: wire::WarehouseOutcome = self
+            .typed("PUT", &paths::warehouse(name), Some(body))
+            .await?;
+        Ok(made.into())
     }
 
     async fn replicate(

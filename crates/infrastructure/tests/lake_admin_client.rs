@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use application::lake::{
-    LakeAdmin, LakeCredentialKind, LakeError, LakeGrant, ManagedAccess, ManagedPolicy,
-    ReplicaTarget, ReplicationState, RetentionRules,
+    LakeAdmin, LakeCredentialKind, LakeError, LakeGrant, LakeHealth, ManagedAccess, ManagedPolicy,
+    ReplicaTarget, ReplicationState, RetentionRules, WarehouseMade,
 };
 use infrastructure::lake_admin_client::LakeAdminClient;
 use testkit::lake::InMemoryLake;
@@ -32,10 +32,14 @@ async fn each_operation_reaches_the_lake() {
         locked_days: Some(30),
         noncurrent_expire_days: None,
     };
-    admin.ensure_warehouse(WH, &rules).await.unwrap();
+    let made = admin.ensure_warehouse(WH, &rules).await;
+    assert_eq!(made, Ok(WarehouseMade::Made));
     assert_eq!(server.lake.snapshot().warehouses[WH], rules);
+    let again = admin.ensure_warehouse(WH, &rules).await;
+    assert_eq!(again, Ok(WarehouseMade::Present));
     let replica = ReplicaTarget {
         endpoint: "https://replica.test".into(),
+        source_pool: true,
     };
     assert_eq!(
         admin.replicate(WH, &replica).await.unwrap(),
@@ -64,7 +68,8 @@ async fn each_operation_reaches_the_lake() {
         .ensure_credentials(LakeCredentialKind::Admin, Some(&made))
         .await;
     assert_eq!(kept.unwrap(), made);
-    assert!(admin.health().await.unwrap().healthy);
+    let health = admin.health().await.unwrap();
+    assert!(matches!(health, LakeHealth::Answered { .. }), "{health:?}");
     let unknown = admin.replication("qd-tenant-unknown").await;
     assert!(matches!(unknown, Err(LakeError::Unknown(_))), "{unknown:?}");
     let invalid = admin.session_policy(&LakeGrant::read_only("Bad*")).await;
