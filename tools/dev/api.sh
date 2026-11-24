@@ -39,6 +39,13 @@ export LAKE_ENDPOINT=https://localhost LAKE_CA_FILE="$PWD/infra/traefik/certs/de
 if [ -f .dev/ca/ca.crt ]; then
   export CA_CERT_FILE="$PWD/.dev/ca/ca.crt" CA_KEY_FILE="$PWD/.dev/ca/ca.key"
 fi
+# The lake admin adapter (decision 0078, step 13), once
+# infra/rustfs/gen-dev-lake-admin.sh made its certificates: through the
+# internal entry point by its name, which resolves to this machine.
+if [ -f .dev/lake-admin/app.pem ]; then
+  export LAKE_ADMIN_URL="https://lake-admin.${INTERNAL_DOMAIN:-internal.localhost}:${TRAEFIK_INTERNAL_PORT:-9443}"
+  export LAKE_ADMIN_CA_FILE="$PWD/.dev/lake-admin/ca.crt" LAKE_ADMIN_CERT_FILE="$PWD/.dev/lake-admin/app.pem"
+fi
 
 # The API's lines also go to .dev/logs/api.log, which Alloy reads in
 # development (infra/observability/alloy/dev-host.alloy) as the container's

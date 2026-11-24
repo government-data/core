@@ -99,6 +99,12 @@ impl LakeAdminClient {
         self
     }
 
+    /// `GET /about`: the protocol versions the adapter serves, and what it
+    /// is.
+    pub async fn about(&self) -> Result<wire::About, LakeError> {
+        self.typed("GET", &paths::about(), None, &Vec::new()).await
+    }
+
     /// `lake`'s keys in `header`, if they are kept.
     async fn header(&self, lake: &Lake, header: &'static str) -> Result<Headers, LakeError> {
         let Some((source, _)) = &self.keys else {

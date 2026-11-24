@@ -68,6 +68,8 @@ async fn each_operation_reaches_the_lake() {
         .ensure_credentials(LakeCredentialKind::Admin, Some(&made))
         .await;
     assert_eq!(kept.unwrap(), made);
+    let about = admin.about().await.unwrap();
+    assert_eq!(about.protocols, [contracts::lake_admin::PROTOCOL]);
     let health = admin.health().await.unwrap();
     assert!(matches!(health, LakeHealth::Answered { .. }), "{health:?}");
     let unknown = admin.replication("qd-tenant-unknown").await;

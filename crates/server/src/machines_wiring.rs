@@ -102,6 +102,7 @@ pub(crate) fn service(
     let keys = Arc::new(PgLakeAdminKeys::new(pool.clone(), sealer));
     let machines = match AdapterLakeAdmins::from_env(keys) {
         Ok(api) => {
+            tokio::spawn(about_the_main_lake(api.clone()));
             let machines = machines
                 .with_lake_admin(Arc::new(api))
                 // The main lake, where the application reaches it (0066 step 11).
@@ -125,6 +126,25 @@ pub(crate) fn service(
             machines
         }
     })
+}
+
+/// What the main lake's adapter says it is, logged once at start (decision
+/// 0078, step 13): whether it serves `lake-admin/1`, or why it did not
+/// answer. Settings → Lake asks its health.
+async fn about_the_main_lake(admins: AdapterLakeAdmins) {
+    use contracts::lake_admin::PROTOCOL;
+    match admins.main_about().await {
+        Ok(about) if about.protocols.iter().any(|p| p == PROTOCOL) => tracing::info!(
+            implementation = %about.implementation,
+            version = %about.version,
+            "the main lake's adapter serves {PROTOCOL}"
+        ),
+        Ok(about) => tracing::warn!(
+            protocols = ?about.protocols,
+            "the main lake's adapter does not serve {PROTOCOL}"
+        ),
+        Err(e) => tracing::warn!(error = %e, "the main lake's adapter did not answer"),
+    }
 }
 
 /// The machines' charts read from Mimir (`MIMIR_QUERY_URL`, 0072 point 13),

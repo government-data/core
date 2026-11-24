@@ -12,3 +12,33 @@ services:
       SSL_CERT_FILE: /etc/ssl/dev-ca.crt
     volumes:
       - ./infra/traefik/certs/dev-ca.crt:/etc/ssl/dev-ca.crt:ro
+
+  # The lake admin adapter (decision 0078, step 13): `lake-admin/1` for the
+  # API, built from this checkout (its image is the module's, in ECR, once
+  # it moves to the module's repository, step 15). It shares Traefik's
+  # network namespace with RustFS: it reaches RustFS at 127.0.0.1:9000 and
+  # listens on 127.0.0.1:9020, where the internal entry point passes its TLS
+  # through by its name, lake-admin.<INTERNAL_DOMAIN>
+  # (infra/traefik/dynamic/lake-admin-dev.yml). Its certificate, of role
+  # `lake`, and the API's, of role `app`, come from
+  # infra/rustfs/gen-dev-lake-admin.sh (`task lake:up` runs it) in
+  # .dev/lake-admin.
+  lake-admin:
+    image: ${LAKE_ADMIN_IMAGE:-qd-lake-rustfs-admin:local}
+    build:
+      context: .
+      dockerfile: infra/docker/lake-rustfs-admin.Dockerfile
+    network_mode: "container:${APP_STACK:-data-quality}-traefik-1"
+    restart: unless-stopped
+    read_only: true
+    environment:
+      QD_LAKE_ADMIN_ADDR: 127.0.0.1:9020
+      QD_LAKE_ADMIN_TLS_DIR: /run/qd-node
+      QD_LAKE_ADMIN_LAKE_URL: http://127.0.0.1:9000
+      QD_MACHINE_NAME: lake-admin.${INTERNAL_DOMAIN:-internal.localhost}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - ./.dev/lake-admin:/run/qd-node:ro
+    depends_on:
+      rustfs:
+        condition: service_healthy

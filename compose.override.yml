@@ -25,6 +25,9 @@ services:
     # (dynamic/metrics-dev.yml; decision 0071).
     environment:
       QD_TRAEFIK_METRICS: plain
+      # The lake admin adapter's route on the internal entry point
+      # (dynamic/lake-admin-dev.yml; decision 0078, step 13).
+      QD_LAKE_ADMIN_DEV: "1"
     # Grafana shares Traefik's network namespace in dev
     # (infra/observability/compose.dev.yml) and reads the audit and run logs
     # from `postgres` (decision 0026, point 6), which is only on `backend`.
@@ -60,8 +63,17 @@ services:
       LAKE_CA_FILE: /etc/qd/dev-ca.crt
       RUSTFS_STS_ISSUER_ACCESS_KEY: ${RUSTFS_STS_ISSUER_ACCESS_KEY:-}
       RUSTFS_STS_ISSUER_SECRET_KEY: ${RUSTFS_STS_ISSUER_SECRET_KEY:-}
+      # The lake admin adapter (decision 0078, step 13), through the internal
+      # entry point by its name, with the certificates of
+      # infra/rustfs/gen-dev-lake-admin.sh.
+      LAKE_ADMIN_URL: https://lake-admin.${INTERNAL_DOMAIN:-internal.localhost}:${TRAEFIK_INTERNAL_PORT:-9443}
+      LAKE_ADMIN_CA_FILE: /etc/qd/lake-admin/ca.crt
+      LAKE_ADMIN_CERT_FILE: /etc/qd/lake-admin/app.pem
+    extra_hosts:
+      - "lake-admin.${INTERNAL_DOMAIN:-internal.localhost}:127.0.0.1"
     volumes:
       - ./infra/traefik/certs/dev-ca.crt:/etc/qd/dev-ca.crt:ro
+      - ./.dev/lake-admin:/etc/qd/lake-admin:ro
 
   web:
     build:
