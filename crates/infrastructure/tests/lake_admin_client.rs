@@ -45,9 +45,10 @@ async fn each_operation_reaches_the_lake() {
         admin.replicate(WH, &replica).await.unwrap(),
         ReplicationState::Configured
     );
+    let sync = admin.replication(WH).await.unwrap();
     assert_eq!(
-        admin.replication(WH).await.unwrap(),
-        ReplicationState::Configured
+        (sync.state, sync.pending, sync.failed),
+        (ReplicationState::Configured, Some(0), Some(0))
     );
     let policies = [ManagedPolicy {
         name: "quality-viewer".into(),

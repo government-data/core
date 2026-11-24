@@ -146,7 +146,7 @@ impl LakeAdminServer {
             ("GET", ["warehouses", name, "replication"]) => admin
                 .replication(name)
                 .await
-                .map(|s| json(&wire::ReplicationState::from(s))),
+                .map(|s| json(&wire::ReplicationSync::from(s))),
             ("PUT", ["policies", "managed"]) => match parse::<wire::ManagedPolicies>(body) {
                 Ok(p) => {
                     let policies: Vec<_> = p.policies.into_iter().map(Into::into).collect();

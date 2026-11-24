@@ -7,7 +7,8 @@ use std::sync::Arc;
 
 use crate::lake::{
     LakeAdmin, LakeAdmins, LakeCredentialKind, LakeError, LakeGrant, LakeHealth, LakeKeys,
-    ManagedPolicy, ReplicaTarget, ReplicationState, RetentionRules, SessionPolicy, WarehouseMade,
+    ManagedPolicy, ReplicaTarget, ReplicationState, ReplicationSync, RetentionRules, SessionPolicy,
+    WarehouseMade,
 };
 
 use super::*;
@@ -108,7 +109,7 @@ impl LakeAdmin for At {
         found.map_or(Ok(ReplicationState::Configured), |(_, a)| a.clone())
     }
 
-    async fn replication(&self, _: &str) -> Result<ReplicationState, LakeError> {
+    async fn replication(&self, _: &str) -> Result<ReplicationSync, LakeError> {
         not_here()
     }
 

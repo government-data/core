@@ -172,6 +172,15 @@ pub enum ReplicationState {
     },
 }
 
+/// A warehouse's replication as it stands, with what waits to be copied now
+/// and what failed to be copied in the last hour, when the lake says them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplicationSync {
+    pub state: ReplicationState,
+    pub pending: Option<u64>,
+    pub failed: Option<u64>,
+}
+
 /// What a managed access policy (0028) allows, on every warehouse.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManagedAccess {
@@ -293,8 +302,8 @@ pub trait LakeAdmin: Send + Sync {
         name: &str,
         replica: &ReplicaTarget,
     ) -> Result<ReplicationState, LakeError>;
-    /// The warehouse's replication as it stands.
-    async fn replication(&self, name: &str) -> Result<ReplicationState, LakeError>;
+    /// The warehouse's replication as it stands, and how far behind it is.
+    async fn replication(&self, name: &str) -> Result<ReplicationSync, LakeError>;
     /// Sets the lake's managed policies to exactly `policies`.
     async fn set_managed_policies(&self, policies: &[ManagedPolicy]) -> Result<(), LakeError>;
     /// `grant` in the lake's policy language; changes nothing.
