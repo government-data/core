@@ -95,6 +95,26 @@ first_start() {
   log "the node agent's files are there: PostgreSQL goes on with TLS"
 }
 
+# The grants an existing installation lacks (quality-sdk decision 0009):
+# once PostgreSQL answers on its socket, the init script that revokes
+# CONNECT from PUBLIC on the core's databases, as a new one runs it. It is
+# safe to run twice; it is tried again while PostgreSQL is not ready (the
+# image's first init restarts it) and given up after a while.
+grants() {
+  tries=0
+  while [ "$tries" -lt 60 ]; do
+    tries=$((tries + 1))
+    sleep 5
+    su-exec postgres pg_isready -q || continue
+    if su-exec postgres bash "$GRANTS" >/dev/null 2>&1; then
+      log "CONNECT on the core's databases revoked from PUBLIC"
+      return 0
+    fi
+  done
+  log "could not revoke CONNECT from PUBLIC on the core's databases"
+}
+GRANTS=/docker-entrypoint-initdb.d/40-revoke-public-connect.sh
+
 mkdir -p "$DST"
 chown postgres:postgres "$DST"
 chmod 700 "$DST"
@@ -104,4 +124,5 @@ present || first_start
 install_files
 log "the machine's certificate installed"
 (watch "$(fingerprint)" </dev/null &)
+(grants </dev/null &)
 exec docker-entrypoint.sh "$@"

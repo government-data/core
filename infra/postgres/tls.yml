@@ -35,7 +35,20 @@
 # workers reach it; QD_PG_TLS_CHECK_EVERY (30), seconds between looks at the
 # agent's files.
 #
+# - Modules reach it on the network data-quality-db (quality-sdk decision
+#   0009), by the same name: a module's service that uses its database
+#   joins that network (`external: true`), connects with its own role and
+#   password over TLS and verifies the name. Only PostgreSQL listens there,
+#   and the network has no way out. The core's databases grant CONNECT by
+#   role, not to PUBLIC (initdb/40-revoke-public-connect.sh), so a module's
+#   role opens its own databases only.
+#
 # Verified with tools/verify/postgres_stack_tls.sh.
+networks:
+  db:
+    name: data-quality-db
+    internal: true
+
 services:
   postgres:
     # The watcher of tls/entrypoint.sh is a child of this init, never of
@@ -67,6 +80,9 @@ services:
       - "${POSTGRES_BIND:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
     networks:
       backend:
+        aliases:
+          - ${POSTGRES_SERVER_NAME:?set POSTGRES_SERVER_NAME to the name in PostgreSQL's certificate}
+      db:
         aliases:
           - ${POSTGRES_SERVER_NAME:?set POSTGRES_SERVER_NAME to the name in PostgreSQL's certificate}
     healthcheck:
