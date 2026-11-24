@@ -18,7 +18,7 @@
 set -u
 export LC_ALL=C
 cd "$(dirname "$0")/../.."
-P=qs-verify-t3
+P=qd-verify-t3
 . tools/verify/trino_engine_lib.sh
 te_rustfs || exit 1
 te_trino || exit 1

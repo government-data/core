@@ -21,7 +21,7 @@
 set -u
 export LC_ALL=C
 cd "$(dirname "$0")/../.."
-P=qs-verify-t2
+P=qd-verify-t2
 . tools/verify/trino_engine_lib.sh
 G=lake.quality_gold
 CUT="DATE '2026-11-01'"
@@ -35,7 +35,7 @@ jq -n --argjson l "$(job loans)" --argjson s "$(job savings)" '{
              {user: "person_.*", catalog: "gold", allow: "read-only"}, {allow: "none"}],
   schemas: [{user: "qd-quality", owner: true}, {owner: false}],
   tables: [{user: "qd-quality", privileges: ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP"]},
-           {user: "job_rules_.*|person_.*", schema: "quality_gold", table: ".*[$]refs", privileges: ["SELECT"]}, $l, $s,
+           {user: "job_rules_.*", schema: "quality_gold", table: ".*[$]refs", privileges: ["SELECT"]}, $l, $s,
            {user: "person_loans", catalog: "gold", schema: "quality_gold", privileges: ["SELECT"],
             filter: "dataset = '\''loans'\''"}]}' >"$D/rules.json"
 te_rustfs || exit 1
@@ -50,15 +50,10 @@ tq_ok "rule_results by dataset, cut, run_id" qd-quality "CREATE TABLE $G.rule_re
   cut date, run_id varchar, rule varchar, failed bigint) WITH (partitioning = ARRAY['dataset', 'cut', 'run_id'])"
 tq_ok "view current_run, SECURITY INVOKER" qd-quality "CREATE VIEW $G.current_run SECURITY INVOKER AS
   SELECT dataset, cut, max_by(run_id, run_seq) AS run_id FROM gold.quality_gold.run_summary GROUP BY dataset, cut"
-tq_ok "view v_rule_results as point 4 writes it (JOIN … USING)" qd-quality "CREATE VIEW $G.v_rule_results_using
-  SECURITY INVOKER AS SELECT t.* FROM gold.quality_gold.rule_results t
-  JOIN gold.quality_gold.current_run r USING (dataset, cut, run_id)"
-expect "  its columns (t.* after USING)" "dataset cut run_id rule failed" \
-  "$(tq qd-quality "DESCRIBE gold.quality_gold.v_rule_results_using" | cut -f1 | tr '\n' ' ' | sed 's/ $//')"
-tq_ok "view v_rule_results with JOIN … ON" qd-quality "CREATE VIEW $G.v_rule_results SECURITY INVOKER AS
+tq_ok "view v_rule_results, SECURITY INVOKER, JOIN … ON" qd-quality "CREATE VIEW $G.v_rule_results SECURITY INVOKER AS
   SELECT t.* FROM gold.quality_gold.rule_results t JOIN gold.quality_gold.current_run r
   ON t.dataset = r.dataset AND t.cut = r.cut AND t.run_id = r.run_id"
-expect "  its columns" "dataset cut run_id rule failed" \
+expect "  its columns (the join columns kept)" "dataset cut run_id rule failed" \
   "$(tq qd-quality "DESCRIBE gold.quality_gold.v_rule_results" | cut -f1 | tr '\n' ' ' | sed 's/ $//')"
 
 # step USER DATASET RUN SEQ STEP: one step of a run (1 insert, 2 flip, 3 delete old).

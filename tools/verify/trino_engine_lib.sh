@@ -7,12 +7,12 @@
 # catalog a script writes into "$D/catalog". No port is published: every
 # query runs through `docker exec` and the Trino CLI. Synthetic rows only;
 # keys are random, kept in files under "$D" and never printed. Not run by
-# itself: a script sets P (qs-verify-…) and sources this file.
+# itself: a script sets P (qd-verify-…) and sources this file.
 #
 # A script may write "$D/rules.json" (file-based access control) before
 # te_trino; without it every user may do everything.
 
-: "${P:?set P to qs-verify-<name> before sourcing}"
+: "${P:?set P to qd-verify-<name> before sourcing}"
 TRINO_IMAGE=${TRINO_IMAGE:-trinodb/trino:484}
 RUSTFS_IMAGE=${RUSTFS_IMAGE:-rustfs/rustfs:1.0.5}
 TRINO_HEAP=${TRINO_HEAP:-2G}
@@ -48,7 +48,7 @@ docker network create "$P" >/dev/null || exit 1
 # --- RustFS: the lake, one warehouse, the platform admin user -----------------
 te_rustfs() {
   local policy secret code call
-  printf 'RUSTFS_ACCESS_KEY=qs%s\nRUSTFS_SECRET_KEY=%s\n' "$(openssl rand -hex 8)" "$(openssl rand -hex 20)" >"$D/root.env"
+  printf 'RUSTFS_ACCESS_KEY=qd%s\nRUSTFS_SECRET_KEY=%s\n' "$(openssl rand -hex 8)" "$(openssl rand -hex 20)" >"$D/root.env"
   docker run -d --name "$P-lake" --network "$P" --memory 1g --env-file "$D/root.env" \
     -e RUSTFS_VOLUMES=/data "$RUSTFS_IMAGE" server --address :9000 >/dev/null || return 1
   for _ in $(seq 1 30); do
@@ -179,12 +179,14 @@ tq_refused() {
 }
 # tq_http USER SQL: the statement through the HTTP API with curl inside the
 # container (no CLI JVM, for concurrent statements), polled to its end;
-# prints FINISHED or "failed: <error name>", exit status 1 when it failed.
+# prints FINISHED or "failed: <error name and message>", exit status 1 when
+# it failed.
 tq_http() {
   local r n e
   r=$(docker exec "$P-trino" curl -s -H "X-Trino-User: $1" --data-binary "$2" http://localhost:8080/v1/statement)
   while :; do
-    e=$(printf '%s' "$r" | grep -o '"errorName":"[^"]*"' | head -1)
+    e=$(printf '%s' "$r" | grep -o '"errorName":"[^"]*"\|"message":"[^"]\{0,160\}' | head -2 | tr '\n' ' ')
+    case "$e" in *errorName*) ;; *) e= ;; esac
     [ -n "$e" ] && { echo "failed: $e"; return 1; }
     n=$(printf '%s' "$r" | grep -o '"nextUri":"[^"]*"' | sed 's/"nextUri":"//; s/"$//')
     [ -z "$n" ] && { echo FINISHED; return 0; }
