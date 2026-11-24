@@ -140,7 +140,7 @@ async fn delete_dataset(
         return refuse(StatusCode::UNPROCESSABLE_ENTITY, "confirm");
     }
     let Some(catalog) = &api.catalog else {
-        return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+        return crate::refusal::no_catalog();
     };
     let mapping = match catalog.snapshot(&dataset).await {
         Ok(Some(snap)) => snap.mapping,
@@ -192,7 +192,7 @@ async fn delete_dataset(
     let author = format!("{0} <{0}@accounts.invalid>", caller.account);
     if let Err(e) = api.drafts.remove_dataset(&dataset, &author).await {
         tracing::error!("delete: catalog: {e}");
-        return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+        return crate::refusal::catalog_failed(&e);
     }
     match audit(&caller, format!("dataset/{dataset}")).await {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
@@ -220,7 +220,7 @@ async fn delete_table(
         return refuse(StatusCode::UNPROCESSABLE_ENTITY, "confirm");
     }
     let Some(catalog) = &api.catalog else {
-        return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+        return crate::refusal::no_catalog();
     };
     let mappings = match catalog.mappings().await {
         Ok(m) => m,
@@ -278,7 +278,10 @@ async fn delete_namespace(
     if body.confirm != namespace {
         return refuse(StatusCode::UNPROCESSABLE_ENTITY, "confirm");
     }
-    let (Some(catalog), Some(lake)) = (&api.catalog, &api.lake) else {
+    let Some(catalog) = &api.catalog else {
+        return crate::refusal::no_catalog();
+    };
+    let Some(lake) = &api.lake else {
         return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
     };
     let tables = match lake.tables(lake::WAREHOUSE, &namespace).await {

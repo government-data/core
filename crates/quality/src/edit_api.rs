@@ -185,7 +185,10 @@ async fn save_on(
             Ok(_) => {}
             Err(e) => {
                 tracing::error!("edit: catalog: {e}");
-                return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+                return refuse(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    crate::refusal::catalog_code(&e),
+                );
             }
         }
     }
@@ -205,7 +208,10 @@ async fn save_on(
         }
         Err(e) => {
             tracing::error!("edit: catalog: {e}");
-            return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+            return refuse(
+                StatusCode::SERVICE_UNAVAILABLE,
+                crate::refusal::catalog_code(&e),
+            );
         }
     };
     let entry = AuditEntry {

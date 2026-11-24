@@ -109,7 +109,10 @@ async fn split(
         Ok(commit) => commit,
         Err(e) => {
             tracing::error!("split: catalog: {e}");
-            return refuse(StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
+            return refuse(
+                StatusCode::SERVICE_UNAVAILABLE,
+                crate::refusal::catalog_code(&e),
+            );
         }
     };
     let entry = AuditEntry {

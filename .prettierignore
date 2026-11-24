@@ -29,5 +29,6 @@ CLAUDE.md
 infra/traefik/dynamic/apps*.yml
 infra/traefik/dynamic/lake-admin-dev.yml
 infra/traefik/dynamic/metrics-dev.yml
+infra/traefik/dynamic/lake-admin-dev.yml
 infra/traefik/internal.yml
 infra/traefik/dynamic/internal.yml

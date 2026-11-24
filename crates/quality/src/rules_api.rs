@@ -258,7 +258,8 @@ pub(crate) async fn on_main(
 ) -> Result<Option<crate::draft_api::DraftFiles>, (StatusCode, &'static str)> {
     catalog.read(MAIN, dataset).await.map_err(|e| {
         tracing::error!("rules: catalog: {e}");
-        (StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable")
+        let code = crate::refusal::catalog_code(&e);
+        (StatusCode::SERVICE_UNAVAILABLE, code)
     })
 }
 

@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 /// 0076, point 5), so it is a fixed name, the one the main tenant's had.
 pub const DATABASE: &str = "tenant_00000000000000000000000000000001";
 
+/// What a catalog answers when the installation has none (no `DOLT_URL`):
+/// the routes say `catalog_not_configured`, not `catalog_unavailable`.
+pub const NOT_CONFIGURED: &str = "no catalog is configured";
+
 /// A dataset's mapping and rules files at one commit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CatalogSnapshot {

@@ -7154,7 +7154,7 @@
         "properties": {
           "error": {
             "type": "string",
-            "description": "`dimension`, `days`, `group`, `duplicate`, `too_many`, `not_found`,\n`catalog_unavailable` or `forbidden`."
+            "description": "`dimension`, `days`, `group`, `duplicate`, `too_many`, `not_found`,\n`catalog_not_configured`, `catalog_unavailable` or `forbidden`."
           }
         }
       },

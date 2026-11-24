@@ -496,8 +496,12 @@ async fn without_a_catalog_no_source_is_deleted() {
         .call(true, "PUT", uri, Some(core(Some("synthetic"))))
         .await;
     assert_eq!(created.0, StatusCode::CREATED);
-    let unavailable = f.call(true, "DELETE", uri, None).await.0;
-    assert_eq!(unavailable, StatusCode::SERVICE_UNAVAILABLE);
+    let unavailable = f.call(true, "DELETE", uri, None).await;
+    let none = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        json!({ "error": "catalog_not_configured" }),
+    );
+    assert_eq!(unavailable, none);
     let (_, listed) = f.call(true, "GET", "/quality/sources", None).await;
     assert_eq!(listed[0]["name"], "core");
     assert_eq!(f.changes(), [("source/core".to_string(), Change::Created)]);

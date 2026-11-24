@@ -301,11 +301,6 @@ fn reading(mappings: &[DatasetMapping], source: &str) -> Result<Vec<String>, Str
     Ok(datasets)
 }
 
-fn unavailable() -> Response {
-    let body = json!({ "error": "catalog_unavailable" });
-    (StatusCode::SERVICE_UNAVAILABLE, Json(body)).into_response()
-}
-
 /// Deletes the source `name`, unless a dataset's mapping reads it, and
 /// audits it.
 #[utoipa::path(
@@ -340,13 +335,13 @@ async fn delete_source(
         Err(e) => return internal(&e.to_string()),
     };
     let Some(catalog) = &api.catalog else {
-        return unavailable();
+        return crate::refusal::no_catalog();
     };
     let mappings = match catalog.mappings().await {
         Ok(m) => m,
         Err(e) => {
             tracing::error!("sources: catalog: {e}");
-            return unavailable();
+            return crate::refusal::catalog_failed(&e);
         }
     };
     match reading(&mappings, &name) {

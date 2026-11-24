@@ -162,7 +162,11 @@ async fn run_now(
 /// lake) has nothing to extract, its cut would only fail.
 async fn source_of(api: &CutApi, dataset: &str) -> Result<String, (StatusCode, &'static str)> {
     let unavailable = (StatusCode::SERVICE_UNAVAILABLE, "catalog_unavailable");
-    let catalog = api.catalog.as_ref().ok_or(unavailable)?;
+    let none = (
+        StatusCode::SERVICE_UNAVAILABLE,
+        crate::refusal::NOT_CONFIGURED,
+    );
+    let catalog = api.catalog.as_ref().ok_or(none)?;
     match catalog.snapshot(dataset).await {
         Ok(Some(snap)) => Mapping::parse(&snap.mapping)
             .ok()
