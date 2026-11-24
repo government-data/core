@@ -116,9 +116,9 @@ pub(crate) async fn access(
         )
         .await?;
     }
-    let policy = lake::maintain_policy(&warehouse, &tables);
+    let grant = lake::maintain_grant(&warehouse, &tables);
     issuer
-        .issue(&warehouse, &format!("job-{job}"), &policy)
+        .issue(&format!("job-{job}"), &grant)
         .await
         .map(Some)
         .map_err(unavailable)

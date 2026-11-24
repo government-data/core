@@ -54,22 +54,21 @@ impl MachineTokens for Tokens {
     }
 }
 
-/// Echoes what it was asked for, as keys.
+/// Echoes what it was asked for, as keys: the grant, as JSON, the secret.
 #[derive(Debug)]
 pub struct Issuer;
 #[async_trait::async_trait]
 impl LakeIssuer for Issuer {
     async fn issue(
         &self,
-        warehouse: &str,
         session: &str,
-        policy: &str,
+        grant: &quality::lake::LakeGrant,
     ) -> Result<LakeAccess, String> {
         Ok(LakeAccess {
             endpoint: "https://lake.test".into(),
-            warehouse: warehouse.into(),
+            warehouse: grant.warehouse.clone(),
             access_key: session.into(),
-            secret_key: policy.into(),
+            secret_key: serde_json::to_string(grant).unwrap(),
             session_token: "token".into(),
             expires_at: "2026-10-30T12:15:00Z".into(),
         })

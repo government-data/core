@@ -7,14 +7,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use application::lake::{Lake, LakeGrant, WriteOnce};
 use auth_gateway::AuthorizationServer;
 use contracts::{MigrationReport, ModuleRegistry};
 use domain::{AuditEventType, AuditRepository, NewActionAudit};
-use infrastructure::lake_catalog::TableLookup;
-use infrastructure::lake_objects::ManifestWriter;
-use infrastructure::lake_sts::StsIssuer;
+use infrastructure::lake_admins::AdapterLakeAdmins;
+use infrastructure::lake_policies::SessionPolicies;
 use infrastructure::module_migrations::PgModuleMigrator;
-use infrastructure::{PgAuditRepository, PgPool, SecretBox};
+use infrastructure::standard_lake::StandardLake;
+use infrastructure::{PgAuditRepository, PgLakeAdminKeys, PgPool, SecretBox};
 use quality::catalog::Catalog;
 use quality::draft_api::DraftCatalog;
 use quality::job_map::Drafts;
@@ -39,8 +40,10 @@ pub(crate) fn registry() -> ModuleRegistry {
 
 /// The modules with the services their routes use. The workers' routes need
 /// the OIDC provider (on-premise) to know the machine behind a token;
-/// without one they are not served. With the lake's issuer (`LAKE_ENDPOINT`
-/// and the issuer's keys), jobs come with credentials for their warehouse;
+/// without one they are not served. With the lake (`LAKE_ENDPOINT`, the
+/// issuer's keys and the main lake's adapter, which writes each grant's
+/// session policy: decision 0078), jobs come with credentials for their
+/// warehouse;
 /// with the catalog (`DOLT_URL`), with their dataset's mapping and rules;
 /// and evaluations leave their manifests in the warehouse through the
 /// same issuer. The sources' routes for people seal their secrets with the
@@ -52,14 +55,14 @@ pub(crate) fn serving(
     secret_box: SecretBox,
     dolt: Option<Arc<DoltSnapshots>>,
 ) -> Result<ModuleRegistry, Box<dyn std::error::Error>> {
-    let issuer = infrastructure::rustfs_sts::issuer_from_env()?;
-    let manifests = issuer
+    let lake = standard_lake(pool, &secret_box)?;
+    let manifests = lake
         .clone()
-        .map(|i| Arc::new(LakeManifests(ManifestWriter::new(i))) as Arc<dyn ManifestStore>);
-    let tables = issuer
+        .map(|l| Arc::new(LakeManifests(l)) as Arc<dyn ManifestStore>);
+    let tables = lake
         .clone()
-        .map(|i| Arc::new(LakeTables(TableLookup::new(i))) as Arc<dyn TableCatalog>);
-    let lake = issuer.map(|i| Arc::new(LakeSts(i)) as Arc<dyn LakeIssuer>);
+        .map(|l| Arc::new(LakeTables(l)) as Arc<dyn TableCatalog>);
+    let lake = lake.map(|l| Arc::new(LakeSts(l)) as Arc<dyn LakeIssuer>);
     let catalog = dolt.clone().map(|d| d as Arc<dyn Catalog>);
     let drafts = dolt.clone().map(|d| d as Arc<dyn Drafts>);
     let review = dolt.map(|d| d as Arc<dyn DraftCatalog>);
@@ -89,6 +92,29 @@ pub(crate) fn serving(
         None => quality,
     };
     Ok(ModuleRegistry::new().register(quality))
+}
+
+/// The lake over its standard protocols (decision 0078, step 8), each
+/// grant's session policy asked of the main lake's adapter and cached;
+/// `None` without the lake's issuer or a way to its adapter: then no job
+/// gets lake credentials, rather than a policy the core would write.
+fn standard_lake(
+    pool: &PgPool,
+    sealer: &SecretBox,
+) -> Result<Option<Arc<dyn Lake>>, Box<dyn std::error::Error>> {
+    let Some(issuer) = infrastructure::rustfs_sts::issuer_from_env()? else {
+        return Ok(None);
+    };
+    let keys = Arc::new(PgLakeAdminKeys::new(pool.clone(), sealer.clone()));
+    let admins = match AdapterLakeAdmins::from_env(keys) {
+        Ok(admins) => Arc::new(admins),
+        Err(e) => {
+            tracing::warn!(error = %e, "no lake admin adapter: jobs get no lake credentials");
+            return Ok(None);
+        }
+    };
+    let policies = Arc::new(SessionPolicies::new(admins.clone(), admins));
+    Ok(Some(Arc::new(StandardLake::new(issuer, policies))))
 }
 
 /// The installation's semantic patterns (decision 0038), from
@@ -164,20 +190,20 @@ impl Sealer for BoxSealer {
     }
 }
 
-/// Where a bronze table's files are, read from the catalog with read-only
-/// credentials of its own (decision 0037).
-struct LakeTables(TableLookup);
+/// Where a bronze table's files are, as the lake's catalog says (decision
+/// 0037), each call within a grant of its own.
+struct LakeTables(Arc<dyn Lake>);
 
 #[async_trait::async_trait]
 impl TableCatalog for LakeTables {
     async fn ensure_namespace(&self, warehouse: &str, namespace: &str) -> Result<(), String> {
-        let policy = quality::lake::namespace_policy(warehouse);
-        self.0.ensure_namespace(warehouse, namespace, &policy).await
+        let made = self.0.ensure_namespace(warehouse, namespace).await;
+        made.map_err(|e| e.to_string())
     }
 
     async fn tables(&self, warehouse: &str, namespace: &str) -> Result<Vec<String>, String> {
-        let policy = quality::lake::read_only_policy(warehouse);
-        self.0.tables(warehouse, namespace, &policy).await
+        let tables = self.0.tables(warehouse, namespace).await;
+        tables.map_err(|e| e.to_string())
     }
 
     async fn table_prefix(
@@ -186,8 +212,8 @@ impl TableCatalog for LakeTables {
         namespace: &str,
         table: &str,
     ) -> Result<Option<String>, String> {
-        let policy = quality::lake::read_only_policy(warehouse);
-        self.0.prefix(warehouse, namespace, table, &policy).await
+        let at = self.0.table_location(warehouse, namespace, table).await;
+        at.map_err(|e| e.to_string())
     }
 
     async fn drop_table(
@@ -196,51 +222,42 @@ impl TableCatalog for LakeTables {
         namespace: &str,
         table: &str,
     ) -> Result<bool, String> {
-        let Some(prefix) = self.table_prefix(warehouse, namespace, table).await? else {
-            return Ok(false);
-        };
-        let policy = quality::lake::drop_policy(warehouse, namespace, table, &prefix);
-        self.0
-            .drop(warehouse, (namespace, table), &prefix, &policy)
-            .await
-            .map(|()| true)
+        let dropped = self.0.drop_table(warehouse, namespace, table).await;
+        dropped.map_err(|e| e.to_string())
     }
 }
 
-/// A cut's manifests, each written with credentials for that write only.
-struct LakeManifests(ManifestWriter);
+/// A cut's manifests, each written once with credentials for that write.
+struct LakeManifests(Arc<dyn Lake>);
 
 #[async_trait::async_trait]
 impl ManifestStore for LakeManifests {
     async fn put_once(&self, warehouse: &str, key: &str, body: Vec<u8>) -> Result<bool, String> {
-        let policy = quality::lake::manifests_policy(warehouse);
-        self.0.put_once(warehouse, key, body, &policy).await
+        let written = self.0.write_once(warehouse, key, &body).await;
+        written
+            .map(|w| w == WriteOnce::Written)
+            .map_err(|e| e.to_string())
     }
 }
 
-/// A job's lake credentials, from RustFS's STS.
-struct LakeSts(StsIssuer);
+/// A job's lake credentials, within its grant, from the lake's STS.
+struct LakeSts(Arc<dyn Lake>);
 
 #[async_trait::async_trait]
 impl LakeIssuer for LakeSts {
-    async fn issue(
-        &self,
-        warehouse: &str,
-        session: &str,
-        policy: &str,
-    ) -> Result<LakeAccess, String> {
+    async fn issue(&self, session: &str, grant: &LakeGrant) -> Result<LakeAccess, String> {
         let c = self
             .0
-            .assume_role(session, policy, Duration::from_secs(15 * 60))
+            .credentials(grant, session, Duration::from_secs(15 * 60))
             .await
             .map_err(|e| e.to_string())?;
         Ok(LakeAccess {
-            endpoint: self.0.endpoint().to_string(),
-            warehouse: warehouse.to_string(),
+            endpoint: self.0.properties().s3_endpoint.clone(),
+            warehouse: grant.warehouse.clone(),
             access_key: c.access_key,
             secret_key: c.secret_key,
             session_token: c.session_token,
-            expires_at: c.expires_at.to_rfc3339(),
+            expires_at: chrono::DateTime::<chrono::Utc>::from(c.expires_at).to_rfc3339(),
         })
     }
 }

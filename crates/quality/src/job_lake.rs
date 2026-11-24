@@ -83,15 +83,11 @@ pub(crate) async fn extract_access(
             &resource,
         )
         .await?;
-        placed.push((at.0, prefix));
+        placed.push((at.0, at.1, prefix));
     }
-    let placed: Vec<(&str, Option<&str>)> = placed
-        .iter()
-        .map(|(namespace, prefix)| (namespace.as_str(), prefix.as_deref()))
-        .collect();
-    let policy = lake::extract_policy(&warehouse, &placed);
+    let grant = lake::extract_grant(&warehouse, &placed);
     issuer
-        .issue(&warehouse, &format!("job-{job}"), &policy)
+        .issue(&format!("job-{job}"), &grant)
         .await
         .map(Some)
         .map_err(|e| {
