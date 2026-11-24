@@ -2061,6 +2061,7 @@ name = "infrastructure"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "application",
  "argon2",
  "async-trait",
  "auth-gateway",

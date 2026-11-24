@@ -10,10 +10,10 @@ use std::time::Duration;
 use auth_gateway::AuthorizationServer;
 use contracts::{MigrationReport, ModuleRegistry};
 use domain::{AuditEventType, AuditRepository, NewActionAudit};
+use infrastructure::lake_catalog::TableLookup;
+use infrastructure::lake_objects::ManifestWriter;
+use infrastructure::lake_sts::StsIssuer;
 use infrastructure::module_migrations::PgModuleMigrator;
-use infrastructure::rustfs_catalog::TableLookup;
-use infrastructure::rustfs_manifests::ManifestWriter;
-use infrastructure::rustfs_sts::StsIssuer;
 use infrastructure::{PgAuditRepository, PgPool, SecretBox};
 use quality::catalog::Catalog;
 use quality::draft_api::DraftCatalog;
@@ -52,7 +52,7 @@ pub(crate) fn serving(
     secret_box: SecretBox,
     dolt: Option<Arc<DoltSnapshots>>,
 ) -> Result<ModuleRegistry, Box<dyn std::error::Error>> {
-    let issuer = StsIssuer::from_env()?;
+    let issuer = infrastructure::rustfs_sts::issuer_from_env()?;
     let manifests = issuer
         .clone()
         .map(|i| Arc::new(LakeManifests(ManifestWriter::new(i))) as Arc<dyn ManifestStore>);
