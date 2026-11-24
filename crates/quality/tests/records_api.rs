@@ -482,7 +482,7 @@ async fn a_refused_reveal_writes_no_row_and_shows_nothing() {
 #[tokio::test]
 async fn a_worker_gets_the_source_and_its_page_of_another_table_is_refused() {
     let f = worker::fixture().await;
-    tenancy::within(worker::tenant(worker::B), async {
+    async {
         let source = quality::source::Source {
             name: "core".into(),
             driver: "sqlserver".into(),
@@ -496,7 +496,7 @@ async fn a_worker_gets_the_source_and_its_page_of_another_table_is_refused() {
         quality::source_store::put(&f.app, &worker::Mirror, &source)
             .await
             .unwrap();
-    })
+    }
     .await;
     let job: Uuid = sqlx::query_scalar(
         "INSERT INTO quality.jobs (tenant_id, kind, parameters, state, worker, lease_until)

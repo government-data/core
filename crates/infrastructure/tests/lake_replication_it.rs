@@ -8,19 +8,11 @@ use auth_gateway::{Lake, ReplicationOutcome, ReplicationStateStore, ReplicationS
 use infrastructure::PgReplicationState;
 use sqlx::postgres::PgPoolOptions;
 
-const MAIN: &str = "00000000-0000-0000-0000-000000000001";
 const A: &str = "qd-tenant-0000000000000000000000000000000a";
 const B: &str = "qd-tenant-0000000000000000000000000000000b";
 
 fn at(secs: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000 + secs)
-}
-
-fn tenant(id: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: "t".into(),
-    }
 }
 
 #[tokio::test]
@@ -36,7 +28,7 @@ async fn each_warehouse_keeps_its_last_outcome_and_when_it_was_first_configured(
         step: ReplicationStep::Rule,
         detail: "HTTP 403 AccessDenied".into(),
     };
-    tenancy::within(tenant(MAIN), async {
+    async {
         assert!(store.all().await.unwrap().is_empty());
         let first = store
             .record(B, &ReplicationOutcome::Configured, at(0))
@@ -56,6 +48,6 @@ async fn each_warehouse_keeps_its_last_outcome_and_when_it_was_first_configured(
             .collect();
         assert_eq!(read, [(A, keys), (B, failed.clone())]);
         assert_eq!(all[0].configured_at, None);
-    })
+    }
     .await;
 }

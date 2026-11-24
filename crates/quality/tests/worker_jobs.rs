@@ -20,7 +20,7 @@ use worker::*;
 #[tokio::test]
 async fn an_extraction_gets_its_source_and_every_credential_given_is_recorded() {
     let f = fixture().await;
-    tenancy::within(tenant(B), async {
+    async {
         let source = Source {
             name: "core".into(),
             driver: "postgres".into(),
@@ -32,9 +32,9 @@ async fn an_extraction_gets_its_source_and_every_credential_given_is_recorded() 
                 .into(),
         };
         source_store::put(&f.app, &Mirror, &source).await.unwrap();
-    })
+    }
     .await;
-    let extract = f.cut(B).await;
+    let extract = f.cut().await;
     let (status, body) = f
         .call(
             "GET",
@@ -109,7 +109,7 @@ fn writes(access: &LakeAccess) -> serde_json::Value {
 #[tokio::test]
 async fn an_extraction_creates_its_table_then_asks_again_for_its_files() {
     let f = fixture().await;
-    let extract = f.cut(B).await;
+    let extract = f.cut().await;
     let w = "qd-tenant-00000000000000000000000000000001";
     let (status, body) = f
         .call(
@@ -196,7 +196,7 @@ async fn an_extraction_creates_its_table_then_asks_again_for_its_files() {
 #[tokio::test]
 async fn a_map_gets_the_source_it_names_and_its_report_publishes_the_dataset_and_its_first_cut() {
     let f = fixture().await;
-    tenancy::within(tenant(B), async {
+    async {
         let source = Source {
             name: "core".into(),
             driver: "postgres".into(),
@@ -208,7 +208,7 @@ async fn a_map_gets_the_source_it_names_and_its_report_publishes_the_dataset_and
                 .into(),
         };
         source_store::put(&f.app, &Mirror, &source).await.unwrap();
-    })
+    }
     .await;
     let job: Uuid = sqlx::query_scalar(
         "INSERT INTO quality.jobs (tenant_id, kind, dataset, parameters, state, worker, lease_until)

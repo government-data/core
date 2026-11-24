@@ -12,17 +12,8 @@ use serde_json::{json, Map, Value};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 
-const MAIN: &str = "00000000-0000-0000-0000-000000000001";
-
 fn at(secs: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000 + secs)
-}
-
-fn tenant(id: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: "t".into(),
-    }
 }
 
 fn values(v: Value) -> Map<String, Value> {
@@ -69,7 +60,7 @@ type Row = (
 );
 
 async fn rows(pool: &PgPool) -> Vec<Row> {
-    tenancy::within(tenant(MAIN), async {
+    async {
         sqlx::query_as(
             "SELECT machine_id::text, alertname, fingerprint, severity, \
                (extract(epoch FROM received_at) - 1800000000)::bigint, \"values\" \
@@ -78,7 +69,7 @@ async fn rows(pool: &PgPool) -> Vec<Row> {
         .fetch_all(pool)
         .await
         .unwrap()
-    })
+    }
     .await
 }
 
@@ -89,7 +80,7 @@ async fn world() -> (testkit::TestDb, PgPool, PgMachineAlerts, String) {
         .connect_with(testkit::app_role(&db).await)
         .await
         .unwrap();
-    let machine: (String,) = tenancy::within(tenant(MAIN), async {
+    let machine: (String,) = async {
         sqlx::query_as(
             "INSERT INTO machines (name, role, state) VALUES ('lake-a', 'lake', 'approved') \
              RETURNING id::text",
@@ -97,16 +88,14 @@ async fn world() -> (testkit::TestDb, PgPool, PgMachineAlerts, String) {
         .fetch_one(&pool)
         .await
         .unwrap()
-    })
+    }
     .await;
     let store = PgMachineAlerts::new(pool.clone());
     (db, pool, store, machine.0)
 }
 
 async fn apply(store: &PgMachineAlerts, changes: &[AlertChange], secs: u64) {
-    tenancy::within(tenant(MAIN), store.apply(changes, at(secs)))
-        .await
-        .unwrap();
+    store.apply(changes, at(secs)).await.unwrap();
 }
 
 #[tokio::test]
@@ -197,7 +186,7 @@ async fn a_delivery_is_one_transaction() {
         AlertChange::Firing(disk(&machine, 0.07)),
         AlertChange::Firing(unknown),
     ];
-    let failed = tenancy::within(tenant(MAIN), store.apply(&changes, at(10))).await;
+    let failed = store.apply(&changes, at(10)).await;
     assert!(failed.is_err(), "no such machine");
     assert!(rows(&pool).await.is_empty(), "nothing of it kept");
 }

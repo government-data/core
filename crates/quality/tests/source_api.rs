@@ -627,7 +627,7 @@ async fn a_map_says_how_far_it_went_then_its_first_cut() {
         "INSERT INTO quality.cuts (tenant_id, dataset, cut, due_at)
          VALUES ($1::uuid, 'loans', DATE '2026-11-04', now())",
     )
-    .bind(tenancy::MAIN_ID)
+    .bind("00000000-0000-0000-0000-000000000001")
     .execute(&f._db.pool)
     .await
     .unwrap();

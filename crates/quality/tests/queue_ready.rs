@@ -12,13 +12,6 @@ use sqlx::postgres::PgPoolOptions;
 /// The installation's tenant, the main one (decision 0076).
 const A: &str = "00000000-0000-0000-0000-000000000001";
 
-fn tenant(id: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: String::new(),
-    }
-}
-
 #[tokio::test]
 async fn ready_jobs_are_counted_by_kind_within_the_tenant() {
     let db = testkit::spawn_test_db().await;
@@ -65,7 +58,7 @@ async fn ready_jobs_are_counted_by_kind_within_the_tenant() {
         .await
         .unwrap();
 
-    let a: Vec<Ready> = tenancy::within(tenant(A), ready(&app)).await.unwrap();
+    let a: Vec<Ready> = ready(&app).await.unwrap();
     assert_eq!(a.len(), 1, "{a:?}");
     assert_eq!((a[0].kind.as_str(), a[0].jobs), ("evaluate", 2));
     assert!((590.0..700.0).contains(&a[0].oldest_seconds), "{a:?}");

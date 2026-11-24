@@ -40,7 +40,7 @@ fn listed(tables: &[(&str, &str)]) -> serde_json::Value {
 }
 
 async fn kept(f: &Fixture) -> (ListingState, Vec<String>) {
-    tenancy::within(tenant(B), async {
+    async {
         let view = lake_tables::view(&f.app).await.unwrap();
         let names = view
             .tables
@@ -48,7 +48,7 @@ async fn kept(f: &Fixture) -> (ListingState, Vec<String>) {
             .map(|t| format!("{}.{}", t.schema, t.name))
             .collect();
         (view.state, names)
-    })
+    }
     .await
 }
 

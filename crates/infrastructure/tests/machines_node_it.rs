@@ -10,8 +10,6 @@ use domain::AdminId;
 use infrastructure::{PgMachines, RingJoinTokenMint};
 use sqlx::postgres::PgPoolOptions;
 
-const MAIN: &str = "00000000-0000-0000-0000-000000000001";
-
 fn t0() -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000)
 }
@@ -34,11 +32,7 @@ async fn a_node_token_makes_only_the_machine_it_names() {
         created_by: AdminId::new("00000000-0000-0000-0000-0000000000ad"),
         expires_at: t0() + Duration::from_secs(3600),
     };
-    let main = tenancy::Tenant {
-        id: MAIN.into(),
-        slug: "main".into(),
-    };
-    tenancy::within(main, async {
+    async {
         let id = reg.issue_token(&token).await.unwrap();
         let node: Option<String> =
             sqlx::query_scalar("SELECT node FROM join_tokens WHERE id = $1::uuid")
@@ -60,6 +54,6 @@ async fn a_node_token_makes_only_the_machine_it_names() {
         );
         let again = reg.redeem(&token.token_hash, "lake-b", t0()).await;
         assert_eq!(again.unwrap(), Err(RedeemRefusal::Token));
-    })
+    }
     .await;
 }

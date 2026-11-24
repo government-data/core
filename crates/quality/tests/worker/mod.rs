@@ -354,26 +354,22 @@ impl Fixture {
         (status, bytes.to_vec())
     }
 
-    /// The failures recorded for the cut, seen as `tenant`.
-    pub async fn failures(&self, tenant: &str) -> Vec<(String, i64)> {
-        let t = tenancy::Tenant {
-            id: tenant.into(),
-            slug: String::new(),
-        };
-        tenancy::within(t, async {
+    /// The failures recorded for the cut, as the application sees it.
+    pub async fn failures(&self) -> Vec<(String, i64)> {
+        async {
             sqlx::query_as("SELECT rule, failures FROM quality.rule_results ORDER BY rule")
                 .fetch_all(&self.app)
                 .await
                 .unwrap()
-        })
+        }
         .await
     }
 
-    /// What each rule's counts are grouped by, seen as `tenant`.
+    /// What each rule's counts are grouped by, as the application sees it.
     /// Each field's profile in the tenant's cuts: field, empty, distinct
     /// values, shape and its count.
-    pub async fn field_quality(&self, tenant: &str) -> Vec<Profile> {
-        tenancy::within(self::tenant(tenant), async {
+    pub async fn field_quality(&self) -> Vec<Profile> {
+        async {
             sqlx::query_as(
                 "SELECT field, empty, distinct_values, pattern, pattern_count, recency
                    FROM quality.field_quality ORDER BY field",
@@ -381,12 +377,12 @@ impl Fixture {
             .fetch_all(&self.app)
             .await
             .unwrap()
-        })
+        }
         .await
     }
 
-    pub async fn grouping(&self, tenant: &str) -> Vec<Grouping> {
-        tenancy::within(self::tenant(tenant), async {
+    pub async fn grouping(&self) -> Vec<Grouping> {
+        async {
             sqlx::query_as(
                 "SELECT rule, field, pattern, dimension, severity
                    FROM quality.rule_results ORDER BY rule",
@@ -394,7 +390,7 @@ impl Fixture {
             .fetch_all(&self.app)
             .await
             .unwrap()
-        })
+        }
         .await
     }
 }
@@ -552,18 +548,11 @@ fn cells() -> Vec<SfcCell> {
     ]
 }
 
-pub fn tenant(id: &str) -> tenancy::Tenant {
-    tenancy::Tenant {
-        id: id.into(),
-        slug: String::new(),
-    }
-}
-
 impl Fixture {
-    /// `clientes`' cut of 2021-03-10, opened as `tenant`; its extraction
+    /// `clientes`' cut of 2021-03-10, opened; its extraction
     /// held by `w1/0`.
-    pub async fn cut(&self, tenant: &str) -> Uuid {
-        let job = tenancy::within(self::tenant(tenant), async {
+    pub async fn cut(&self) -> Uuid {
+        let job = async {
             let mut tx = self.app.begin().await.unwrap();
             let request = CutRequest {
                 dataset: "clientes",
@@ -576,7 +565,7 @@ impl Fixture {
             let (_, _, job) = open_cut(&mut tx, &request).await.unwrap();
             tx.commit().await.unwrap();
             job.unwrap()
-        })
+        }
         .await;
         self.hold(job).await;
         job

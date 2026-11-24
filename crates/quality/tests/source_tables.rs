@@ -21,7 +21,7 @@ async fn core(f: &Fixture) {
 
 /// The source `core` on `driver`.
 async fn source_on(f: &Fixture, driver: &str) {
-    tenancy::within(tenant(B), async {
+    async {
         let source = Source {
             name: "core".into(),
             driver: driver.into(),
@@ -33,7 +33,7 @@ async fn source_on(f: &Fixture, driver: &str) {
                 .into(),
         };
         source_store::put(&f.app, &Mirror, &source).await.unwrap();
-    })
+    }
     .await;
 }
 
@@ -63,7 +63,7 @@ fn listed(tables: &[(&str, &str)]) -> serde_json::Value {
 }
 
 async fn kept(f: &Fixture) -> (ListingState, Vec<String>) {
-    tenancy::within(tenant(B), async {
+    async {
         let view = source_tables::view(&f.app, "core").await.unwrap();
         let names = view
             .tables
@@ -71,7 +71,7 @@ async fn kept(f: &Fixture) -> (ListingState, Vec<String>) {
             .map(|t| format!("{}.{}", t.schema, t.name))
             .collect();
         (view.state, names)
-    })
+    }
     .await
 }
 
@@ -154,9 +154,9 @@ async fn a_listing_goes_with_its_source() {
         f.call("POST", &uri, "token-w1", Some(body.clone())).await.0,
         StatusCode::NO_CONTENT
     );
-    tenancy::within(tenant(B), async {
+    async {
         assert!(source_store::delete(&f.app, "core").await.unwrap());
-    })
+    }
     .await;
     // A report that comes after is taken, and kept nowhere.
     assert_eq!(
@@ -184,17 +184,13 @@ async fn a_listing_that_failed_an_attempt_says_it_retries_and_why() {
         .bind(state)
     };
     fail("queued").execute(&f.db.pool).await.unwrap();
-    let view = tenancy::within(tenant(B), source_tables::view(&f.app, "core"))
-        .await
-        .unwrap();
+    let view = source_tables::view(&f.app, "core").await.unwrap();
     assert_eq!(view.state, ListingState::Retrying);
     assert_eq!((view.attempt, view.max_attempts), (Some(2), Some(3)));
     assert_eq!(view.reason, Some(ListingReason::Connect));
 
     fail("failed").execute(&f.db.pool).await.unwrap();
-    let view = tenancy::within(tenant(B), source_tables::view(&f.app, "core"))
-        .await
-        .unwrap();
+    let view = source_tables::view(&f.app, "core").await.unwrap();
     assert_eq!(view.state, ListingState::Failed);
     assert_eq!(view.reason, Some(ListingReason::Connect));
     assert_eq!(view.attempt, None);
