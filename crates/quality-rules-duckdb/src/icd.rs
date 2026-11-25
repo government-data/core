@@ -10,7 +10,7 @@ use quality::mapping::{FieldRole, Mapping};
 use quality::worker_api::{GroupMetrics, SfcCell};
 use quality_rules_compile::Compiled;
 use quality_rules_model::Severity;
-use quality_rules_sql::{Engine, Sql, Tables};
+use quality_rules_sql::{double, Engine, Sql, Tables};
 
 use crate::groups::{dimensions, serious};
 use crate::keys::{entity_key, record_key};
@@ -111,14 +111,14 @@ fn conformity(rules: &[(usize, f64)]) -> Option<String> {
     let sum = |term: &dyn Fn(usize) -> String| {
         rules
             .iter()
-            .map(|(i, s)| format!("{s} * {}", term(*i)))
+            .map(|(i, s)| format!("{} * {}", double(*s), term(*i)))
             .collect::<Vec<_>>()
             .join(" + ")
     };
     Some(format!(
-        "1 - ({}) / NULLIF({}, 0)",
-        sum(&|i| format!("COALESCE(\"r{i}\"::INT, 0)")),
-        sum(&|i| format!("(\"r{i}\" IS NOT NULL)::INT"))
+        "DOUBLE '1' - ({}) / NULLIF({}, DOUBLE '0')",
+        sum(&|i| format!("IF(\"r{i}\", DOUBLE '1', DOUBLE '0')")),
+        sum(&|i| format!("IF(\"r{i}\" IS NOT NULL, DOUBLE '1', DOUBLE '0')"))
     ))
 }
 
@@ -130,13 +130,18 @@ fn weighted(parts: &[(f64, String)]) -> String {
     let (top, bottom): (Vec<_>, Vec<_>) = parts
         .iter()
         .map(|(w, x)| {
+            let w = double(*w);
             (
-                format!("{w} * COALESCE({x}, 0)"),
-                format!("{w} * ({x} IS NOT NULL)::INT"),
+                format!("{w} * COALESCE({x}, DOUBLE '0')"),
+                format!("{w} * IF({x} IS NOT NULL, DOUBLE '1', DOUBLE '0')"),
             )
         })
         .unzip();
-    format!("({}) / NULLIF({}, 0)", top.join(" + "), bottom.join(" + "))
+    format!(
+        "({}) / NULLIF({}, DOUBLE '0')",
+        top.join(" + "),
+        bottom.join(" + ")
+    )
 }
 
 pub(crate) fn measured(mapping: &Mapping, rules: &[IcdRule], timely: bool) -> Vec<Measured> {
@@ -255,9 +260,13 @@ impl Runner {
             "CAST({} AS VARCHAR) AS \"__s\"",
             plan.segment.as_deref().unwrap_or("NULL")
         ));
+        // Without an update date the A component does not apply (decision
+        // 0090, Open 6): `greatest` sees no `NULL`.
         let a = plan.updated.as_ref().map_or("NULL".to_string(), |u| {
             format!(
-                "pow(0.5, greatest(date_diff('day', {u}, CAST({cut_text} AS DATE)), 0) / 365.0)"
+                "CASE WHEN {u} IS NULL THEN NULL ELSE power(DOUBLE '0.5', \
+                 CAST(greatest(date_diff('day', {u}, CAST({cut_text} AS DATE)), 0) AS DOUBLE) \
+                 / DOUBLE '365') END"
             )
         });
         columns.push(format!("{a} AS \"__a\""));
@@ -267,7 +276,7 @@ impl Runner {
             .collect();
         for (j, d) in plan.dimensions.iter().enumerate() {
             columns.push(format!(
-                "NULLIF(trim(CAST({d} AS VARCHAR)), '') AS \"__g{j}\""
+                "NULLIF(trim(BOTH ' ' FROM CAST({d} AS VARCHAR)), '') AS \"__g{j}\""
             ));
         }
         let mut kept = vec![
@@ -354,10 +363,19 @@ impl Runner {
             .enumerate()
             .map(|(i, f)| (f64::from(f.weight), format!("\"e{i}\"")))
             .collect();
+        // The segment is the entity's commonest, the first by name on a tie.
         let sql = format!(
-            "WITH e AS (SELECT \"__k\", mode(\"__s\") AS \"__s\", {} FROM \"__icd\"
-                         WHERE \"__k\" IS NOT NULL GROUP BY \"__k\")
-             SELECT \"__k\", {}, \"__s\" FROM e ORDER BY \"__k\"",
+            "WITH e AS (SELECT \"__k\", {} FROM \"__icd\"
+                         WHERE \"__k\" IS NOT NULL GROUP BY \"__k\"),
+                  c AS (SELECT \"__k\", \"__s\", count(*) AS n FROM \"__icd\"
+                         WHERE \"__k\" IS NOT NULL AND \"__s\" IS NOT NULL
+                         GROUP BY \"__k\", \"__s\"),
+                  m AS (SELECT \"__k\", \"__s\", row_number() OVER (PARTITION BY \"__k\"
+                                ORDER BY n DESC NULLS LAST, \"__s\" ASC NULLS LAST) AS i
+                          FROM c)
+             SELECT e.\"__k\", {}, m.\"__s\" FROM e
+               LEFT JOIN m ON m.\"__k\" = e.\"__k\" AND m.i = 1
+              ORDER BY e.\"__k\" ASC NULLS LAST",
             per_field.join(", "),
             weighted(&icd)
         );

@@ -33,17 +33,19 @@ rules:
     alert: a
 ";
 
-fn loans(name: &str) -> (std::path::PathBuf, String) {
+/// The three loans the formulas below are worked on.
+const ROWS: &str = "('001.234', 'PN', '300', 500.0, DATE '2026-12-31'),
+                ('1234', 'PN', NULL, 2000.0, DATE '2025-12-31'),
+                ('999', 'PN', '310', NULL, NULL)";
+
+fn loans(name: &str, rows: &str) -> (std::path::PathBuf, String) {
     let dir = std::env::temp_dir().join(format!("qd-icd-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("loans.parquet").display().to_string();
     Connection::open_in_memory()
         .unwrap()
         .execute_batch(&format!(
-            "COPY (SELECT * FROM (VALUES
-                ('001.234', 'PN', '300', 500.0, DATE '2026-12-31'),
-                ('1234', 'PN', NULL, 2000.0, DATE '2025-12-31'),
-                ('999', 'PN', '310', NULL, NULL)
+            "COPY (SELECT * FROM (VALUES {rows}
               ) AS t(doc, kind, phone, amount, updated)) TO '{path}' (FORMAT parquet)"
         ))
         .unwrap();
@@ -51,7 +53,11 @@ fn loans(name: &str) -> (std::path::PathBuf, String) {
 }
 
 fn icd(mapping: &str, name: &str) -> quality_rules_duckdb::IcdReport {
-    let (dir, path) = loans(name);
+    icd_of(mapping, name, ROWS)
+}
+
+fn icd_of(mapping: &str, name: &str, rows: &str) -> quality_rules_duckdb::IcdReport {
+    let (dir, path) = loans(name, rows);
     let mapping = Mapping::parse(mapping).unwrap();
     let mut runner = Runner::new().unwrap();
     runner.load_mapped(&mapping, &path).unwrap();
@@ -161,4 +167,31 @@ fn each_group_has_its_records_serious_failures_and_mean_icd() {
     );
     assert!(near(out.groups[2].icd, records[1]));
     assert!(near(out.groups[3].icd, records.iter().sum::<f64>() / 3.0));
+}
+
+// A client of two loans with one segment each, and one loan without an
+// update date whose phone is empty: its Phone has C 0 and no A, so 0 (not
+// 0.15/0.55, as if it were up to date).
+const TIED: &str = "('5', 'PN', '300', 500.0, DATE '2026-12-31'),
+                ('5', 'PJ', '300', 500.0, DATE '2026-12-31'),
+                ('7', 'PN', NULL, 500.0, NULL)";
+
+#[test]
+fn a_tied_segment_is_the_first_by_name() {
+    let out = icd_of(MAPPING, "tied", TIED);
+    let segments: Vec<(&str, Option<&str>)> = out
+        .entities
+        .iter()
+        .map(|e| (e.key.as_str(), e.segment.as_deref()))
+        .collect();
+    assert_eq!(segments, [("5", Some("PJ")), ("7", Some("PN"))]);
+}
+
+#[test]
+fn a_record_without_an_update_date_has_no_timeliness() {
+    let out = icd_of(MAPPING, "undated", TIED);
+    let phone = out.fields.iter().find(|(n, _)| n == "Phone").unwrap().1;
+    assert!(near(phone, 2.0 / 3.0), "{phone:?}");
+    // Phone 0 (critical, 4), Amount and Type 1 (3 and 2).
+    assert!(near(out.entities[1].icd, 5.0 / 9.0));
 }
