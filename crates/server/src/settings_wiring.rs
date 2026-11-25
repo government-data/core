@@ -157,20 +157,6 @@ impl SettingsConnectors for Connectors {
         })
     }
 
-    async fn account_apps(
-        &self,
-        p: &OAuthProviderSettings,
-        email: &str,
-    ) -> Result<serde_json::Value, String> {
-        infrastructure::oauth_provider::account_apps(
-            &p.token_endpoint,
-            &p.client_id,
-            &p.client_secret,
-            email,
-        )
-        .await
-    }
-
     fn mailer(&self, s: &MailSettings) -> Result<Arc<dyn Mailer>, String> {
         let mailer = match s.transport {
             MailTransport::Smtp => OutboundMailer::Smtp(SmtpMailer::new(SmtpConfig {
@@ -247,9 +233,8 @@ impl api::captcha::TokenVerifier for TurnstileVerifier {
 
 /// The captcha (Turnstile), with its keys from the environment
 /// (`TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` or `_FILE`) when they are
-/// there; `true` alongside when they were. Without them, management may send
-/// the platform's later (the instances we manage).
-pub(crate) fn captcha_from_env() -> Result<(api::captcha::Captcha, bool), String> {
+/// there; without them, nothing is asked.
+pub(crate) fn captcha_from_env() -> Result<api::captcha::Captcha, String> {
     let captcha = api::captcha::Captcha::new(Arc::new(TurnstileVerifier(
         infrastructure::turnstile::Turnstile::new()?,
     )));
@@ -266,8 +251,8 @@ pub(crate) fn captcha_from_env() -> Result<(api::captcha::Captcha, bool), String
         (Some(site), Some(secret)) => {
             captcha.configure(Some((site, secret)));
             tracing::info!("captcha (Turnstile) from the environment");
-            Ok((captcha, true))
+            Ok(captcha)
         }
-        _ => Ok((captcha, false)),
+        _ => Ok(captcha),
     }
 }

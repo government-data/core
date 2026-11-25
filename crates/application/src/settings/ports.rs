@@ -91,13 +91,4 @@ pub trait SettingsConnectors: Send + Sync {
     fn oauth_provider(&self, s: &OAuthProviderSettings) -> Result<Arc<dyn OAuthProvider>, String>;
     async fn discover_oidc(&self, issuer: &str) -> Result<OidcDiscovery, String>;
     fn mailer(&self, s: &MailSettings) -> Result<Arc<dyn Mailer>, String>;
-    /// The shared account's applications `email` can go to, with `p`'s
-    /// credentials (`{"apps": [...]}`).
-    async fn account_apps(
-        &self,
-        _p: &OAuthProviderSettings,
-        _email: &str,
-    ) -> Result<serde_json::Value, String> {
-        Err("without the shared account".into())
-    }
 }

@@ -15,12 +15,11 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use auth_gateway::{AdminRepository, SessionService};
+use auth_gateway::SessionService;
 
 use crate::error::ApiError;
 use crate::rbac::require_action;
@@ -28,31 +27,20 @@ use crate::session::{require_session, CurrentSession};
 
 mod account;
 
-use account::{account_apps, account_url};
+use account::account_apps;
 pub use account::{InstalledModules, LocalApps};
 
 type ApiResult<T> = Result<T, ApiError>;
 
 /// Mount the routes, behind a session and the `admin` role, except
-/// `/settings/account`, which is public, and `/settings/account/apps`,
-/// which is for anyone with a session.
-pub fn routes(
-    settings: SettingsService,
-    sessions: SessionService,
-    admins: Arc<dyn AdminRepository>,
-) -> Router {
-    let public = Router::new()
-        .route("/settings/account", get(account_url))
-        .with_state(settings.clone())
-        .merge(
-            Router::new()
-                .route("/settings/account/apps", get(account_apps))
-                .with_state((settings.clone(), admins))
-                .layer(axum::middleware::from_fn_with_state(
-                    sessions.clone(),
-                    require_session,
-                )),
-        );
+/// `/settings/account/apps`, which is for anyone with a session.
+pub fn routes(settings: SettingsService, sessions: SessionService) -> Router {
+    let any_session = Router::new()
+        .route("/settings/account/apps", get(account_apps))
+        .layer(axum::middleware::from_fn_with_state(
+            sessions.clone(),
+            require_session,
+        ));
     Router::new()
         .route("/settings", get(get_all))
         // DELETE goes on each fixed route: a separate `/settings/{section}`
@@ -78,7 +66,7 @@ pub fn routes(
             sessions,
             require_session,
         ))
-        .merge(public)
+        .merge(any_session)
 }
 
 async fn loaded(
@@ -96,9 +84,6 @@ fn to_api(e: SettingsError) -> ApiError {
     match e {
         SettingsError::Invalid(fields) => ApiError::validation(fields),
         SettingsError::Unreachable(message) => ApiError::bad_gateway("unreachable", message),
-        SettingsError::Managed => {
-            ApiError::conflict("managed", "This is managed from gestión (the cloud).")
-        }
         SettingsError::Internal(detail) => ApiError::internal(format!("settings: {detail}")),
     }
 }
@@ -165,13 +150,7 @@ fn ldap_out(s: &Section<LdapSettings>) -> Value {
 }
 
 fn mail_out(s: &Section<MailSettings>) -> Value {
-    // The platform's: the tenant sees the server and the sender, not the user.
-    let platform = s.value.platform;
-    section_out(s, &["smtp_password", "graph_client_secret"], |value| {
-        if platform {
-            value["smtp_username"] = json!("");
-        }
-    })
+    section_out(s, &["smtp_password", "graph_client_secret"], |_| {})
 }
 
 fn oauth_out(settings: &SettingsService, s: &Section<OAuthSettings>) -> Value {
@@ -203,13 +182,6 @@ async fn get_all(State(settings): State<SettingsService>) -> Json<Value> {
         // How long recovery links last when the mail settings set none.
         "reset_link_default_minutes": settings.reset_link_default_minutes(),
         "encryption_key": settings.key_source(),
-        // The platform mail's sender (the management panel's); `null` if
-        // there is none: then configuring one's own is mandatory.
-        "platform_mail_from": settings.platform_mail_from(),
-        // The shared account it signs in with (`null` without one): then OAuth2
-        // is not configured here, management handles access (and, with
-        // `platform_mail_from`, mail).
-        "platform_account": settings.platform_account(),
     }))
 }
 

@@ -374,42 +374,6 @@ pub async fn discover_oidc(issuer: &str) -> Result<OidcEndpoints, String> {
     parse_discovery(&body)
 }
 
-/// The shared account's applications `email` can go to (the list for the
-/// UI's menu): `POST {account}/v1/apps/destinations`, with this installation's
-/// credentials as the account's client. The account is deduced from its
-/// `token_endpoint` (`…/oauth/token`), which in the cloud goes through the
-/// internal network.
-pub async fn account_apps(
-    token_endpoint: &str,
-    client_id: &str,
-    client_secret: &str,
-    email: &str,
-) -> Result<serde_json::Value, String> {
-    let base = token_endpoint
-        .trim_end_matches('/')
-        .strip_suffix("/oauth/token")
-        .ok_or_else(|| format!("{token_endpoint} is not the common account's"))?;
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-        .map_err(|e| e.to_string())?;
-    let response = client
-        .post(format!("{base}/v1/apps/destinations"))
-        .json(&serde_json::json!({
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "email": email,
-        }))
-        .send()
-        .await
-        .map_err(|e| format!("the common account: {e}"))?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(format!("the common account answered {status}"));
-    }
-    response.json().await.map_err(|e| e.to_string())
-}
-
 fn parse_discovery(body: &str) -> Result<OidcEndpoints, String> {
     let doc: DiscoveryDocument =
         serde_json::from_str(body).map_err(|e| format!("no es un documento OIDC: {e}"))?;

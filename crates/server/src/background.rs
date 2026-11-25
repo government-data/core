@@ -1,32 +1,5 @@
 //! The work that runs in the background while the server serves: the
-//! periodic round and the scheduler.
-
-use application::SettingsService;
-
-/// The background work, every `BACKGROUND_INTERVAL_SECS` (15 by default):
-/// keep the platform mail set.
-pub(crate) fn spawn_background(settings: SettingsService) {
-    let tick = std::time::Duration::from_secs(
-        std::env::var("BACKGROUND_INTERVAL_SECS")
-            .ok()
-            .and_then(|v| v.trim().parse::<u64>().ok())
-            .filter(|v| *v > 0)
-            .unwrap_or(15),
-    );
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(tick);
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        loop {
-            interval.tick().await;
-            // The platform mail, if there is one, stays set (and up to date).
-            match settings.seed_platform_mail().await {
-                Ok(true) => tracing::info!("platform mail set"),
-                Ok(false) => {}
-                Err(e) => tracing::error!("settings: {e}"),
-            }
-        }
-    });
-}
+//! scheduler.
 
 /// The scheduler (decision 0035): every `SCHEDULER_INTERVAL_SECS` (30 by
 /// default), if this VM holds its lock, fires the due schedules. Fires missed for longer than

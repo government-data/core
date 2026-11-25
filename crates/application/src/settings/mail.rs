@@ -1,5 +1,4 @@
-//! The outgoing mail section, and the platform's mail (the one the
-//! management panel sets).
+//! The outgoing mail section.
 
 use std::collections::BTreeMap;
 
@@ -8,76 +7,13 @@ use auth_gateway::{MailLoader, MailNotice, MailSlot, MailTone};
 
 use super::{
     invalid, keep_secrets, MailSettings, MailTransport, Section, SettingsError, SettingsService,
-    SettingsSource, SmtpSecurity, MAIL, MAX_RESET_LINK_MINUTES, MIN_RESET_LINK_MINUTES,
+    SmtpSecurity, MAIL, MAX_RESET_LINK_MINUTES, MIN_RESET_LINK_MINUTES,
 };
 
 impl SettingsService {
-    /// The platform's mail (the one set in the management panel): it is set
-    /// instead of the installation's own
-    /// ([`Self::seed_platform_mail`]), and meanwhile it is the one that sends.
-    pub fn set_platform_mail(&self, s: Option<MailSettings>) -> Result<(), String> {
-        let mailer = s.as_ref().map(|s| self.connectors.mailer(s)).transpose()?;
-        self.mail.set_platform(mailer);
-        *self
-            .platform
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = s;
-        Ok(())
-    }
-
-    pub(super) fn platform_mail(&self) -> Option<MailSettings> {
-        self.platform
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
-    }
-
     /// The language the current company's email notices go out in.
     pub fn notice_language(&self) -> texts::Language {
         texts::Language::parse(&self.mail().value.notice_language).unwrap_or_default()
-    }
-
-    /// The platform mail's sender, if there is one.
-    pub fn platform_mail_from(&self) -> Option<String> {
-        self.platform_mail().map(|s| s.from_address)
-    }
-
-    /// Set the platform's mail in the current company, instead of its own if
-    /// it had one (in the cloud the management panel runs the mail), or bring
-    /// it up to date (new credentials in the panel). It keeps the notices'
-    /// language and the links' lifetime. `true` if something changed.
-    pub async fn seed_platform_mail(&self) -> Result<bool, SettingsError> {
-        self.ensure_loaded().await?;
-        self.seed_loaded().await
-    }
-
-    pub(super) async fn seed_loaded(&self) -> Result<bool, SettingsError> {
-        let Some(platform) = self.platform_mail() else {
-            return Ok(false);
-        };
-        let current = self.read().mail;
-        let mut next = MailSettings {
-            enabled: true,
-            platform: true,
-            ..platform
-        };
-        if !matches!(current.source, SettingsSource::Unset) {
-            let prev = current.value;
-            next.notice_language = prev.notice_language.clone();
-            next.reset_link_minutes = prev.reset_link_minutes;
-            if prev == next {
-                return Ok(false);
-            }
-        }
-        let source = self.persist(MAIL, &next, "").await?;
-        self.apply_mail(&next).map_err(SettingsError::Internal)?;
-        self.current.update(|c| {
-            c.mail = Section {
-                value: next,
-                source,
-            }
-        });
-        Ok(true)
     }
 
     /// The mail in use, for whoever needs to send.
@@ -104,28 +40,8 @@ impl SettingsService {
         Ok(())
     }
 
-    /// With the platform's mail the company only chooses its own part
-    /// (sending or not, the notices' language, the links' lifetime); the
-    /// server stays the platform's. Any other mail is the company's own.
-    fn platform_server_kept(&self, input: MailSettings) -> MailSettings {
-        let stored = self.read().mail.value;
-        if input.platform && stored.platform {
-            MailSettings {
-                enabled: input.enabled,
-                notice_language: input.notice_language,
-                reset_link_minutes: input.reset_link_minutes,
-                ..stored
-            }
-        } else {
-            MailSettings {
-                platform: false,
-                ..input
-            }
-        }
-    }
-
     fn complete_mail(&self, mut s: MailSettings) -> Result<MailSettings, SettingsError> {
-        keep_platform_secrets_out(&mut s, &self.read().mail.value);
+        keep_secrets(&mut s, &self.read().mail.value);
         for field in [
             &mut s.from_address,
             &mut s.from_name,
@@ -193,9 +109,6 @@ impl SettingsService {
         input: MailSettings,
         actor: &str,
     ) -> Result<Section<MailSettings>, SettingsError> {
-        if self.platform_mail().is_some() {
-            return Err(SettingsError::Managed);
-        }
         if input.reset_link_minutes != 0
             && !(MIN_RESET_LINK_MINUTES..=MAX_RESET_LINK_MINUTES)
                 .contains(&input.reset_link_minutes)
@@ -209,7 +122,6 @@ impl SettingsService {
                 ),
             ));
         }
-        let input = self.platform_server_kept(input);
         let value = if input.enabled {
             let s = self.complete_mail(input)?;
             self.connectors
@@ -218,7 +130,7 @@ impl SettingsService {
             s
         } else {
             let mut s = input;
-            keep_platform_secrets_out(&mut s, &self.read().mail.value);
+            keep_secrets(&mut s, &self.read().mail.value);
             s
         };
         let source = self.persist(MAIL, &value, actor).await?;
@@ -234,7 +146,7 @@ impl SettingsService {
         if !looks_like_email(to) {
             return Err(invalid("to", &texts::tr!("app.settings.invalidEmail")));
         }
-        let value = self.complete_mail(self.platform_server_kept(input))?;
+        let value = self.complete_mail(input)?;
         let mailer = self
             .connectors
             .mailer(&value)
@@ -251,15 +163,6 @@ impl SettingsService {
             )
             .await
             .map_err(SettingsError::Unreachable)
-    }
-}
-
-/// Keep the stored secrets the form sends empty, except the platform mail's:
-/// the company never gets them nor uses them with a server it chooses (it
-/// would carry them off in the SMTP AUTH).
-fn keep_platform_secrets_out(s: &mut MailSettings, stored: &MailSettings) {
-    if !(stored.platform && !s.platform) {
-        keep_secrets(s, stored);
     }
 }
 
