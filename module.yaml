@@ -60,6 +60,11 @@ secrets:
   generate:
     - name: dolt-root-password
     - name: dolt-app-password
+    # The lake's STS issuer (decision 0091, point 4): the API's keys for
+    # the jobs' lake credentials, never written by a person.
+    - name: rustfs-sts-issuer-access-key
+      bytes: 16
+    - name: rustfs-sts-issuer-secret-key
 
 # No `drain`: the core counts its own work (it is not one of the modules it
 # asks).
