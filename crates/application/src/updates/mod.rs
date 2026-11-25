@@ -22,8 +22,10 @@ use crate::settings::MailSlot;
 mod drain;
 mod module_menu;
 mod module_permissions;
+mod module_roles;
 mod modules;
 mod policy;
+mod registry;
 mod report;
 mod store;
 #[cfg(test)]
@@ -32,8 +34,10 @@ pub(crate) mod tests;
 pub use drain::{DrainStatus, ModuleWork, ModulesWork};
 pub use module_menu::{InLanguages, ModuleMenu};
 pub use module_permissions::{ModuleAction, ModulePermissions, ModulePolicy};
+pub use module_roles::{ModuleRole, RoleFile, RoleStrategy};
 pub use modules::{DeclaredModule, InstalledModule};
 pub use policy::UpdatePolicy;
+pub use registry::RegistryToken;
 pub use report::{DaemonReport, Outcome};
 pub use store::{
     HistoryEntry, Maintenance, MaintenanceError, Requester, UpdateRequest, UpdaterRow,
@@ -56,6 +60,8 @@ pub struct UpdatesService {
     notices: Option<(MailSlot, Arc<dyn AdminContacts>)>,
     /// Where the modules' work in flight comes from.
     modules: Vec<Arc<dyn ModulesWork>>,
+    /// The registry's pull credential, in memory only (quality-sdk 0013).
+    registry: registry::Held,
 }
 
 impl std::fmt::Debug for UpdatesService {
@@ -70,6 +76,7 @@ impl UpdatesService {
             store,
             notices: None,
             modules: Vec::new(),
+            registry: registry::Held::default(),
         }
     }
 

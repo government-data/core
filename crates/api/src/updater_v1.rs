@@ -7,6 +7,7 @@
 //! | `GET /updater/v1/orders`               | the policy and the pending request       |
 //! | `PUT /updater/v1/maintenance`          | maintenance begins (`active`) or ends    |
 //! | `PUT /updater/v1/modules`              | the installed modules, the whole list    |
+//! | `PUT /updater/v1/registry`             | the registry's pull token, held in memory |
 //! | `GET /updater/v1/drain?horizon_secs=N` | what still runs, and whether it drained  |
 //! | `GET /updater/v1/modules/{name}/replica` | whether the replica of its data is in sync |
 //! | `GET /updater/v1/version`              | the version and the features it has      |
@@ -23,11 +24,12 @@
 use std::time::Duration;
 
 use application::{
-    InstalledModule, MachinesService, MaintenanceError, UpdatesError, UpdatesService,
+    InstalledModule, MachinesService, MaintenanceError, RegistryToken, UpdatesError, UpdatesService,
 };
 use auth_gateway::http::client_cert::{ClientCertificateError, ClientCertificates};
 use auth_gateway::{Machine, MachineRole};
-use axum::extract::{Path, Query, Request, State};
+use axum::body::Bytes;
+use axum::extract::{DefaultBodyLimit, Path, Query, Request, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
@@ -50,6 +52,10 @@ pub const FEATURES: &[&str] = &[
     "module-clients",
     "agent-audit",
 ];
+
+/// The most `PUT /updater/v1/modules` takes: every module with its roles'
+/// files (256 KiB each, base64).
+const MODULES_BODY_LIMIT: usize = 16 * 1024 * 1024;
 
 /// "Scheduled soon" when the agent does not say: within 30 minutes.
 const DEFAULT_HORIZON: Duration = Duration::from_secs(30 * 60);
@@ -80,7 +86,11 @@ pub fn routes(
         .route("/updater/v1/state", put(state))
         .route("/updater/v1/orders", get(orders))
         .route("/updater/v1/maintenance", put(maintenance))
-        .route("/updater/v1/modules", put(modules))
+        .route(
+            "/updater/v1/modules",
+            put(modules).layer(DefaultBodyLimit::max(MODULES_BODY_LIMIT)),
+        )
+        .route("/updater/v1/registry", put(registry))
         .route("/updater/v1/modules/{name}/replica", get(replica))
         .route("/updater/v1/drain", get(drain))
         .route("/updater/v1/version", get(version))
@@ -186,8 +196,9 @@ struct ModulesBody {
 
 /// `PUT /updater/v1/modules`: `{"modules": [{name, version, drain_path,
 /// route_path?, menu?, permissions?}]}` (`menu`: `{label: {en, es}, path:
-/// {en, es}, requires?}`; `permissions`: `{actions, policies}`), every
-/// installed module; it replaces the list before it.
+/// {en, es}, requires?}`; `permissions`: `{actions, policies}`; `roles`:
+/// `[{name, strategy, services, images, files?}]`), every installed module;
+/// it replaces the list before it.
 async fn modules(State(updates): State<UpdatesService>, Json(body): Json<ModulesBody>) -> Response {
     match updates.set_modules(body.modules).await {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
@@ -195,6 +206,36 @@ async fn modules(State(updates): State<UpdatesService>, Json(body): Json<Modules
             refusal(StatusCode::BAD_REQUEST, format!("{field}: {e}"))
         }
         Err(e) => logged_unavailable("modules", &e.to_string()),
+    }
+}
+
+/// The registry token as the agent hands it.
+#[derive(Deserialize)]
+struct RegistryBody {
+    host: String,
+    username: String,
+    password: String,
+    expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// `PUT /updater/v1/registry`: `{host, username, password, expires_at}`,
+/// the registry's pull token (quality-sdk decision 0013), held in memory in
+/// place of the one before; `204`, or `400` and the one held is kept. The
+/// body is read here so that no extractor's refusal quotes it.
+async fn registry(State(updates): State<UpdatesService>, body: Bytes) -> Response {
+    let Ok(body) = serde_json::from_slice::<RegistryBody>(&body) else {
+        let why = texts::tr!("api.updater.badRegistryToken");
+        return refusal(StatusCode::BAD_REQUEST, why);
+    };
+    let token = RegistryToken {
+        host: body.host,
+        username: body.username,
+        password: body.password,
+        expires_at: body.expires_at,
+    };
+    match updates.hold_registry_token(token) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => refusal(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
 

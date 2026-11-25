@@ -59,10 +59,11 @@
     },
     "updater": {
       "badEvent": "the event is one of ModuleAdded, ModuleRemoved, ModulePurgeStarted, ModulePurged, ModuleSecretsRotated, with a module, a version and an outcome",
+      "badRegistryToken": "the registry token is {host, username, password, expires_at} with expires_at in RFC 3339",
       "clientTaken": "client {{client}} was registered by hand or by another module: a module does not take it over",
       "noProvider": "this installation's OIDC provider is not configured (OIDC_SIGNING_KEY)",
-      "notTheAgent": "Only the update agent's certificate calls updater/v1.",
       "noSuchModule": "no module {{name}} is installed",
+      "notTheAgent": "Only the update agent's certificate calls updater/v1.",
       "purgeInstalled": "module {{name}} is installed: remove it before purging it",
       "unavailable": "The database does not answer."
     },
@@ -193,9 +194,13 @@
       "modules": {
         "badDescription": "module {{name}}: {{action}} needs a description in each language",
         "badDrainPath": "module {{name}}: the drain path must start with «/» and stay under the module",
-        "badProvides": "module {{name}}: each capability it provides must be lower-case letters, digits and «-», at most 16",
         "badMenu": "module {{name}}: the menu entry needs a label in each language and paths under its route",
         "badName": "a module's name is lower-case letters, digits and «-»",
+        "badProvides": "module {{name}}: each capability it provides must be lower-case letters, digits and «-», at most 16",
+        "badRole": "module {{name}}: the role {{role}} is lower-case letters, digits, «-» or «_», at most 63",
+        "badRoleFile": "module {{name}}: a file of the role {{role}} has a path outside the module, or its content does not match its SHA-256",
+        "badRoleImages": "module {{name}}: the role {{role}} lists 1 to 32 images, each once and pinned by digest (host/path@sha256:…)",
+        "badRoleServices": "module {{name}}: the role {{role}} lists 1 to 32 Compose services, each once",
         "badRoutePath": "module {{name}}: the route path is «/» and one segment of lower-case letters, digits and «-»",
         "badVersion": "module {{name}}: the version is missing",
         "coreAction": "module {{name}}: {{action}} is an action of the core, not of the module",
@@ -203,6 +208,10 @@
         "menuWithoutRoute": "module {{name}}: a menu entry needs a route",
         "repeated": "module {{name}} is named twice",
         "repeatedAction": "module {{name}}: {{action}} is named twice, or there are too many",
+        "repeatedRole": "module {{name}}: the role {{role}} is named twice",
+        "reservedRole": "module {{name}}: the role {{role}} is the master's own, which never joins",
+        "roleFilesTooLarge": "module {{name}}: its roles' files weigh more than 256 KiB",
+        "tooManyRoles": "module {{name}}: at most 16 machine roles",
         "unknownAction": "module {{name}}: {{action}} is not an action of the core or of the module"
       },
       "noUpdateService": "this installation does not have the update service: repeat the installation or run «orquestador actualizar» on the server",
@@ -234,6 +243,12 @@
         "updatedTo": "Quality Data was updated to version {{version}}",
         "urgentDidNotComeBack": "URGENT: Quality Data did not come back after updating",
         "whatsNew": "What's new"
+      },
+      "registry": {
+        "badHost": "the registry's host is a DNS name with no scheme, port or path",
+        "badUsername": "the registry's username is 1 to 64 printable characters with no space",
+        "badPassword": "the registry's password is 1 to 16384 printable characters",
+        "badExpiry": "the registry token's expiry is in the future and at most 12 hours and 5 minutes ahead"
       }
     }
   },

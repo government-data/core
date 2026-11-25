@@ -37,6 +37,10 @@ tracing.workspace = true
 # `sync` to hand the change notices to the open tabs.
 tokio = { workspace = true, features = ["sync"] }
 serde.workspace = true
+# A module role's files are checked against their SHA-256 (quality-sdk
+# decision 0013).
+base64.workspace = true
+sha2.workspace = true
 
 # Test-only: a stub port needs `async-trait` to implement the async `HealthCheck`
 # contract, and `tokio` provides the runtime for `#[tokio::test]`.

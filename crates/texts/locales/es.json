@@ -59,10 +59,11 @@
     },
     "updater": {
       "badEvent": "el evento es uno de ModuleAdded, ModuleRemoved, ModulePurgeStarted, ModulePurged, ModuleSecretsRotated, con un módulo, una versión y un resultado",
+      "badRegistryToken": "el token del registro es {host, username, password, expires_at} con expires_at en RFC 3339",
       "clientTaken": "el cliente {{client}} se registró a mano o por otro módulo: un módulo no lo toma",
       "noProvider": "el proveedor OIDC de esta instalación no está configurado (OIDC_SIGNING_KEY)",
-      "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
       "noSuchModule": "no hay ningún módulo {{name}} instalado",
+      "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
       "purgeInstalled": "el módulo {{name}} está instalado: quítalo antes de purgarlo",
       "unavailable": "La base de datos no responde."
     },
@@ -193,9 +194,13 @@
       "modules": {
         "badDescription": "módulo {{name}}: {{action}} necesita una descripción en cada idioma",
         "badDrainPath": "módulo {{name}}: la ruta de drenaje debe empezar por «/» y quedarse bajo el módulo",
-        "badProvides": "módulo {{name}}: cada capacidad que provee debe ser de minúsculas, dígitos y «-», 16 a lo sumo",
         "badMenu": "módulo {{name}}: la entrada de menú necesita una etiqueta en cada idioma y rutas bajo su ruta",
         "badName": "el nombre de un módulo lleva minúsculas, dígitos y «-»",
+        "badProvides": "módulo {{name}}: cada capacidad que provee debe ser de minúsculas, dígitos y «-», 16 a lo sumo",
+        "badRole": "módulo {{name}}: el rol {{role}} es de minúsculas, dígitos, «-» o «_», 63 a lo sumo",
+        "badRoleFile": "módulo {{name}}: un archivo del rol {{role}} tiene una ruta fuera del módulo, o su contenido no coincide con su SHA-256",
+        "badRoleImages": "módulo {{name}}: el rol {{role}} lista de 1 a 32 imágenes, cada una una vez y fijada por digest (host/ruta@sha256:…)",
+        "badRoleServices": "módulo {{name}}: el rol {{role}} lista de 1 a 32 servicios de Compose, cada uno una vez",
         "badRoutePath": "módulo {{name}}: la ruta es «/» y un segmento de minúsculas, dígitos y «-»",
         "badVersion": "módulo {{name}}: falta la versión",
         "coreAction": "módulo {{name}}: {{action}} es una acción del núcleo, no del módulo",
@@ -203,6 +208,10 @@
         "menuWithoutRoute": "módulo {{name}}: una entrada de menú necesita una ruta",
         "repeated": "el módulo {{name}} aparece dos veces",
         "repeatedAction": "módulo {{name}}: {{action}} aparece dos veces, o hay demasiadas",
+        "repeatedRole": "módulo {{name}}: el rol {{role}} aparece dos veces",
+        "reservedRole": "módulo {{name}}: el rol {{role}} es el del propio servidor principal, que nunca se une",
+        "roleFilesTooLarge": "módulo {{name}}: los archivos de sus roles pesan más de 256 KiB",
+        "tooManyRoles": "módulo {{name}}: 16 roles de máquina a lo sumo",
         "unknownAction": "módulo {{name}}: {{action}} no es una acción del núcleo ni del módulo"
       },
       "noUpdateService": "esta instalación no tiene el servicio de actualizaciones: repite la instalación o corre «orquestador actualizar» en el servidor",
@@ -234,6 +243,12 @@
         "updatedTo": "Quality Data se actualizó a la versión {{version}}",
         "urgentDidNotComeBack": "URGENTE: Quality Data no volvió después de actualizar",
         "whatsNew": "Novedades"
+      },
+      "registry": {
+        "badHost": "el host del registro es un nombre DNS sin esquema, puerto ni ruta",
+        "badUsername": "el usuario del registro tiene de 1 a 64 caracteres imprimibles sin espacios",
+        "badPassword": "la contraseña del registro tiene de 1 a 16384 caracteres imprimibles",
+        "badExpiry": "el vencimiento del token del registro está en el futuro y a lo sumo 12 horas y 5 minutos después"
       }
     }
   },

@@ -148,6 +148,7 @@ mod tests {
             menu,
             permissions: None,
             provides: Vec::new(),
+            roles: Vec::new(),
         }
     }
 
