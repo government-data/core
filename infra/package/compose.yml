@@ -30,6 +30,20 @@
 #   ca/        the installation's CA (`server ca-init`): the API's, to sign
 #              the machines' certificates and to check PostgreSQL's, and the
 #              installer's one-shots'
+#   secrets/dolt-root-password, secrets/dolt-app-password
+#              Dolt's root and the application user's passwords (decision
+#              0080's amendment of 2026-11-24), made by the installer, or by
+#              the update agent when missing (module.yaml's secrets), 0400
+#              and the API's user's
+#
+# Dolt, the catalog (decisions 0021, 0080's amendment): infra/dolt with
+# certificate.yml's overrides (TLS only, a client certificate of the installation's CA,
+# the application machine's machine.pem copied at each start), on a network
+# of its own with the API only, published nowhere. The API reaches it as
+# `dolt` and verifies that name (ssl-mode=VERIFY_IDENTITY): the CA signs the
+# application machine's certificate for its own name, PostgreSQL's alias on
+# `backend`, and for `dolt` (ruled by the user 2026-11-24). It presents the
+# same machine.pem, the password from its file.
 #
 # database_url is verify-full by POSTGRES_SERVER_NAME (decision 0082):
 #   postgres://<APP_DB_USER>:<password>@<POSTGRES_SERVER_NAME>:5432/<POSTGRES_DB>?sslmode=verify-full&sslrootcert=/run/qd-ca/ca.crt
@@ -57,6 +71,12 @@ include:
       - infra/postgres/docker-compose.yml
       - infra/postgres/tls.yml
   - infra/postgres/api.override.yml
+  # Dolt; certificate.yml's overrides are written below, as that file
+  # declares data-quality-edge external, which would stop this project
+  # from creating it. Its paths are written from the repository's root, as
+  # its stack runs with --project-directory .: here the package's.
+  - path: infra/dolt/docker-compose.yml
+    project_directory: .
 
 networks:
   # The API's own network (decision 0083): Traefik and the API only, so the
@@ -65,12 +85,20 @@ networks:
   api:
     name: data-quality-api
     internal: true
+  # Dolt and the API only (decision 0080's amendment, point 9).
+  catalog:
+    name: data-quality-catalog
+    internal: true
 
 secrets:
   database_url:
     file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/database_url
   postgres_superuser_password:
     file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/postgres_superuser_password
+  dolt_root_password:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/dolt-root-password
+  dolt_app_password:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/dolt-app-password
 
 services:
   traefik:
@@ -108,10 +136,12 @@ services:
     # (decision 0087), not development's `acme`.
     label_file: !override
       - ./infra/traefik/tls-source/${QD_TLS_MODE:-file}-api.labels
-    # PostgreSQL's network and its own; never data-quality-edge (0083).
+    # PostgreSQL's network, its own and Dolt's; never data-quality-edge
+    # (0083).
     networks: !override
       - backend
       - api
+      - catalog
     labels:
       - "traefik.docker.network=data-quality-api"
     environment:
@@ -122,10 +152,16 @@ services:
       DATABASE_URL_FILE: /run/secrets/database_url
       CA_CERT_FILE: /run/qd-ca/ca.crt
       CA_KEY_FILE: /run/qd-ca/ca.key
+      # The catalog, its name verified (see above).
+      DOLT_URL: "mysql://qd_app@dolt:3306?ssl-mode=VERIFY_IDENTITY&ssl-ca=/run/qd-node/ca.crt&ssl-cert=/run/qd-node/machine.pem&ssl-key=/run/qd-node/machine.pem"
+      DOLT_PASSWORD_FILE: /run/secrets/dolt_app_password
     secrets:
       - database_url
+      - dolt_app_password
     volumes:
       - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/ca:/run/qd-ca:ro"
+      # The application machine's certificate, presented to Dolt.
+      - "${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro"
     read_only: true
     tmpfs:
       - /tmp
@@ -160,3 +196,30 @@ services:
     image: ${IMAGE_WEB:-${WEB_IMAGE:?set IMAGE_WEB or WEB_IMAGE to a versioned image}}
     label_file: !override
       - ./infra/traefik/tls-source/${QD_TLS_MODE:-file}-web.labels
+
+  # The catalog (decision 0080's amendment). Its first start on an empty
+  # volume makes root, qd_app and the catalog's database (infra/dolt/init).
+  dolt:
+    image: ${IMAGE_DOLT:?set IMAGE_DOLT to a versioned image}
+    # As infra/dolt/certificate.yml: TLS only, with the application
+    # machine's certificate copied at each start (tls/entrypoint.sh).
+    entrypoint: ["tini", "--", "/etc/qd/dolt/entrypoint.sh"]
+    networks: !override
+      - catalog
+    environment:
+      QD_DOLT_TLS_SOURCE: /run/qd-node
+      QD_DOLT_TLS_DIR: /run/dolt-tls
+      DOLT_ROOT_PASSWORD_FILE: /run/secrets/dolt_root_password
+      DOLT_APP_PASSWORD_FILE: /run/secrets/dolt_app_password
+    secrets:
+      - dolt_root_password
+      - dolt_app_password
+    tmpfs:
+      - /run/dolt-tls:mode=0700
+    volumes:
+      - ./infra/dolt/tls/entrypoint.sh:/etc/qd/dolt/entrypoint.sh:ro
+      - ./infra/dolt/tls/config.yaml:/etc/dolt/servercfg.d/config.yaml:ro
+      - "${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro"
+    # `dolt sql` has no client certificate: whether it listens.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3306"]
