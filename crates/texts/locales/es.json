@@ -216,7 +216,8 @@
         "reservedRole": "módulo {{name}}: el rol {{role}} es el del propio servidor principal, que nunca se une",
         "roleFilesTooLarge": "módulo {{name}}: los archivos de sus roles pesan más de 256 KiB",
         "tooManyRoles": "módulo {{name}}: 16 roles de máquina a lo sumo",
-        "unknownAction": "módulo {{name}}: {{action}} no es una acción del núcleo ni del módulo"
+        "unknownAction": "módulo {{name}}: {{action}} no es una acción del núcleo ni del módulo",
+        "badRemovalPath": "módulo {{name}}: la ruta de retiro debe empezar por «/» y quedarse bajo el módulo"
       },
       "noUpdateService": "esta instalación no tiene el servicio de actualizaciones: repite la instalación o corre «orquestador actualizar» en el servidor",
       "objectExpected": "se esperaba un objeto",
@@ -253,6 +254,10 @@
         "badUsername": "el usuario del registro tiene de 1 a 64 caracteres imprimibles sin espacios",
         "badPassword": "la contraseña del registro tiene de 1 a 16384 caracteres imprimibles",
         "badExpiry": "el vencimiento del token del registro está en el futuro y a lo sumo 12 horas y 5 minutos después"
+      },
+      "removal": {
+        "noAnswer": "el módulo {{name}} declara una comprobación de retiro y no respondió: el retiro espera a que responda",
+        "unreadable": "el módulo {{name}} rechazó el retiro con una respuesta que no se puede leer"
       }
     }
   },

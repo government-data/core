@@ -8,6 +8,7 @@
 //! | `PUT /updater/v1/maintenance`          | maintenance begins (`active`) or ends    |
 //! | `PUT /updater/v1/modules`              | the installed modules, the whole list    |
 //! | `PUT /updater/v1/registry`             | the registry's pull token, held in memory |
+//! | `GET /updater/v1/removal/{module}`     | the modules' refusals of its removal     |
 //! | `GET /updater/v1/drain?horizon_secs=N` | what still runs, and whether it drained  |
 //! | `GET /updater/v1/modules/{name}/replica` | whether the replica of its data is in sync |
 //! | `GET /updater/v1/version`              | the version and the features it has      |
@@ -52,6 +53,7 @@ pub const FEATURES: &[&str] = &[
     "module-clients",
     "agent-audit",
     "registry-credentials",
+    "module-removal",
 ];
 
 /// The most `PUT /updater/v1/modules` takes: every module with its roles'
@@ -92,6 +94,7 @@ pub fn routes(
             put(modules).layer(DefaultBodyLimit::max(MODULES_BODY_LIMIT)),
         )
         .route("/updater/v1/registry", put(registry))
+        .route("/updater/v1/removal/{module}", get(removal))
         .route("/updater/v1/modules/{name}/replica", get(replica))
         .route("/updater/v1/drain", get(drain))
         .route("/updater/v1/version", get(version))
@@ -314,6 +317,20 @@ async fn replica(
     };
     let state = caller.machines.replica_sync(&module.provides).await;
     Json(json!({ "state": state.as_str() })).into_response()
+}
+
+/// `GET /updater/v1/removal/{module}`: `{"refusals": [{module, reason,
+/// counts}]}`, every installed module's refusal of the removal of
+/// `module`, asked at its removal path (quality-sdk decision 0015); none:
+/// it may be removed. A module that does not answer refuses.
+async fn removal(State(updates): State<UpdatesService>, Path(module): Path<String>) -> Response {
+    match updates.removal_refusals(&module).await {
+        Ok(refusals) => Json(json!({ "refusals": refusals })).into_response(),
+        Err(UpdatesError::Invalid(field, e)) => {
+            refusal(StatusCode::BAD_REQUEST, format!("{field}: {e}"))
+        }
+        Err(e) => logged_unavailable("removal", &e.to_string()),
+    }
 }
 
 /// `GET /updater/v1/version`: `{version, features}`.

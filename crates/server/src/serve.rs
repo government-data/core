@@ -139,7 +139,14 @@ fn app(
             &modules,
             drain_wiring::ANSWER_WITHIN,
         )))
-        .with_modules_work(Arc::new(app_modules));
+        .with_modules_work(Arc::new(app_modules))
+        // Whether a module may be removed: every installed module's
+        // removal path (quality-sdk 0015).
+        .with_removal_checks(Arc::new(
+            infrastructure::module_removal::HttpModuleRemovals::from_env(
+                drain_wiring::ANSWER_WITHIN,
+            )?,
+        ));
     // The machines: Settings → Execution, the install routes (their own
     // limit) and the route they join with (the login's).
     let machine_routes = machines_wiring::routes(

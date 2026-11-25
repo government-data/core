@@ -216,7 +216,8 @@
         "reservedRole": "module {{name}}: the role {{role}} is the master's own, which never joins",
         "roleFilesTooLarge": "module {{name}}: its roles' files weigh more than 256 KiB",
         "tooManyRoles": "module {{name}}: at most 16 machine roles",
-        "unknownAction": "module {{name}}: {{action}} is not an action of the core or of the module"
+        "unknownAction": "module {{name}}: {{action}} is not an action of the core or of the module",
+        "badRemovalPath": "module {{name}}: the removal path must start with «/» and stay under the module"
       },
       "noUpdateService": "this installation does not have the update service: repeat the installation or run «orquestador actualizar» on the server",
       "objectExpected": "an object was expected",
@@ -253,6 +254,10 @@
         "badUsername": "the registry's username is 1 to 64 printable characters with no space",
         "badPassword": "the registry's password is 1 to 16384 printable characters",
         "badExpiry": "the registry token's expiry is in the future and at most 12 hours and 5 minutes ahead"
+      },
+      "removal": {
+        "noAnswer": "module {{name}} declares a removal check and did not answer: the removal waits until it answers",
+        "unreadable": "module {{name}} refused the removal with an answer that does not read"
       }
     }
   },
