@@ -26,10 +26,11 @@ impl Runner {
                     "WITH e AS (SELECT {v} AS v FROM {from}),
                      f AS (SELECT v FROM e
                             WHERE NOT (v IS NULL OR regexp_full_match(v, '[\\s\\x{{00A0}}]*'))),
-                     p AS (SELECT left(regexp_replace(regexp_replace(v, '[0-9]', '9', 'g'),
-                                                      '[[:alpha:]]', 'A', 'g'), {SHAPE}) AS p,
-                                  count(*) AS n
-                             FROM f GROUP BY 1 ORDER BY n DESC, p LIMIT 1)
+                     s AS (SELECT substr(regexp_replace(regexp_replace(v, '[0-9]', '9', 'g'),
+                                                        '[A-Za-z]', 'A', 'g'), 1, {SHAPE}) AS p
+                             FROM f),
+                     p AS (SELECT p, count(*) AS n FROM s GROUP BY p
+                            ORDER BY n DESC NULLS LAST, p ASC NULLS LAST LIMIT 1)
                      SELECT (SELECT count(*) FROM e) - (SELECT count(*) FROM f),
                             (SELECT count(DISTINCT v) FROM f),
                             (SELECT p FROM p),
