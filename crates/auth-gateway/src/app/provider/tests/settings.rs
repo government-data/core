@@ -198,7 +198,11 @@ async fn each_client_is_signed_with_its_algorithm_if_the_key_is_there() {
     );
     assert_eq!(
         d["grant_types_supported"],
-        json!(["authorization_code", "client_credentials"])
+        json!([
+            "authorization_code",
+            "client_credentials",
+            "urn:ietf:params:oauth:grant-type:token-exchange"
+        ])
     );
     let jwks: Value = serde_json::from_str(&f.server.jwks()).unwrap();
     assert_eq!(jwks["keys"], json!([{ "kid": "ES256" }]));

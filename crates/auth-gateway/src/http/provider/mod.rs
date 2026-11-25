@@ -15,6 +15,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use self::form::basic_credentials;
+use crate::app::provider::exchange::{ACCESS_TOKEN_TYPE, TOKEN_EXCHANGE};
 use crate::http::client_cert::{ClientCertificateError, ClientCertificates};
 use crate::http::session::SESSION_COOKIE;
 use crate::{
@@ -143,6 +144,9 @@ pub struct TokenForm {
     /// `client_credentials`: the audience, as RFC 8707 or as `audience`.
     resource: Option<String>,
     audience: Option<String>,
+    /// Token exchange (RFC 8693): the person's token and its kind.
+    subject_token: Option<String>,
+    subject_token_type: Option<String>,
 }
 
 /// `certificate` is the machine's, if the header is trusted and holds one;
@@ -174,7 +178,10 @@ async fn token_handler(
         resource: form.resource,
         audience: form.audience,
         client_certificate: certificate.ok(),
+        subject_token: form.subject_token,
+        subject_token_type: form.subject_token_type,
     };
+    let exchanged = req.grant_type.as_deref() == Some(TOKEN_EXCHANGE);
     match state.server.token(&req).await {
         Ok(t) => {
             let mut body = json!({
@@ -188,6 +195,9 @@ async fn token_handler(
             }
             if !t.scope.is_empty() {
                 body["scope"] = json!(t.scope);
+            }
+            if exchanged {
+                body["issued_token_type"] = json!(ACCESS_TOKEN_TYPE);
             }
             no_store(Json(body).into_response())
         }

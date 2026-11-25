@@ -442,6 +442,7 @@ async fn the_tokens_carry_the_policy_names_for_the_applications() {
 }
 
 mod certificate;
+mod exchange;
 mod job_token;
 mod module_client;
 mod module_clients;

@@ -118,7 +118,12 @@ fn app(
     let provider = infrastructure::oidc::provider_from_env(&db.pool, admins.clone(), &oidc_issuer)?
         // A module client's role claim, from the actions each person holds
         // (quality-sdk decision 0009).
-        .map(|p| p.with_actions(api::iam::action_holder(platform.clone())));
+        .map(|p| {
+            p.with_actions(api::iam::action_holder(platform.clone()))
+                // Each token exchanged is recorded before it is given
+                // (decision 0089).
+                .with_audit(Arc::new(PgAuditRepository::new(db.pool.clone())))
+        });
     let certificates = machines_wiring::client_certificates_from_env()?;
     let oidc = oidc_provider(provider.clone(), sessions.clone(), certificates.clone());
     // Who the session is, for every route that requires a capability: the
