@@ -40,7 +40,7 @@ COPY . .
 RUN cargo build --release --locked -p worker -p node-agent
 # Into the home of distroless's `nonroot` (uid 65532), where DuckDB looks.
 RUN mkdir -p /out/home && HOME=/out/home target/release/qd-worker --install-extensions
-ARG DUCKDB_EXTENSIONS=https://github.com/quality-data/core/releases/download/duckdb-extensions-v2.0.0
+ARG DUCKDB_EXTENSIONS=https://github.com/government-data/core/releases/download/duckdb-extensions-v2.0.0
 RUN mkdir -p /out/home/.duckdb/extensions/v2.0.0/linux_amd64 \
  && cd /out/home/.duckdb/extensions/v2.0.0/linux_amd64 \
  && printf '%s  %s\n' \

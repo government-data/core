@@ -28,7 +28,7 @@ pub struct FailGroup {
 fn shape_of(field: &str) -> Result<String, Error> {
     let v = format!("CAST({} AS VARCHAR)", quoted(field)?);
     Ok(format!(
-        "coalesce(left(regexp_replace(regexp_replace({v}, '\\p{{N}}', '9', 'g'), '\\p{{L}}', 'A', 'g'), {SHAPE_LEN}), '∅')"
+        "coalesce(substr(regexp_replace(regexp_replace({v}, '\\p{{N}}', '9', 'g'), '\\p{{L}}', 'A', 'g'), 1, {SHAPE_LEN}), '∅')"
     ))
 }
 
@@ -69,7 +69,7 @@ impl Runner {
             .collect::<Result<Vec<_>, Error>>()?;
         let names: Vec<String> = (0..fields.len()).map(|i| format!("k.\"c{i}\"")).collect();
         let order = (0..shown.key.len().max(1).min(fields.len()))
-            .map(|i| format!("\"c{i}\""))
+            .map(|i| format!("\"c{i}\" ASC NULLS LAST"))
             .collect::<Vec<_>>();
         let order = if order.is_empty() {
             "1".to_string()
@@ -79,11 +79,12 @@ impl Runner {
         let query = format!(
             "WITH r AS (SELECT {cols}, {shape} AS shape, ({rule}) AS outcome FROM {ds}),
                   f AS (SELECT * FROM r WHERE outcome),
-                  g AS (SELECT shape, count(*) AS n FROM f GROUP BY shape ORDER BY n DESC, shape LIMIT {top}),
+                  g AS (SELECT shape, count(*) AS n FROM f GROUP BY shape
+                         ORDER BY n DESC NULLS LAST, shape ASC NULLS LAST LIMIT {top}),
                   k AS (SELECT f.*, row_number() OVER (PARTITION BY f.shape ORDER BY {order}) AS i
                           FROM f JOIN g USING (shape))
              SELECT g.shape, g.n, {names} FROM g LEFT JOIN k ON k.shape = g.shape AND k.i <= {each}
-             ORDER BY g.n DESC, g.shape, k.i",
+             ORDER BY g.n DESC NULLS LAST, g.shape ASC NULLS LAST, k.i ASC NULLS LAST",
             cols = columns.join(", "),
             rule = sql.text,
             ds = quoted(dataset)?,
