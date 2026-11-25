@@ -73,7 +73,7 @@ pub struct LakePoolsOut {
 /// A pool's layout.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct LakePoolIn {
-    /// The nodes' names, in order: 4 to 16, each a host's name its peers
+    /// The nodes' names, in order: 1 to 16, each a host's name its peers
     /// resolve (lowercase letters, digits and hyphens, not at either end).
     #[schema(example = json!(["lake-a", "lake-b", "lake-c", "lake-d"]))]
     nodes: Vec<String>,
