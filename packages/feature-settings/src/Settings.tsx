@@ -9,15 +9,6 @@ import { t } from "./i18n";
 import { CardIcon } from "./CardIcon";
 import { SECTIONS } from "./homeSections";
 
-/** The common account this installation signs in with, or `null`: with it gestión handles
- * the access (OAuth2). */
-async function accountUrl(): Promise<string | null> {
-  const r = await fetch("/api/settings/account", { credentials: "same-origin" }).catch(() => null);
-  if (!r?.ok) return null;
-  const { url } = (await r.json()) as { url: string | null };
-  return url && url.startsWith("https://") ? url : null;
-}
-
 /** The updates in one line (`null` if it is not updated from here). */
 interface UpdatesSummary {
   stale: boolean;
@@ -43,10 +34,10 @@ async function updatesSummary(): Promise<{ on: boolean; text: string } | null> {
     : { on: true, text: t("settings:home.updates.current", { installed }) };
 }
 
-/** «Mi cuenta»: each person's profile and, if there are OAuth providers (and
- * not the common account, which signs in by email), their linked accounts. */
+/** «Mi cuenta»: each person's profile and, if there are OAuth providers, their
+ * linked accounts. */
 async function accountSummary(): Promise<{ enabled: boolean; on: boolean; text: string } | null> {
-  const providers = (await accountUrl()) ? [] : await accountApi.providers();
+  const providers = await accountApi.providers();
   if (providers.length === 0) {
     return { enabled: true, on: true, text: t("settings:home.account.profile") };
   }
@@ -210,8 +201,7 @@ export const Settings: Component = () => {
             <Show
               when={
                 can("admin:Configure") &&
-                (settings.state === "errored" ||
-                  (settings.state === "ready" && !section.managed?.(settings())))
+                (settings.state === "errored" || settings.state === "ready")
               }
             >
               <A href={section.path} class="settings-card">

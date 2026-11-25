@@ -18,7 +18,6 @@
     "mail": {
       "label": "Outgoing mail",
       "desc": "Office 365 or SMTP for the notices.",
-      "platform": "Platform mail",
       "required": "Not configured"
     },
     "oauth": {
@@ -225,7 +224,6 @@
     "noPerArea": "No (only the administrators' groups)"
   },
   "oauth": {
-    "managedByAccount": "This instance signs in with Quality Data's common account: access is managed from gestión and each person is linked to their account (that is how they see billing). OAuth2 providers are not configured here.",
     "title": "OAuth2 / OIDC sign-in",
     "intro": "“Sign in with…” buttons on the sign-in page. People get in if they already have an account with that email (when the provider vouches for it) or linked their account under Settings → Linked accounts.",
     "tenantId": "Entra ID tenant ID (Microsoft only)",

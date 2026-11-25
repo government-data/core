@@ -18,7 +18,6 @@
     "mail": {
       "label": "Correo saliente",
       "desc": "Office 365 o SMTP para los avisos.",
-      "platform": "Correo de la plataforma",
       "required": "Sin configurar"
     },
     "oauth": {
@@ -225,7 +224,6 @@
     "noPerArea": "No (solo los grupos de administradores)"
   },
   "oauth": {
-    "managedByAccount": "Esta instancia entra con la cuenta común de Quality Data: los accesos se administran desde gestión y cada persona queda asociada a su cuenta (así ve la facturación). Aquí no se configuran proveedores OAuth2.",
     "title": "Inicio de sesión OAuth2 / OIDC",
     "intro": "Botones de “Entrar con…” en la pantalla de inicio de sesión. Entra quien ya tiene una cuenta con ese correo (si el proveedor lo da por verificado) o quien vinculó su cuenta desde Configuración → Cuentas vinculadas.",
     "tenantId": "Id del tenant de Entra ID (solo para Microsoft)",
