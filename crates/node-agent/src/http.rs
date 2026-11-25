@@ -13,6 +13,7 @@ use serde_json::json;
 use crate::api::{answer, classify, CallError, Issued, MachineApi};
 use crate::cert::Credentials;
 use crate::dolt::{self, DoltGate};
+use crate::registry::{RegistryGate, RegistryGrant};
 use crate::restart::Release;
 
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -120,6 +121,18 @@ impl Release for DoltApi<'_> {
 impl DoltGate for DoltApi<'_> {
     async fn hold(&self, identity: &Credentials, ca: &str) -> Result<dolt::HoldAnswer, CallError> {
         self.0.hold_of("dolt", identity, ca).await
+    }
+}
+
+/// The registry token for the machine's role (quality-sdk decision 0013).
+#[async_trait]
+impl RegistryGate for HttpApi {
+    async fn registry(&self, identity: &Credentials, ca: &str) -> Result<RegistryGrant, CallError> {
+        let url = format!("{}/internal/machines/registry", self.internal_url);
+        let sent = machine_client(identity, ca)?.get(url).send().await;
+        let (status, retry_after, body) = read(sent).await?;
+        success(status, retry_after)?;
+        serde_json::from_slice(&body).map_err(|_| CallError::Unavailable(status))
     }
 }
 

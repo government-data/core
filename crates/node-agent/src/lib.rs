@@ -16,6 +16,8 @@
 //!   it is free to give it the certificate in use (point 11);
 //! - [`restart`]: what a restart through the API's hold does: the command,
 //!   the wait and the release;
+//! - [`registry`]: on a cluster's machine, the registry token for its role
+//!   and the pull of its images (quality-sdk decision 0013);
 //! - [`metrics`]: its metrics file, renewals by result and the certificate's
 //!   end (decision 0071).
 
@@ -31,6 +33,7 @@ pub mod http;
 pub mod metrics;
 pub mod plan;
 pub mod ports;
+pub mod registry;
 pub mod restart;
 pub mod store;
 
