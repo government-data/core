@@ -5,7 +5,9 @@
 # that text on both engines. Candidates: printf/format with %.17g, %.15g,
 # %.17e and %.15e, and a cast through DECIMAL(38, 10); each over a
 # synthetic corpus (integers, decimals, powers of ten, halves, large and
-# small, subnormals, negative zero, random bit patterns).
+# small, subnormals, negative zero, random bit patterns); then, for ruling
+# 26, the plain cast to text of integers (tinyint to bigint) and DECIMALs
+# of several precisions and scales, value by value.
 #
 # One throwaway Trino 484 node (memory catalog only, its HTTP port on a
 # random port of 127.0.0.1) on a network of its own; DuckDB in process.

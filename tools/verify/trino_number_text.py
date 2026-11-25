@@ -94,8 +94,61 @@ def main():
           + ("" if diff else "  ALL OK"))
     for i in diff[:5]:
         print(f"    {vals[i]!r}: duckdb {d[i]!r} trino {t[i]!r}")
+    exact_ok = exact_casts()
     print("RESULT:", "a candidate agrees on every value" if agree_any else "no candidate agrees on every value")
-    sys.exit(0 if agree_any else 1)
+    print("RESULT (integers and decimals):", "ALL OK" if exact_ok else "they differ")
+    # Ruling 26: floating point has no shape; what must agree is the exact
+    # types' cast.
+    sys.exit(0 if exact_ok else 1)
+
+
+EXACT_TYPES = ["tinyint", "smallint", "integer", "bigint", "decimal(5,0)", "decimal(9,2)",
+               "decimal(18,4)", "decimal(38,10)", "decimal(38,0)", "decimal(4,4)"]
+
+
+def exact_corpus(ty, rnd):
+    if not ty.startswith("decimal"):
+        bits = {"tinyint": 7, "smallint": 15, "integer": 31, "bigint": 63}[ty]
+        lo, hi = -(2 ** bits), 2 ** bits - 1
+        vals = [0, 1, -1, 10, -10, 100, lo, hi, lo + 1, hi - 1]
+        vals += [rnd.randint(lo, hi) for _ in range(200)]
+        return [str(v) for v in vals]
+    p, sc = (int(x) for x in ty[8:-1].split(","))
+    def make(ip, fp, neg):
+        text = ip + ("." + fp if sc else "")
+        return ("-" if neg else "") + text
+    out = []
+    for neg in (False, True):
+        out.append(make("0", "0" * sc, neg))
+        out.append(make("9" * (p - sc) if p > sc else "0", "9" * sc, neg))
+        if sc:
+            out.append(make("0", "0" * (sc - 1) + "1", neg))
+            out.append(make("1" if p > sc else "0", "5" + "0" * (sc - 1), neg))
+    for _ in range(200):
+        ip = str(rnd.randint(0, 10 ** (p - sc) - 1)) if p > sc else "0"
+        fp = str(rnd.randint(0, 10 ** sc - 1)).zfill(sc) if sc else ""
+        out.append(make(ip, fp, rnd.random() < 0.5))
+    return out
+
+
+def exact_casts():
+    """Integers and decimals: CAST to text on both engines, value by value."""
+    rnd = random.Random(26)
+    all_ok = True
+    for ty in EXACT_TYPES:
+        vals = exact_corpus(ty, rnd)
+        dty = ty.upper()
+        d = [r[0] for r in DUCK.execute(
+            "SELECT CAST(CAST(v AS %s) AS VARCHAR) FROM (SELECT unnest(?) AS v, "
+            "generate_subscripts(?, 1) AS i) ORDER BY i" % dty, [vals, vals]).fetchall()]
+        rows = ", ".join(f"({i}, CAST('{v}' AS {ty}))" for i, v in enumerate(vals))
+        t = [r[1] for r in trino(f"SELECT i, CAST(x AS varchar) FROM (VALUES {rows}) AS v (i, x) ORDER BY i")]
+        diff = [i for i in range(len(vals)) if d[i] != t[i]]
+        print(f"{ty}: {len(vals) - len(diff)}/{len(vals)} agree" + ("" if diff else "  ALL OK"))
+        for i in diff[:5]:
+            print(f"    {vals[i]}: duckdb {d[i]!r} trino {t[i]!r}")
+        all_ok &= not diff
+    return all_ok
 
 
 if __name__ == "__main__":
