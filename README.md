@@ -5,5 +5,5 @@ quality pipelines with their notices, on a platform with tenants and single
 sign-on. The quality core is being built.
 
 The user guide is the `docs` module, in its own repository
-([quality-data/docs](https://github.com/quality-data/docs)): an installation
+([government-data/docs](https://github.com/government-data/docs)): an installation
 serves it at `/docs`, behind its sign-in, once the module is added.

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for coding agents working in this repository (`quality-data/core`,
+Instructions for coding agents working in this repository (`government-data/core`,
 public). Brought from the `calidad` repository on 2026-11-20.
 
 ## What this is

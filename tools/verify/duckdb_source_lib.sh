@@ -19,7 +19,7 @@ CONTAINERS=("$DUCK")
 EXTVOL=qs-verify-$SRC-ext
 # The reviewed extensions the worker's image takes (decision 0077 point 8),
 # self-hosted for DuckDB v2.0.0 on linux_amd64.
-RELEASE=https://github.com/quality-data/core/releases/download/duckdb-extensions-v2.0.0
+RELEASE=https://github.com/government-data/core/releases/download/duckdb-extensions-v2.0.0
 
 ok() { printf '[OK  ] %s\n' "$*"; }
 ko() { printf '[FAIL] %s\n' "$*"; FAILED=1; }
