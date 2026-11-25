@@ -88,8 +88,9 @@ expect "ana, the chart in explore (forced, no cache): loans only" "loans cached=
 expect "  the mutator: from explore" "$(id_of ana) chart" \
   "$(mlog '[.username, (.source | ascii_downcase | sub("querysource."; ""))] | join(" ")')"
 expect "carla (author, both datasets) in SQL Lab" "loans,savings" "$(sqllab carla)"
-expect "  the mutator: from SQL Lab" "$(id_of carla) sql_lab" \
-  "$(mlog '[.username, (.source | ascii_downcase | sub("querysource."; ""))] | join(" ")')"
+expect "  the mutator: from SQL Lab, the token found by username (SQL Lab runs in a request of its own)" \
+  "$(id_of carla) person-by-username sql_lab" \
+  "$(mlog '[.username, .kind, (.source | ascii_downcase | sub("querysource."; ""))] | join(" ")')"
 expect "ana (viewer) has no SQL Lab" "error" "$(sqllab ana | cut -d: -f1)"
 expect "Trino's query log: the users of the chart table's queries" \
   "$(printf '%s\n' bi-superset "person-$(id_of ana)" "person-$(id_of bruno)" "person-$(id_of carla)" | sort | tr '\n' ' ')" \

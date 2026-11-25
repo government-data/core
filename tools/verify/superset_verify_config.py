@@ -75,12 +75,24 @@ def _session_token():
     return pair[0] if pair else None
 
 
+_BY_USER = {}  # account id -> the person's latest access token: this process's memory only
+
+
 def _expired_session_guard():
-    """Ends Superset's session when the provider's access token has expired."""
-    if E("SESSION_GUARD", "1") != "1" or not has_request_context():
+    """Ends Superset's session when the provider's access token has expired;
+    otherwise remembers the token by username, for SQL Lab (it runs in a test
+    request context of its own, with no session)."""
+    if not has_request_context():
         return None
     tok = _session_token()
     if tok is None:
+        return None
+    from flask_login import current_user
+
+    if getattr(current_user, "is_authenticated", False) and not getattr(current_user, "is_guest_user", False):
+        with _LOCK:
+            _BY_USER[current_user.username] = tok
+    if E("SESSION_GUARD", "1") != "1":
         return None
     try:
         import jwt
@@ -172,7 +184,11 @@ def _subject():
         raw = request.headers.get("X-GuestToken") or request.form.get("guest_token")
         return raw, "guest" if raw else "guest-without-token"
     tok = _session_token()
-    return (tok, "person") if tok else (None, "none")
+    if tok:
+        return tok, "person"
+    with _LOCK:
+        tok = _BY_USER.get(getattr(user, "username", None))
+    return (tok, "person-by-username") if tok else (None, "none")
 
 
 def DB_CONNECTION_MUTATOR(uri, params, username, security_manager, source):  # noqa: N802
