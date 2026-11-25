@@ -80,3 +80,33 @@ impl AuthorizationServer {
         })
     }
 }
+
+impl AuthorizationServer {
+    /// The module a client was registered by (quality-sdk decision 0009);
+    /// `None` for a client registered by hand, a disabled one, or none.
+    pub async fn client_module(&self, client_id: &str) -> Option<String> {
+        let id = ClientId::parse(client_id).ok()?;
+        let client = self.clients.find(&id).await.ok()??;
+        if client.disabled() {
+            return None;
+        }
+        client.settings.module.map(|m| m.module)
+    }
+
+    /// Which of `actions` the account `subject` holds now (quality-sdk
+    /// decision 0002, `iam/effective`): `Ok(None)` when there is no such
+    /// account; an error when what it holds cannot be read.
+    pub async fn held_actions(
+        &self,
+        subject: &str,
+        actions: &[String],
+    ) -> Result<Option<Vec<String>>, crate::domain::RepositoryError> {
+        let Some(admin) = self.admins.find_by_id(&AdminId::new(subject)).await? else {
+            return Ok(None);
+        };
+        let Some(source) = &self.actions else {
+            return Ok(Some(Vec::new()));
+        };
+        source.held(&admin, actions).await.map(Some)
+    }
+}

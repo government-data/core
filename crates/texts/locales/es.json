@@ -60,7 +60,9 @@
     "platform": {
       "notFoundOrNoAccess": "No existe o no tienes acceso.",
       "roleForbids": "Tu rol en esta área no permite esta acción.",
-      "notAModuleClient": "Solo el cliente de máquina de un módulo instalado, con un token vigente para el núcleo, llama a /v1."
+      "notAModuleClient": "Solo el cliente de máquina de un módulo instalado, con un token vigente para el núcleo, llama a /v1.",
+      "notAModule": "Este cliente no lo registró un módulo.",
+      "noSuchSubject": "Ninguna cuenta tiene ese id."
     },
     "updater": {
       "badEvent": "el evento es uno de ModuleAdded, ModuleRemoved, ModulePurgeStarted, ModulePurged, ModuleSecretsRotated, con un módulo, una versión y un resultado",

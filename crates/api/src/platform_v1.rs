@@ -8,16 +8,18 @@
 //! | Call               | Does                                                 |
 //! | ------------------ | ---------------------------------------------------- |
 //! | `GET /v1/modules`  | the installed modules, as the update agent told them |
+//! | `GET /v1/iam/effective?subject=<id>` | which of the module's actions a person holds |
 
 use application::UpdatesService;
 use auth_gateway::AuthorizationServer;
-use axum::extract::{Request, State};
+use axum::extract::{Query, Request, State};
 use axum::http::header::AUTHORIZATION;
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::{Json, Router};
+use axum::{Extension, Json, Router};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::updater_v1::refusal;
@@ -35,9 +37,18 @@ pub struct ModuleCaller {
 /// Mount `/v1/…`; `provider` is `None` without `OIDC_SIGNING_KEY`, and
 /// then every call is a 503.
 pub fn routes(provider: Option<AuthorizationServer>, updates: UpdatesService) -> Router {
+    let effective = Effective {
+        provider: provider.clone(),
+        updates: updates.clone(),
+    };
     Router::new()
         .route("/v1/modules", get(modules))
         .with_state(updates)
+        .merge(
+            Router::new()
+                .route("/v1/iam/effective", get(iam_effective))
+                .with_state(effective),
+        )
         .layer(axum::middleware::from_fn_with_state(
             provider,
             require_module_client,
@@ -86,6 +97,66 @@ async fn modules(State(updates): State<UpdatesService>) -> Response {
         }
         Err(e) => {
             tracing::error!("v1 modules: {e}");
+            crate::updater_v1::unavailable()
+        }
+    }
+}
+
+/// What `iam/effective` reads: the provider (who the person is and what
+/// they hold) and the modules' declared actions.
+#[derive(Clone)]
+struct Effective {
+    provider: Option<AuthorizationServer>,
+    updates: UpdatesService,
+}
+
+#[derive(Deserialize)]
+struct SubjectQuery {
+    /// The person's account id, as the `sub` of their tokens.
+    subject: String,
+}
+
+/// `GET /v1/iam/effective?subject=<account id>`: `{"subject", "actions"}`,
+/// which of the calling module's own actions (its manifest's
+/// `permissions.actions`) the person holds now, by the core's IAM (deny
+/// unless allowed, an explicit deny wins). The module is its machine
+/// client's, never one it names. A module caches the answer at most 60 s.
+/// No such account: `404`; a client no module registered: `403`.
+async fn iam_effective(
+    State(e): State<Effective>,
+    Extension(caller): Extension<ModuleCaller>,
+    Query(q): Query<SubjectQuery>,
+) -> Response {
+    let Some(provider) = e.provider else {
+        return refusal(
+            StatusCode::SERVICE_UNAVAILABLE,
+            texts::tr!("api.updater.noProvider"),
+        );
+    };
+    let Some(module) = provider.client_module(&caller.client).await else {
+        return refusal(StatusCode::FORBIDDEN, texts::tr!("api.platform.notAModule"));
+    };
+    let declared = match e.updates.declared_modules().await {
+        Ok(declared) => declared,
+        Err(err) => {
+            tracing::error!("v1 iam/effective: {err}");
+            return crate::updater_v1::unavailable();
+        }
+    };
+    let actions: Vec<String> = declared
+        .into_iter()
+        .filter(|d| d.name == module && d.installed)
+        .flat_map(|d| d.permissions.actions)
+        .map(|a| a.name)
+        .collect();
+    match provider.held_actions(&q.subject, &actions).await {
+        Ok(Some(held)) => Json(json!({ "subject": q.subject, "actions": held })).into_response(),
+        Ok(None) => refusal(
+            StatusCode::NOT_FOUND,
+            texts::tr!("api.platform.noSuchSubject"),
+        ),
+        Err(err) => {
+            tracing::error!("v1 iam/effective: what a person holds: {err}");
             crate::updater_v1::unavailable()
         }
     }

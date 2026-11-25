@@ -111,3 +111,99 @@ async fn a_modules_machine_client_reads_the_installed_modules() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "no provider");
     drop(db);
 }
+
+#[tokio::test]
+async fn a_module_reads_which_of_its_actions_a_person_holds() {
+    use application::PlatformService;
+    use infrastructure::PgPlatformRepository;
+
+    let db = testkit::spawn_test_db().await;
+    let pool = db.pool.clone();
+    let updates = UpdatesService::new(Arc::new(Store(PgMaintenanceStore::new(pool.clone()))));
+    let platform = PlatformService::new(Arc::new(PgPlatformRepository::new(pool.clone())))
+        .with_updates(updates.clone());
+    let signer = Ed25519Signer::from_pkcs8_base64(&Ed25519Signer::generate().unwrap()).unwrap();
+    let provider = AuthorizationServer::new(
+        Arc::new(PgOidcClients::new(pool.clone())),
+        Arc::new(PgAuthorizationCodes::new(pool.clone())),
+        Arc::new(ResetTokenAdapter),
+        Arc::new(OAuthSecrets),
+        Arc::new(signer),
+        Arc::new(PgAdminRepository::new(pool.clone())),
+        Arc::new(SystemClock),
+        "https://qd.example.com/api",
+    )
+    .with_actions(api::iam::action_holder(platform));
+    let action = |name: &str| {
+        json!({ "name": name,
+        "description": { "en": "Do it", "es": "Hacerlo" } })
+    };
+    let modules = serde_json::from_value(json!([{
+        "name": "orchestrator", "version": "1.2.0",
+        "permissions": {
+            "actions": [action("orchestrator:RunWorkflow"), action("orchestrator:ViewFlows")],
+            "policies": [{ "name": "orchestrator:Viewers",
+                           "description": { "en": "Viewers", "es": "Lectores" },
+                           "actions": ["orchestrator:ViewFlows"] }] } }]))
+    .unwrap();
+    updates.set_modules(modules).await.unwrap();
+    let body: ModuleClientsRequest = serde_json::from_value(json!({ "machine": {
+        "capabilities": ["orchestration"], "audiences": ["core"], "secret": SECRET } }))
+    .unwrap();
+    provider
+        .put_module_clients("orchestrator", &body, "https://qd.example.com")
+        .await
+        .unwrap();
+    let ana: String = sqlx::query_scalar(
+        "INSERT INTO admin_users (email, password_hash, role) VALUES ('ana@example.com', 'x', 'user')
+         RETURNING id::text",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO iam_attachments (principal_kind, principal_id, policy)
+         VALUES ('user', $1::uuid, 'orchestrator:Viewers')",
+    )
+    .bind(&ana)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let app = api::platform_v1::routes(Some(provider.clone()), updates);
+    let core = token(&provider, api::platform_v1::AUDIENCE).await;
+
+    let path = format!("/v1/iam/effective?subject={ana}");
+    let (status, body) = get_path(&app, &path, Some(&core)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        body,
+        json!({ "subject": ana, "actions": ["orchestrator:ViewFlows"] })
+    );
+
+    let nobody = "/v1/iam/effective?subject=00000000-0000-0000-0000-000000000000";
+    let (status, _) = get_path(&app, nobody, Some(&core)).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = get_path(&app, &path, None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    drop(db);
+}
+
+async fn get_path(app: &axum::Router, path: &str, token: Option<&str>) -> (StatusCode, Value) {
+    let mut request = Request::builder().uri(path);
+    if let Some(token) = token {
+        request = request.header("authorization", format!("Bearer {token}"));
+    }
+    let response = app
+        .clone()
+        .oneshot(request.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
