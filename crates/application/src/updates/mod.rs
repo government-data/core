@@ -37,7 +37,7 @@ pub use module_permissions::{ModuleAction, ModulePermissions, ModulePolicy};
 pub use module_roles::{ModuleRole, RoleFile, RoleStrategy};
 pub use modules::{DeclaredModule, InstalledModule};
 pub use policy::UpdatePolicy;
-pub use registry::RegistryToken;
+pub use registry::{GrantRefusal, RegistryGrant, RegistryToken, RoleModule};
 pub use report::{DaemonReport, Outcome};
 pub use store::{
     HistoryEntry, Maintenance, MaintenanceError, Requester, UpdateRequest, UpdaterRow,

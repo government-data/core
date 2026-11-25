@@ -928,6 +928,36 @@
         }
       }
     },
+    "/internal/machines/registry": {
+      "get": {
+        "tags": [
+          "machines"
+        ],
+        "summary": "`GET /internal/machines/registry`: the pull token for a machine of a\nrole an installed module declares.",
+        "operationId": "registry_handler",
+        "responses": {
+          "200": {
+            "description": "The token and the role's images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No client certificate"
+          },
+          "403": {
+            "description": "Not an approved machine's certificate in use, or no installed module declares its role"
+          },
+          "503": {
+            "description": "No token held, or it expired: ask again later; or the client certificate header is not trusted"
+          }
+        }
+      }
+    },
     "/internal/machines/renew": {
       "post": {
         "tags": [
@@ -6416,6 +6446,48 @@
           }
         }
       },
+      "RegistryOut": {
+        "type": "object",
+        "description": "The registry's pull token and the role's images.",
+        "required": [
+          "host",
+          "username",
+          "password",
+          "expires_at",
+          "images",
+          "modules"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "description": "RFC 3339."
+          },
+          "host": {
+            "type": "string",
+            "description": "The registry's DNS name."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`<host>/<path>@sha256:<64 hex>`, sorted, each once."
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleModuleOut"
+            },
+            "description": "Each installed module that declares the role, by name: what the\nmachine runs of it."
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
       "RenewIn": {
         "type": "object",
         "description": "A machine asks for a new certificate.",
@@ -6693,6 +6765,59 @@
               "null"
             ],
             "description": "At most 32 ASCII characters (`INC-2041`): letters, digits and\n`-_/#.`, the first a letter or digit, at least one letter."
+          }
+        }
+      },
+      "RoleFileOut": {
+        "type": "object",
+        "description": "A file of a module's role.",
+        "required": [
+          "path",
+          "sha256",
+          "content_base64"
+        ],
+        "properties": {
+          "content_base64": {
+            "type": "string",
+            "description": "Its content, standard base64."
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative to the module's folder."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "The SHA-256 of its content, lowercase hex."
+          }
+        }
+      },
+      "RoleModuleOut": {
+        "type": "object",
+        "description": "A module of the machine's role: its version, the role's services and\nits files, which the machine puts under `<module>/`.",
+        "required": [
+          "name",
+          "version",
+          "services",
+          "files"
+        ],
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleFileOut"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "string"
           }
         }
       },

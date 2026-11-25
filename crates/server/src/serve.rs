@@ -175,6 +175,13 @@ fn app(
             machines.clone(),
             certificates.clone(),
         ))
+        // The registry's pull token for the clusters' machines (quality-sdk
+        // 0013), handed by the same agent.
+        .merge(api::machines::registry::routes(
+            machines.clone(),
+            updates.clone(),
+            certificates.clone(),
+        ))
         // A module's OIDC clients, from the same agent (quality-sdk 0009).
         .merge(api::updater_v1_clients::routes(
             provider.clone(),

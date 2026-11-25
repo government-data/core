@@ -52,7 +52,10 @@
       "alertsNotApp": "Solo el certificado de la VM de la aplicación entrega las alertas de Grafana.",
       "alertsUnavailable": "Esta API no guarda las alertas de las máquinas.",
       "invalidRange": "El rango es 1h, 24h o 7d.",
-      "invalidAlert": "Una alerta de la entrega no es como Grafana la envía: un estado firing o resolved, una huella de letras y dígitos y una hora de inicio."
+      "invalidAlert": "Una alerta de la entrega no es como Grafana la envía: un estado firing o resolved, una huella de letras y dígitos y una hora de inicio.",
+      "registryNoRole": "Ningún módulo instalado declara el rol de esta máquina.",
+      "registryNoToken": "El núcleo no tiene ahora un token del registro: vuelva a preguntar más tarde.",
+      "registryRefused": "Solo el certificado en uso de una máquina aprobada recibe el token del registro."
     },
     "platform": {
       "notFoundOrNoAccess": "No existe o no tienes acceso.",
