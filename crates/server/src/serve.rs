@@ -156,7 +156,7 @@ fn app(
             audit,
             admins,
             oauth,
-            platform,
+            platform.clone(),
             Some(settings),
             Some(password_reset),
             config.cors_allowed_origins(),
@@ -172,8 +172,16 @@ fn app(
         ))
         // A module's OIDC clients, from the same agent (quality-sdk 0009).
         .merge(api::updater_v1_clients::routes(
-            provider,
+            provider.clone(),
             public_url_from_env(),
+            updates.clone(),
+            machines.clone(),
+            certificates.clone(),
+        ))
+        // A module's purge and the agent's own audit (quality-sdk 0009).
+        .merge(api::updater_v1_purge::routes(
+            provider,
+            platform,
             updates.clone(),
             machines.clone(),
             certificates.clone(),

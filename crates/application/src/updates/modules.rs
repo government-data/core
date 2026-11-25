@@ -81,6 +81,14 @@ impl UpdatesService {
     }
 }
 
+impl UpdatesService {
+    /// Forget a module's permissions (its purge): its actions leave the
+    /// catalog. Its policies' assignments are the platform's to delete.
+    pub async fn forget_module_permissions(&self, module: &str) -> Result<(), String> {
+        self.store.forget_module_permissions(module).await
+    }
+}
+
 /// A module's actions and managed policies as the core keeps them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeclaredModule {
