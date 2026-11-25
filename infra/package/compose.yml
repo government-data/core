@@ -36,6 +36,16 @@
 #              the update agent when missing (module.yaml's secrets), 0400
 #              and the API's user's
 #
+#   secrets/rustfs-sts-issuer-access-key, secrets/rustfs-sts-issuer-secret-key
+#              the lake's STS issuer's keys (decision 0091, point 4), made
+#              the same way, critical keys; the API reads them as files
+#
+# The lake (decision 0091, point 4): the API reaches it at LAKE_ENDPOINT
+# and its admin adapter at LAKE_ADMIN_URL, both from the .env and empty
+# until the installation has a lake; it presents the application
+# machine's certificate and trusts the installation's CA, which signs the
+# lake's. The lake's root keys are made and kept by the core (0066 step 11).
+#
 # Dolt, the catalog (decisions 0021, 0080's amendment): infra/dolt with
 # certificate.yml's overrides (TLS only, a client certificate of the installation's CA,
 # the application machine's machine.pem copied at each start), on a network
@@ -99,6 +109,10 @@ secrets:
     file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/dolt-root-password
   dolt_app_password:
     file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/dolt-app-password
+  rustfs_sts_issuer_access_key:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/rustfs-sts-issuer-access-key
+  rustfs_sts_issuer_secret_key:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/rustfs-sts-issuer-secret-key
 
 services:
   traefik:
@@ -155,9 +169,23 @@ services:
       # The catalog, its name verified (see above).
       DOLT_URL: "mysql://qd_app@dolt:3306?ssl-mode=VERIFY_IDENTITY&ssl-ca=/run/qd-node/ca.crt&ssl-cert=/run/qd-node/machine.pem&ssl-key=/run/qd-node/machine.pem"
       DOLT_PASSWORD_FILE: /run/secrets/dolt_app_password
+      # The lake (see above); unset, no job gets lake credentials and
+      # Settings → Lake says the lake is not reachable.
+      LAKE_ENDPOINT: ${LAKE_ENDPOINT:-}
+      LAKE_CA_FILE: ${LAKE_CA_FILE:-/run/qd-ca/ca.crt}
+      LAKE_CLIENT_CERT_FILE: ${LAKE_CLIENT_CERT_FILE:-/run/qd-node/machine.pem}
+      LAKE_ADMIN_URL: ${LAKE_ADMIN_URL:-}
+      LAKE_ADMIN_CA_FILE: ${LAKE_ADMIN_CA_FILE:-/run/qd-ca/ca.crt}
+      LAKE_ADMIN_CERT_FILE: ${LAKE_ADMIN_CERT_FILE:-/run/qd-node/machine.pem}
+      RUSTFS_STS_ISSUER_ACCESS_KEY: ""
+      RUSTFS_STS_ISSUER_ACCESS_KEY_FILE: /run/secrets/rustfs_sts_issuer_access_key
+      RUSTFS_STS_ISSUER_SECRET_KEY: ""
+      RUSTFS_STS_ISSUER_SECRET_KEY_FILE: /run/secrets/rustfs_sts_issuer_secret_key
     secrets:
       - database_url
       - dolt_app_password
+      - rustfs_sts_issuer_access_key
+      - rustfs_sts_issuer_secret_key
     volumes:
       - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/ca:/run/qd-ca:ro"
       # The application machine's certificate, presented to Dolt.
