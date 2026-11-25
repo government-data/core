@@ -5,6 +5,12 @@
 //! that names it, and every node is given the same layout, derived here
 //! alone ([`PoolLayout::volumes`]).
 //!
+//! A lake may start on one server (decision 0091, point 3, verified with
+//! RustFS 1.0.5): a pool needs at least [`MIN_POOL_DRIVES`] drives in all,
+//! except the first pool of one node and one drive, which RustFS starts but
+//! never grows (neither by drives nor by a pool): it grows by a copy into a
+//! new lake ([`PoolLayout::grows_only_by_copy`]).
+//!
 //! All pools are one RustFS deployment: the lake's root keys and admin keys
 //! are the lake's, kept under `pool:main` (ruling 2). An installation's lake
 //! is either today's single node or pools, the first pool named
@@ -13,10 +19,16 @@
 use std::time::SystemTime;
 
 use crate::domain::machine::is_label;
+use crate::domain::machine_install::MAIN_POOL;
 use crate::domain::{AdminId, RepositoryError};
 
-/// The fewest servers a pool has (0029, point 5).
-pub const MIN_POOL_NODES: usize = 4;
+/// The fewest servers a pool has (0091, point 3).
+pub const MIN_POOL_NODES: usize = 1;
+
+/// The fewest drives a pool has in all, every node's together, but the
+/// first pool's of one node and one drive: RustFS's rule for a pool (0091,
+/// V1).
+pub const MIN_POOL_DRIVES: usize = 2;
 
 /// The most: a bound against a mistaken request, not a limit of RustFS's
 /// that was measured (four nodes were verified, 0066 step 11).
@@ -35,7 +47,8 @@ pub const RUSTFS_PEER_PORT: u16 = 9010;
 pub const REPLICATION_ALIAS: &str = "qd-lake-replication";
 
 /// A pool's layout, checked: a name, at least [`MIN_POOL_NODES`] nodes,
-/// each a name a certificate and DNS take, and the drives of each node.
+/// each a name a certificate and DNS take, and the drives of each node, at
+/// least [`MIN_POOL_DRIVES`] in all but for the first pool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PoolLayout {
     name: String,
@@ -60,6 +73,9 @@ pub enum PoolRefusal {
     RepeatedNode,
     /// Drives out of 1 to [`MAX_POOL_DRIVES`].
     Drives,
+    /// Fewer than [`MIN_POOL_DRIVES`] in all, for a pool that is not the
+    /// first.
+    TooFewDrives,
 }
 
 /// Whether `name` can be a pool node's: its certificate's CN and only DNS
@@ -98,6 +114,9 @@ impl PoolLayout {
         if !(1..=MAX_POOL_DRIVES).contains(&drives) {
             return Err(PoolRefusal::Drives);
         }
+        if name != MAIN_POOL && checked.len() * usize::from(drives) < MIN_POOL_DRIVES {
+            return Err(PoolRefusal::TooFewDrives);
+        }
         Ok(Self {
             name: name.to_string(),
             nodes: checked,
@@ -117,11 +136,22 @@ impl PoolLayout {
         self.drives
     }
 
+    /// One node with one drive: RustFS takes neither more drives nor a
+    /// pool beside it, so it grows only by a copy into a new lake (0091 V1).
+    pub fn grows_only_by_copy(&self) -> bool {
+        self.nodes.len() == 1 && self.drives == 1
+    }
+
     /// RustFS's `RUSTFS_VOLUMES`, the same on every node: each node's
     /// drives, in order, at `/data/<n>` (as `join.sh` mounts them), on the
     /// peers' port, space-separated. A plain list of unrelated names was
-    /// verified with RustFS 1.0.5 (0066 step 11).
+    /// verified with RustFS 1.0.5 (0066 step 11). One node with one drive
+    /// is the path `/data/1`: RustFS refuses a single drive by URL (0091,
+    /// V3).
     pub fn volumes(&self) -> String {
+        if self.grows_only_by_copy() {
+            return "/data/1".into();
+        }
         let mut volumes = Vec::with_capacity(self.nodes.len() * usize::from(self.drives));
         for node in &self.nodes {
             for n in 1..=self.drives {
@@ -166,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn a_pool_takes_four_host_names_or_more_in_order() {
+    fn a_pool_takes_host_names_in_order() {
         let given = names(&[" lake-b ", "lake-a", "", "lake-d", "lake-c"]);
         let pool = PoolLayout::parse("main", &given, 2).unwrap();
         assert_eq!(pool.nodes(), ["lake-b", "lake-a", "lake-d", "lake-c"]);
@@ -176,16 +206,33 @@ mod tests {
     }
 
     #[test]
+    fn a_lake_may_start_on_one_node_of_one_drive_or_more() {
+        let one = PoolLayout::parse("main", &names(&["lake-a"]), 1).unwrap();
+        assert!(one.grows_only_by_copy());
+        assert_eq!(one.volumes(), "/data/1");
+        let four = PoolLayout::parse("main", &names(&["lake-a"]), 4).unwrap();
+        assert!(!four.grows_only_by_copy());
+        assert_eq!(four.volumes().split(' ').count(), 4);
+        let two = PoolLayout::parse("main", &names(&["lake-a", "lake-b"]), 1);
+        assert!(!two.unwrap().grows_only_by_copy());
+    }
+
+    #[test]
+    fn a_pool_beside_the_first_needs_two_drives_in_all() {
+        let refused = PoolLayout::parse("more", &names(&["lake-e"]), 1);
+        assert_eq!(refused.unwrap_err(), PoolRefusal::TooFewDrives);
+        assert!(PoolLayout::parse("more", &names(&["lake-e"]), 2).is_ok());
+        assert!(PoolLayout::parse("more", &names(&["lake-e", "lake-f"]), 1).is_ok());
+    }
+
+    #[test]
     fn a_pool_out_of_form_is_refused() {
         let four = names(&["a", "b", "c", "d"]);
         let refused = |name: &str, nodes: &[&str], drives| {
             PoolLayout::parse(name, &names(nodes), drives).unwrap_err()
         };
         assert_eq!(refused("Main", &["a", "b", "c", "d"], 1), PoolRefusal::Name);
-        assert_eq!(
-            refused("main", &["a", "b", "c"], 1),
-            PoolRefusal::TooFewNodes
-        );
+        assert_eq!(refused("main", &["", " "], 1), PoolRefusal::TooFewNodes);
         let seventeen: Vec<String> = (1..=17).map(|i| format!("n{i}")).collect();
         let too_many = PoolLayout::parse("main", &seventeen, 1).unwrap_err();
         assert_eq!(too_many, PoolRefusal::TooManyNodes);

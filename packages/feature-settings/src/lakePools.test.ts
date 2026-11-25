@@ -3,6 +3,7 @@ import { createApiClient } from "@knime-orchestador/api-client";
 import {
   defineMainPool,
   definable,
+  growsOnlyByCopy,
   loadMainPool,
   nodeState,
   parseNodes,
@@ -126,5 +127,14 @@ describe("a pool node's command", () => {
     const outcome = await requestNodeJoin(api, "lake-c", " ");
     expect(await seen[0].json()).toEqual({ role: "lake", pool: "main", node: "lake-c" });
     expect(outcome).toMatchObject({ kind: "command", addDrives: true });
+  });
+});
+
+describe("growsOnlyByCopy", () => {
+  it("holds for one server with one drive alone", () => {
+    expect(growsOnlyByCopy(1, 1)).toBe(true);
+    expect(growsOnlyByCopy(1, 4)).toBe(false);
+    expect(growsOnlyByCopy(2, 1)).toBe(false);
+    expect(growsOnlyByCopy(4, 2)).toBe(false);
   });
 });

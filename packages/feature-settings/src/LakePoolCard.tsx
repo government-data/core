@@ -5,7 +5,15 @@ import { Field, NoticeBox, useAction } from "./common";
 import { t } from "./i18n";
 import { JoinResult } from "./JoinMachine";
 import type { JoinOutcome } from "./joinRequest";
-import { defineMainPool, definable, loadMainPool, nodeState, requestNodeJoin } from "./lakePools";
+import {
+  defineMainPool,
+  definable,
+  growsOnlyByCopy,
+  loadMainPool,
+  nodeState,
+  parseNodes,
+  requestNodeJoin,
+} from "./lakePools";
 import type { LakePool, MachinesApi } from "./machinesApi";
 
 /** The pool's layout, typed: its nodes in order and the drives of each. */
@@ -53,6 +61,9 @@ const PoolForm: Component<{
           onInput={(e) => setDrives(e.currentTarget.value)}
         />
       </Field>
+      <Show when={growsOnlyByCopy(parseNodes(nodes()).length, Number(drives()))}>
+        <p class="st-notice st-notice--warn">{t("settings:lake.pool.oneDrive")}</p>
+      </Show>
       <NoticeBox notice={action.notice()} />
       <div class="st-actions">
         <button type="submit" class="fk-btn st-primary" disabled={action.busy()}>
@@ -132,7 +143,7 @@ const NodeCommand: Component<{ api: MachinesApi; node?: string; onClose: () => v
 
 /**
  * The lake's pool `main` (0029 point 5; 0066 step 11): defined here before
- * any of its servers exists, at least four, then each server's command,
+ * any of its servers exists, one or more, then each server's command,
  * which names it; once a node has joined, the layout stays.
  */
 export const LakePoolCard: Component<{ api: MachinesApi }> = (props) => {
@@ -148,6 +159,13 @@ export const LakePoolCard: Component<{ api: MachinesApi }> = (props) => {
             ? pool.error.message
             : t("settings:lake.pool.loadError")}
         </p>
+      </Show>
+      <Show when={!definable(pool.latest) && pool.latest}>
+        {(p) => (
+          <Show when={growsOnlyByCopy(p().nodes.length, p().drives)}>
+            <p class="st-notice st-notice--warn">{t("settings:lake.pool.oneDrive")}</p>
+          </Show>
+        )}
       </Show>
       <Show when={pool.latest}>
         {(p) => (

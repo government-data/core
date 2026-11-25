@@ -32,7 +32,7 @@ async fn main_is_defined_before_any_node_by_whoever_may_manage_machines() {
     for (uri, body, field) in [
         (
             "/lake/pools/main",
-            json!({ "nodes": ["a", "b", "c"], "drives": 1 }),
+            json!({ "nodes": [], "drives": 1 }),
             "nodes",
         ),
         (

@@ -31,6 +31,7 @@
       "invalidNode": "Elige uno de los nodos del pool: el token es solo para ese servidor.",
       "nodeNotTaken": "Solo el token de un nodo de un pool del lago (rol lake) nombra un nodo.",
       "poolDrives": "Cada nodo tiene de 1 a {{max}} discos.",
+      "poolTooFewDrives": "Un pool junto al primero tiene al menos {{min}} discos en total.",
       "poolDrivesCount": "Indica tantos discos como tienen los nodos del pool, o ninguno y añádelos a mano.",
       "poolJoined": "Un nodo de este pool ya se unió: su disposición ya no puede cambiar.",
       "poolNodeName": "Cada nodo es el nombre de un servidor: letras minúsculas, dígitos y guiones, de 1 a 63, sin guion al principio ni al final.",

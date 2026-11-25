@@ -5542,7 +5542,7 @@
             "items": {
               "type": "string"
             },
-            "description": "The nodes' names, in order: 4 to 16, each a host's name its peers\nresolve (lowercase letters, digits and hyphens, not at either end).",
+            "description": "The nodes' names, in order: 1 to 16, each a host's name its peers\nresolve (lowercase letters, digits and hyphens, not at either end).",
             "example": [
               "lake-a",
               "lake-b",

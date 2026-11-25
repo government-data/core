@@ -2205,7 +2205,7 @@ export interface components {
              */
             drives: number;
             /**
-             * @description The nodes' names, in order: 4 to 16, each a host's name its peers
+             * @description The nodes' names, in order: 1 to 16, each a host's name its peers
              *     resolve (lowercase letters, digits and hyphens, not at either end).
              * @example [
              *       "lake-a",

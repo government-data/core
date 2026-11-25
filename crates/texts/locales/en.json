@@ -31,6 +31,7 @@
       "invalidNode": "Choose one of the pool's nodes: the token is for that server alone.",
       "nodeNotTaken": "Only a lake pool's node (the role lake) is named by its token.",
       "poolDrives": "Each node has 1 to {{max}} drives.",
+      "poolTooFewDrives": "A pool beside the first has at least {{min}} drives in all.",
       "poolDrivesCount": "Give as many drives as the pool's nodes have, or none and add them by hand.",
       "poolJoined": "A node of this pool has joined: its layout can no longer change.",
       "poolNodeName": "Each node is a server's name: lowercase letters, digits and hyphens, 1 to 63, not starting or ending with a hyphen.",
