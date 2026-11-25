@@ -157,7 +157,7 @@ services:
       # (/api/internal/machines/…) and the update agent's (/api/updater/…)
       # are not served here: only on the internal entry point, with a client
       # certificate (infra/traefik/internal.yml).
-      - "traefik.http.routers.api.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`)"
+      - "traefik.http.routers.api.rule=Host(`${APP_DOMAIN:-localhost}`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`) && !PathPrefix(`/api/v1/`)"
       - "traefik.http.routers.api.entrypoints=websecure"
       - "traefik.http.routers.api.priority=100"
       - "traefik.http.routers.api.middlewares=api-chain@file"
