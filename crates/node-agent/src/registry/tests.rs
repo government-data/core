@@ -62,6 +62,21 @@ impl Docker for FakeDocker {
             Ok(())
         }
     }
+
+    async fn up(
+        &self,
+        config: &Path,
+        module: &str,
+        dir: &Path,
+        services: &[String],
+    ) -> Result<(), String> {
+        assert!(
+            dir.join("compose.yml").is_file(),
+            "its files are in place first"
+        );
+        self.seen(config, format!("up {module} {}", services.join(",")));
+        Ok(())
+    }
 }
 
 struct World {
@@ -91,7 +106,25 @@ fn grant() -> RegistryGrant {
             "registry.example.com/a@sha256:aa".into(),
             "registry.example.com/b@sha256:bb".into(),
         ],
-        modules: Vec::new(),
+        modules: vec![crate::role_files::RoleModule {
+            name: "lake-rustfs".into(),
+            version: "0.2.1".into(),
+            services: vec!["rustfs".into(), "gate".into()],
+            files: vec![role_file("compose.yml", b"services: {}\n")],
+        }],
+    }
+}
+
+fn role_file(path: &str, bytes: &[u8]) -> crate::role_files::RoleFile {
+    use base64::Engine as _;
+    use sha2::{Digest, Sha256};
+    crate::role_files::RoleFile {
+        path: path.into(),
+        sha256: Sha256::digest(bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
+        content_base64: base64::engine::general_purpose::STANDARD.encode(bytes),
     }
 }
 
@@ -119,8 +152,11 @@ async fn an_answer_logs_in_pulls_each_image_and_removes_the_directory() {
             "login AWS registry.example.com",
             "pull registry.example.com/a@sha256:aa",
             "pull registry.example.com/b@sha256:bb",
+            "up lake-rustfs rustfs,gate",
         ]
     );
+    let placed = w.dir.path().join("modules/lake-rustfs/compose.yml");
+    assert_eq!(std::fs::read_to_string(placed).unwrap(), "services: {}\n");
     none_left(&w);
 }
 

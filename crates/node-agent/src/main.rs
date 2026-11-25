@@ -45,9 +45,11 @@
 //! With `QD_REGISTRY_PULL=on`, on a cluster's machine, it asks the API for
 //! the registry token and its role's images (quality-sdk decision 0013)
 //! once it has a certificate, then every 6 hours, or 10 minutes after the
-//! API held no token or a pull failed; it logs in with a fresh 0700
+//! API held no token or a pull failed; it puts each module's files under
+//! `QD_AGENT_DIR/modules/<module>/`, logs in with a fresh 0700
 //! configuration directory inside `QD_AGENT_DIR`, pulls each image by
-//! digest and removes the directory. The password is never logged.
+//! digest, starts the role's services from the module's `compose.yml` and
+//! removes the directory. The password is never logged.
 //!
 //! Its lines are every service's (decision 0026, `logging`): flat JSON with
 //! `service` `node-agent` and `vm` from `OBS_VM`, filtered by `RUST_LOG`

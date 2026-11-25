@@ -60,6 +60,16 @@ pub trait Docker: Send + Sync {
     async fn login(&self, config: &Path, grant: &RegistryGrant) -> Result<(), String>;
     /// `docker --config <config> pull <image>`.
     async fn pull(&self, config: &Path, image: &str) -> Result<(), String>;
+    /// `docker --config <config> compose --project-name <module>
+    /// --project-directory <dir> --file <dir>/compose.yml up --detach
+    /// --no-build <services>`: the role's services of a module.
+    async fn up(
+        &self,
+        config: &Path,
+        module: &str,
+        dir: &Path,
+        services: &[String],
+    ) -> Result<(), String>;
 }
 
 /// How a round ended, and so when to ask again.
@@ -100,7 +110,8 @@ pub async fn pull_role(store: &FileStore, gate: &dyn RegistryGate, docker: &dyn 
         return Pulled::Retry(format!("the role's files: {e}"));
     }
     let config = store.path(&format!("docker-config-{}", std::process::id()));
-    let pulled = pull_with(&config, &grant, docker).await;
+    let modules = store.path("modules");
+    let pulled = pull_with(&config, &grant, docker, &modules).await;
     if let Err(e) = remove(&config) {
         tracing::error!("the registry's configuration directory could not be removed: {e}");
     }
@@ -114,6 +125,7 @@ async fn pull_with(
     config: &Path,
     grant: &RegistryGrant,
     docker: &dyn Docker,
+    modules: &Path,
 ) -> Result<(), String> {
     private_dir(config).map_err(|e| format!("configuration directory: {e}"))?;
     docker
@@ -125,6 +137,12 @@ async fn pull_with(
             .pull(config, image)
             .await
             .map_err(|e| format!("pull {image}: {e}"))?;
+    }
+    for m in &grant.modules {
+        docker
+            .up(config, &m.name, &modules.join(&m.name), &m.services)
+            .await
+            .map_err(|e| format!("start {}'s services: {e}", m.name))?;
     }
     Ok(())
 }
@@ -176,6 +194,31 @@ impl Docker for DockerCli {
 
     async fn pull(&self, config: &Path, image: &str) -> Result<(), String> {
         self.run(config, &["pull", "--quiet", image], None).await
+    }
+
+    async fn up(
+        &self,
+        config: &Path,
+        module: &str,
+        dir: &Path,
+        services: &[String],
+    ) -> Result<(), String> {
+        let dir = dir.to_string_lossy().to_string();
+        let file = format!("{dir}/compose.yml");
+        let mut args = vec![
+            "compose",
+            "--project-name",
+            module,
+            "--project-directory",
+            dir.as_str(),
+            "--file",
+            file.as_str(),
+            "up",
+            "--detach",
+            "--no-build",
+        ];
+        args.extend(services.iter().map(String::as_str));
+        self.run(config, &args, None).await
     }
 }
 
