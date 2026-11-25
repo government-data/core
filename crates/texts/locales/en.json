@@ -58,7 +58,8 @@
     },
     "platform": {
       "notFoundOrNoAccess": "It does not exist or you do not have access.",
-      "roleForbids": "Your role in this area does not allow this action."
+      "roleForbids": "Your role in this area does not allow this action.",
+      "notAModuleClient": "Only an installed module's machine client, with a live token for the core, calls /v1."
     },
     "updater": {
       "badEvent": "the event is one of ModuleAdded, ModuleRemoved, ModulePurgeStarted, ModulePurged, ModuleSecretsRotated, with a module, a version and an outcome",
