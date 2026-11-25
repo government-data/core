@@ -11,6 +11,7 @@ use quality::worker_api::{QueueFindings, SfcCell};
 
 use crate::icd::{measured, role_field, IcdRule, Measured};
 use crate::{invalid, quote_text, Error, Runner};
+use quality_rules_sql::double;
 
 /// The most queues kept per dimension, those with the most open findings.
 const MOST_QUEUES: usize = 1000;
@@ -68,8 +69,9 @@ fn terms(fields: &[Measured], cells: &[SfcCell]) -> Vec<String> {
                 .iter()
                 .find(|c| c.field == f.name && c.total > 0)
                 .map_or(0.2, |c| prox(c.ok as f64 / c.total as f64));
-            let c = f64::from(f.weight) / 4.0;
-            format!("COALESCE({c} * (1 - \"f{n}\") * {closeness}, 0)")
+            let c = double(f64::from(f.weight) / 4.0);
+            let closeness = double(closeness);
+            format!("COALESCE({c} * (DOUBLE '1' - \"f{n}\") * {closeness}, DOUBLE '0')")
         })
         .collect()
 }
@@ -146,7 +148,7 @@ impl Runner {
                 .map(|(n, _)| &terms[n])
                 .collect();
             let priority = match own.len() {
-                0 => "0.0".to_string(),
+                0 => "DOUBLE '0'".to_string(),
                 1 => own[0].clone(),
                 _ => format!(
                     "greatest({})",
@@ -219,7 +221,7 @@ impl Runner {
         let gone = match previous {
             Some(p) => format!(
                 "UNION ALL
-                 SELECT g.dimension, g.grp, p.since, 0, count(*), 0.0
+                 SELECT g.dimension, g.grp, p.since, 0, count(*), DOUBLE '0'
                    FROM {} p JOIN {} g USING (record)
                   WHERE g.dimension IN ({}) AND NOT EXISTS
                         (SELECT 1 FROM \"__findings\" f WHERE f.record = p.record AND f.rule = p.rule)

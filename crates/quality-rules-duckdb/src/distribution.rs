@@ -6,12 +6,16 @@
 
 use quality::worker_api::OutlierGroup;
 
+use quality_rules_sql::double;
+
 use crate::{quoted, Error, Runner};
 
 /// Robust z beyond which an amount is an outlier.
 const Z: f64 = 3.5;
 /// The least spread a group's MAD is taken as, in log10 units.
 const MAD_FLOOR: f64 = 0.10;
+/// What scales a MAD to a normal's standard deviation, as robust z reads it.
+const MAD_SCALE: f64 = 0.6745;
 /// The most groups kept per dimension, those with the most amounts.
 const MOST_GROUPS: usize = 1000;
 
@@ -48,17 +52,23 @@ impl Runner {
         let mut out = Vec::new();
         for dimension in dimensions {
             let sql = format!(
-                "WITH v AS (SELECT COALESCE(NULLIF(trim(CAST({d} AS VARCHAR)), ''), '') AS g,
+                "WITH v AS (SELECT COALESCE(NULLIF(trim(BOTH ' ' FROM CAST({d} AS VARCHAR)), ''),
+                                            '') AS g,
                                    log10(CAST({a} AS DOUBLE)) AS x
-                              FROM {from} WHERE CAST({a} AS DOUBLE) > 0),
+                              FROM {from} WHERE CAST({a} AS DOUBLE) > DOUBLE '0'),
                       m AS (SELECT g, median(x) AS med FROM v GROUP BY g),
                       s AS (SELECT g, med, median(abs(x - med)) AS mad
                               FROM v JOIN m USING (g) GROUP BY g, med),
-                      z AS (SELECT g, 0.6745 * (x - med) / greatest(mad, {MAD_FLOOR}) AS z
+                      z AS (SELECT g, {k} * (x - med) / greatest(mad, {floor}) AS z
                               FROM v JOIN s USING (g))
-                 SELECT g, count(*), count(*) FILTER (WHERE z < -{Z}),
-                        count(*) FILTER (WHERE z > {Z})
-                   FROM z GROUP BY g ORDER BY 2 DESC, g LIMIT {MOST_GROUPS}",
+                 SELECT g, count(*) AS n, count(*) FILTER (WHERE z < {low}),
+                        count(*) FILTER (WHERE z > {high})
+                   FROM z GROUP BY g
+                  ORDER BY n DESC NULLS LAST, g ASC NULLS LAST LIMIT {MOST_GROUPS}",
+                k = double(MAD_SCALE),
+                floor = double(MAD_FLOOR),
+                low = double(-Z),
+                high = double(Z),
                 d = quoted(dimension)?,
                 a = quoted(amount)?,
                 from = quoted(dataset)?,
