@@ -112,6 +112,9 @@ fn a_file_outside_the_module_or_not_matching_its_digest_is_refused() {
         file("../etc/passwd", b"a"),
         file("/etc/passwd", b"a"),
         file("config//gate.toml", b"a"),
+        file("config/./gate.toml", b"a"),
+        file("config/gate toml", b"a"),
+        file(&"a".repeat(256), b"a"),
         wrong,
         not_base64,
     ] {
@@ -119,6 +122,13 @@ fn a_file_outside_the_module_or_not_matching_its_digest_is_refused() {
         r.files = vec![bad];
         assert_eq!(check(&[r]), Err(Refusal::BadFile("lake".into())));
     }
+}
+
+#[test]
+fn a_path_is_once_per_role() {
+    let mut r = role("lake");
+    r.files = vec![file("compose.yml", b"a"), file("compose.yml", b"b")];
+    assert_eq!(check(&[r]), Err(Refusal::BadFile("lake".into())));
 }
 
 #[test]

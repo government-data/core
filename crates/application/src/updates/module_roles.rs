@@ -22,8 +22,10 @@ pub(super) const MAX_MODULE_FILES_BYTES: usize = 256 * 1024;
 
 /// The longest name of a role or a service.
 const MAX_NAME: usize = 63;
-/// The longest image reference or file path.
+/// The longest image reference.
 const MAX_REFERENCE: usize = 512;
+/// The longest file path.
+const MAX_PATH: usize = 255;
 
 /// How a role's machines update.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,8 +86,9 @@ pub(super) enum Refusal {
     FilesTooLarge,
 }
 
-/// Check a module's roles: names, services, images and files, and the
-/// module's files within [`MAX_MODULE_FILES_BYTES`].
+/// Check a module's roles: names, services, images and files (each path
+/// once per role), and the module's distinct files (by path) within
+/// [`MAX_MODULE_FILES_BYTES`].
 pub(super) fn check(roles: &[ModuleRole]) -> Result<(), Refusal> {
     if roles.len() > MAX_ROLES {
         return Err(Refusal::TooMany);
@@ -110,9 +113,13 @@ pub(super) fn check(roles: &[ModuleRole]) -> Result<(), Refusal> {
         if !listed_once(&role.images, is_image) {
             return Err(Refusal::BadImages(name.clone()));
         }
+        let mut paths = BTreeSet::new();
         for file in &role.files {
             let size = file_size(file).ok_or_else(|| Refusal::BadFile(name.clone()))?;
-            if files.insert((file.path.as_str(), file.sha256.as_str())) {
+            if !paths.insert(file.path.as_str()) {
+                return Err(Refusal::BadFile(name.clone()));
+            }
+            if files.insert(file.path.as_str()) {
                 bytes += size;
             }
         }
@@ -175,7 +182,7 @@ fn is_image(image: &str) -> bool {
 /// The decoded size of a file whose path is relative and stays in the
 /// module's folder and whose content matches its SHA-256; `None` otherwise.
 fn file_size(file: &RoleFile) -> Option<usize> {
-    let path_ok = file.path.len() <= MAX_REFERENCE
+    let path_ok = file.path.len() <= MAX_PATH
         && file.path.split('/').all(|s| {
             !s.is_empty()
                 && s != "."
