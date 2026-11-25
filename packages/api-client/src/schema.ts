@@ -2795,6 +2795,7 @@ export interface components {
             reads: string[];
             severity: string;
             skips?: string | null;
+            trino?: string | null;
         };
         RulesFileOut: {
             /** @description The codes of its lint errors: none to approve. */
