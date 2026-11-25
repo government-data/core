@@ -51,6 +51,7 @@ pub const FEATURES: &[&str] = &[
     "module-permissions",
     "module-clients",
     "agent-audit",
+    "registry-credentials",
 ];
 
 /// The most `PUT /updater/v1/modules` takes: every module with its roles'

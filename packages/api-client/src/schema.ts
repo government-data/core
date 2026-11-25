@@ -485,6 +485,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/machines/registry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * `GET /internal/machines/registry`: the pull token for a machine of a
+         *     role an installed module declares.
+         */
+        get: operations["registry_handler"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/machines/renew": {
         parameters: {
             query?: never;
@@ -2564,6 +2584,17 @@ export interface components {
         Refusals: {
             errors: components["schemas"]["Refusal"][];
         };
+        /** @description The registry's pull token and the role's images. */
+        RegistryOut: {
+            /** @description RFC 3339. */
+            expires_at: string;
+            /** @description The registry's DNS name. */
+            host: string;
+            /** @description `<host>/<path>@sha256:<64 hex>`, sorted, each once. */
+            images: string[];
+            password: string;
+            username: string;
+        };
         /** @description A machine asks for a new certificate. */
         RenewIn: {
             /**
@@ -4032,6 +4063,47 @@ export interface operations {
                 content?: never;
             };
             /** @description The client certificate header is not trusted */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    registry_handler: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The token and the role's images */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryOut"];
+                };
+            };
+            /** @description No client certificate */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not an approved machine's certificate in use, or no installed module declares its role */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No token held, or it expired: ask again later; or the client certificate header is not trusted */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -26,6 +26,7 @@ mod lake_replication;
 mod lake_sync;
 mod lake_warehouse;
 mod lifecycle;
+mod registry;
 mod renew;
 mod series;
 
@@ -55,6 +56,7 @@ pub use lake_replica::ReplicaState;
 pub use lake_replication::{Lakes, ReplicationReadiness, ReplicationStatus, RECONCILER};
 pub use lake_sync::{ReplicaSync, REPLICATED};
 use lifecycle::done;
+pub use registry::RegistryOutcome;
 pub use renew::{RenewError, Renewed};
 pub use series::MachineMetrics;
 

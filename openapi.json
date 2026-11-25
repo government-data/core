@@ -928,6 +928,36 @@
         }
       }
     },
+    "/internal/machines/registry": {
+      "get": {
+        "tags": [
+          "machines"
+        ],
+        "summary": "`GET /internal/machines/registry`: the pull token for a machine of a\nrole an installed module declares.",
+        "operationId": "registry_handler",
+        "responses": {
+          "200": {
+            "description": "The token and the role's images",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistryOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No client certificate"
+          },
+          "403": {
+            "description": "Not an approved machine's certificate in use, or no installed module declares its role"
+          },
+          "503": {
+            "description": "No token held, or it expired: ask again later; or the client certificate header is not trusted"
+          }
+        }
+      }
+    },
     "/internal/machines/renew": {
       "post": {
         "tags": [
@@ -6413,6 +6443,40 @@
             "items": {
               "$ref": "#/components/schemas/Refusal"
             }
+          }
+        }
+      },
+      "RegistryOut": {
+        "type": "object",
+        "description": "The registry's pull token and the role's images.",
+        "required": [
+          "host",
+          "username",
+          "password",
+          "expires_at",
+          "images"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "description": "RFC 3339."
+          },
+          "host": {
+            "type": "string",
+            "description": "The registry's DNS name."
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`<host>/<path>@sha256:<64 hex>`, sorted, each once."
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
           }
         }
       },
