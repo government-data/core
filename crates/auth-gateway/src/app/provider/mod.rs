@@ -25,6 +25,7 @@ use crate::domain::{
 
 mod client_auth;
 mod code;
+pub mod exchange;
 mod machine;
 mod module_client_requests;
 mod module_clients;
@@ -112,6 +113,10 @@ pub struct TokenRequest {
     /// deployment trusts its header: how a machine role's client
     /// authenticates (RFC 8705 `tls_client_auth`). Ignored by other clients.
     pub client_certificate: Option<MachineCertificate>,
+    /// Token exchange (RFC 8693): the token of the person the new one
+    /// speaks for, and its kind.
+    pub subject_token: Option<String>,
+    pub subject_token_type: Option<String>,
 }
 
 /// A successful `/token`.
@@ -174,6 +179,9 @@ pub struct AuthorizationServer {
     /// Which actions a person holds, for a module client's role claim;
     /// without it, the claim is sent empty.
     actions: Option<Arc<dyn ActionHolder>>,
+    /// Where an exchanged token is recorded before it is given (core
+    /// decision 0089); without it, no token is exchanged.
+    audit: Option<Arc<dyn domain::AuditRepository>>,
 }
 
 impl std::fmt::Debug for AuthorizationServer {
@@ -210,7 +218,14 @@ impl AuthorizationServer {
             policies: None,
             machines: None,
             actions: None,
+            audit: None,
         }
+    }
+
+    /// Record each exchanged token (core decision 0089) in `audit`.
+    pub fn with_audit(mut self, audit: Arc<dyn domain::AuditRepository>) -> Self {
+        self.audit = Some(audit);
+        self
     }
 
     /// Compute the role claims of module clients (quality-sdk decision
@@ -255,7 +270,11 @@ impl AuthorizationServer {
             "userinfo_endpoint": format!("{base}/oauth/userinfo"),
             "jwks_uri": format!("{base}/oauth/jwks"),
             "response_types_supported": ["code"],
-            "grant_types_supported": ["authorization_code", "client_credentials"],
+            "grant_types_supported": [
+                "authorization_code",
+                "client_credentials",
+                exchange::TOKEN_EXCHANGE,
+            ],
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": self.signers.algorithms(),
             "scopes_supported": SCOPES_SUPPORTED,
@@ -410,6 +429,7 @@ impl AuthorizationServer {
         match req.grant_type.as_deref() {
             Some("authorization_code") => self.redeem_code(req).await,
             Some("client_credentials") => self.client_credentials(req).await,
+            Some(exchange::TOKEN_EXCHANGE) => self.exchange(req).await,
             _ => Err(TokenError::UnsupportedGrantType),
         }
     }

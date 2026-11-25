@@ -197,7 +197,10 @@ impl AuthorizationServer {
 /// The audience of a machine token: the one asked for (`resource` or
 /// `audience`, the same if both come), which must be one of the client's, or
 /// else its first.
-fn requested_audience(req: &TokenRequest, client: &OidcClient) -> Result<String, TokenError> {
+pub(super) fn requested_audience(
+    req: &TokenRequest,
+    client: &OidcClient,
+) -> Result<String, TokenError> {
     let resource = req.resource.as_deref().filter(|r| !r.is_empty());
     let audience = req.audience.as_deref().filter(|a| !a.is_empty());
     let asked = match (resource, audience) {
