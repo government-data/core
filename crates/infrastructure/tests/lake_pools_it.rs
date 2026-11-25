@@ -50,18 +50,20 @@ async fn a_pool_is_kept_in_order_and_defined_again_in_place() {
         assert_eq!(store.all().await.unwrap().len(), 1, "one row per pool");
     }
     .await;
-    let three: Result<(i64,), _> = async {
-        sqlx::query_as(
-            "INSERT INTO lake_pools (name, nodes, drives, defined_by, defined_at) \
-             VALUES ('two', ARRAY['a','b','c'], 1, $1::uuid, now()) RETURNING 1::bigint",
-        )
-        .bind(ADMIN)
-        .fetch_one(&pool)
-        .await
-    }
-    .await;
-    assert!(
-        three.is_err(),
-        "fewer than four nodes refused by the table too"
-    );
+    let insert = |name: &'static str, nodes: &'static str| {
+        let pool = pool.clone();
+        async move {
+            let sql = format!(
+                "INSERT INTO lake_pools (name, nodes, drives, defined_by, defined_at) \
+                 VALUES ('{name}', {nodes}, 1, $1::uuid, now()) RETURNING 1::bigint"
+            );
+            let row: Result<(i64,), _> = sqlx::query_as(&sql).bind(ADMIN).fetch_one(&pool).await;
+            row
+        }
+    };
+    let none = insert("two", "ARRAY[]::text[]").await;
+    assert!(none.is_err(), "a pool of no nodes refused by the table too");
+    // A lake may start on one node (decision 0091, point 3).
+    let one = insert("one", "ARRAY['a']").await;
+    assert!(one.is_ok(), "one node kept: {one:?}");
 }

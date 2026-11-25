@@ -34,7 +34,7 @@ pub use directory::{DirectoryAccounts, DirectoryAuthenticator, DirectoryError, D
 pub use lake_admin::{LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept};
 pub use lake_pool::{
     LakePool, LakePoolStore, PoolLayout, PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES,
-    MIN_POOL_NODES, REPLICATION_ALIAS, RUSTFS_PEER_PORT,
+    MIN_POOL_DRIVES, MIN_POOL_NODES, REPLICATION_ALIAS, RUSTFS_PEER_PORT,
 };
 pub use lake_replication::{
     ReplicationOutcome, ReplicationStateStore, ReplicationStep, WarehouseState, Warehouses,

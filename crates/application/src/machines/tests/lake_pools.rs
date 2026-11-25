@@ -67,10 +67,8 @@ async fn main_is_defined_before_any_node_and_again_until_one_joins() {
     let s = &w.service;
     let (by, from) = (admin(), origin());
     assert_eq!(s.lake_pools().await, Ok(vec![]));
-    let three = s
-        .define_pool("main", &nodes(&FOUR[..3]), 1, &by, &from)
-        .await;
-    assert_eq!(three, Err(PoolError::Layout(PoolRefusal::TooFewNodes)));
+    let none = s.define_pool("main", &nodes(&[]), 1, &by, &from).await;
+    assert_eq!(none, Err(PoolError::Layout(PoolRefusal::TooFewNodes)));
     let second = s.define_pool("more", &nodes(&FOUR), 1, &by, &from).await;
     assert_eq!(second, Err(PoolError::NotMain));
     assert!(w.actions().is_empty(), "nothing audited for a refusal");

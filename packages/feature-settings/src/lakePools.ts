@@ -39,6 +39,15 @@ export async function defineMainPool(
   return api.definePool(MAIN_POOL, parseNodes(nodesText), drives);
 }
 
+/**
+ * Whether a lake of `nodes` servers with `drives` each grows only by a
+ * copy into a new lake (decision 0091, point 3): one server with one drive
+ * takes neither more drives nor a pool.
+ */
+export function growsOnlyByCopy(nodes: number, drives: number): boolean {
+  return nodes === 1 && drives === 1;
+}
+
 /** One node's line: whether it joined, and in what state. */
 export function nodeState(state: string | null | undefined): string {
   return state
