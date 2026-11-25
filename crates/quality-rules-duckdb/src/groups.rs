@@ -58,10 +58,10 @@ impl Runner {
         let mut out = Vec::new();
         for (j, name) in names.enumerate().take(n) {
             let sql = format!(
-                "SELECT \"__g{j}\", count(*), count(*) FILTER (WHERE \"__serious\"),
+                "SELECT \"__g{j}\" AS g, count(*) AS n, count(*) FILTER (WHERE \"__serious\"),
                         avg(\"__icd\")
-                   FROM \"__icd\" GROUP BY 1
-                  ORDER BY 2 DESC, 1 NULLS LAST LIMIT {MOST_GROUPS}"
+                   FROM \"__icd\" GROUP BY \"__g{j}\"
+                  ORDER BY n DESC NULLS LAST, g ASC NULLS LAST LIMIT {MOST_GROUPS}"
             );
             let mut stmt = self.con.prepare(&sql)?;
             let rows = stmt.query_map([], |r| {

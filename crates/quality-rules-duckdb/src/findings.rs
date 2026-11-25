@@ -164,8 +164,8 @@ impl Runner {
         }
         if each.is_empty() {
             each.push(
-                "SELECT NULL::VARCHAR AS record, NULL::VARCHAR AS rule, NULL::DOUBLE AS priority \
-                 WHERE FALSE"
+                "SELECT CAST(NULL AS VARCHAR) AS record, CAST(NULL AS VARCHAR) AS rule, \
+                 CAST(NULL AS DOUBLE) AS priority WHERE FALSE"
                     .into(),
             );
         }
@@ -185,8 +185,8 @@ impl Runner {
             each.join(" UNION ALL ")
         ))?;
         let mut groups = vec![
-            "SELECT NULL::VARCHAR AS record, NULL::VARCHAR AS dimension, \
-                               NULL::VARCHAR AS grp WHERE FALSE"
+            "SELECT CAST(NULL AS VARCHAR) AS record, CAST(NULL AS VARCHAR) AS dimension, \
+             CAST(NULL AS VARCHAR) AS grp WHERE FALSE"
                 .to_string(),
         ];
         for (j, name) in dimensions(mapping).enumerate() {
@@ -223,7 +223,7 @@ impl Runner {
                    FROM {} p JOIN {} g USING (record)
                   WHERE g.dimension IN ({}) AND NOT EXISTS
                         (SELECT 1 FROM \"__findings\" f WHERE f.record = p.record AND f.rule = p.rule)
-                  GROUP BY ALL",
+                  GROUP BY g.dimension, g.grp, p.since",
                 p.findings,
                 p.groups,
                 names.join(", ")
@@ -234,18 +234,19 @@ impl Runner {
             "WITH u (dimension, grp, since, open, resolved, priority) AS (
                  SELECT g.dimension, g.grp, f.since, count(*), 0, sum(f.priority)
                    FROM \"__findings\" f JOIN \"__finding_groups\" g USING (record)
-                  GROUP BY ALL
+                  GROUP BY g.dimension, g.grp, f.since
                  {gone}),
                   q AS (SELECT dimension, grp, since, sum(open) AS open,
                                sum(resolved) AS resolved, sum(priority) AS priority
-                          FROM u GROUP BY ALL),
+                          FROM u GROUP BY dimension, grp, since),
                   t AS (SELECT *, sum(open) OVER (PARTITION BY dimension, grp) AS total FROM q),
                   r AS (SELECT *, dense_rank() OVER (PARTITION BY dimension
-                                   ORDER BY total DESC, grp NULLS LAST) AS n
+                                   ORDER BY total DESC NULLS LAST, grp ASC NULLS LAST) AS n
                           FROM t)
-             SELECT dimension, grp, CAST(since AS VARCHAR), open::BIGINT, resolved::BIGINT,
-                    priority::DOUBLE
-               FROM r WHERE n <= {MOST_QUEUES} ORDER BY dimension, n, since"
+             SELECT dimension, grp, CAST(since AS VARCHAR), CAST(open AS BIGINT),
+                    CAST(resolved AS BIGINT), CAST(priority AS DOUBLE)
+               FROM r WHERE n <= {MOST_QUEUES}
+              ORDER BY dimension ASC NULLS LAST, n ASC NULLS LAST, since ASC NULLS LAST"
         );
         let mut stmt = self.con.prepare(&sql)?;
         let rows = stmt.query_map([], |r| {
