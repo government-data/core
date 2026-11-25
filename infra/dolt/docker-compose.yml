@@ -12,9 +12,13 @@
 #   infra/dolt/tenant.sh add <id>   the catalog database, granted to qd_app
 #   infra/dolt/backup.sh            Dolt backups, then copied to the lake
 #
-# Required environment (in the repo `.env`):
+# Required environment (in the repo `.env`; compose.dev.yml requires them):
 #   DOLT_ROOT_PASSWORD   root, used only from inside the container
 #   DOLT_APP_PASSWORD    the application's user, `qd_app`
+# or, with certificate.yml (the core's package, decision 0080), the files
+# DOLT_ROOT_PASSWORD_FILE and DOLT_APP_PASSWORD_FILE, which
+# tls/entrypoint.sh reads. The image is IMAGE_DOLT in an installation (the
+# signed index's digest), DOLT_IMAGE or the default otherwise.
 # For the copy of the backups to the lake (infra/dolt/lake-backup-user.sh):
 #   DOLT_BACKUP_S3_ACCESS_KEY, DOLT_BACKUP_S3_SECRET_KEY
 name: data-quality-dolt # `-p` in the tasks: .env sets COMPOSE_PROJECT_NAME for the app
@@ -28,13 +32,13 @@ volumes:
 
 services:
   dolt:
-    image: ${DOLT_IMAGE:-dolthub/dolt-sql-server:2.6.1}
+    image: ${IMAGE_DOLT:-${DOLT_IMAGE:-dolthub/dolt-sql-server:2.6.1}}
     restart: unless-stopped
     environment:
-      DOLT_ROOT_PASSWORD: ${DOLT_ROOT_PASSWORD:?set DOLT_ROOT_PASSWORD in .env}
+      DOLT_ROOT_PASSWORD: ${DOLT_ROOT_PASSWORD:-}
       DOLT_ROOT_HOST: localhost
       DOLT_APP_USER: qd_app
-      DOLT_APP_PASSWORD: ${DOLT_APP_PASSWORD:?set DOLT_APP_PASSWORD in .env}
+      DOLT_APP_PASSWORD: ${DOLT_APP_PASSWORD:-}
       # Read by config.yaml.
       DOLT_LOG_LEVEL: ${DOLT_LOG_LEVEL:-warning}
       DOLT_MAX_CONNECTIONS: ${DOLT_MAX_CONNECTIONS:-200}
