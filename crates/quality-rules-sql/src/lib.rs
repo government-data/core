@@ -81,3 +81,24 @@ pub fn quote_text(text: &str) -> Result<String, Error> {
     }
     Ok(format!("'{}'", text.replace('\'', "''")))
 }
+
+/// A numeric constant of the engine's arithmetic as a `DOUBLE` literal
+/// (decision 0090, point 8.1), the same text on every engine, so no
+/// decimal arithmetic enters what it computes. `x` is finite.
+pub fn double(x: f64) -> String {
+    debug_assert!(x.is_finite(), "a constant is finite");
+    format!("DOUBLE '{x}'")
+}
+
+#[cfg(test)]
+mod double_tests {
+    use super::double;
+
+    #[test]
+    fn a_constant_is_a_double_literal_of_its_shortest_text() {
+        assert_eq!(double(0.4), "DOUBLE '0.4'");
+        assert_eq!(double(365.0), "DOUBLE '365'");
+        assert_eq!(double(-3.5), "DOUBLE '-3.5'");
+        assert_eq!(double(0.6745), "DOUBLE '0.6745'");
+    }
+}
