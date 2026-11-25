@@ -42,6 +42,13 @@
 //! connection and releases the hold. Its failures are logged and never
 //! stop the agent.
 //!
+//! With `QD_REGISTRY_PULL=on`, on a cluster's machine, it asks the API for
+//! the registry token and its role's images (quality-sdk decision 0013)
+//! once it has a certificate, then every 6 hours, or 10 minutes after the
+//! API held no token or a pull failed; it logs in with a fresh 0700
+//! configuration directory inside `QD_AGENT_DIR`, pulls each image by
+//! digest and removes the directory. The password is never logged.
+//!
 //! Its lines are every service's (decision 0026, `logging`): flat JSON with
 //! `service` `node-agent` and `vm` from `OBS_VM`, filtered by `RUST_LOG`
 //! (`info`), `LOG_FORMAT=pretty` for text. Its metrics file (decision 0071)
@@ -60,6 +67,7 @@ use node_agent::dolt::{Followed, Follower, TcpProbe};
 use node_agent::http::{DoltApi, HttpApi};
 use node_agent::metrics::NodeMetrics;
 use node_agent::ports::{Processes, SystemClock};
+use node_agent::registry::Pulled;
 use node_agent::store::FileStore;
 
 #[tokio::main]
@@ -91,6 +99,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         let api = HttpApi::new("", &settings.internal_url, None);
         tokio::spawn(follow_dolt(dolt, store, api));
     }
+    if std::env::var("QD_REGISTRY_PULL").is_ok_and(|v| v == "on") {
+        let store = FileStore::open(&settings.dir)
+            .map_err(|e| format!("QD_AGENT_DIR {}: {e}", settings.dir.display()))?;
+        let api = HttpApi::new("", &settings.internal_url, None);
+        tokio::spawn(pull_images(store, api));
+    }
     let public_url = settings.public_url.clone().unwrap_or_default();
     let api = HttpApi::new(&public_url, &settings.internal_url, join_ca);
     tracing::info!(mode = ?settings.mode, every = ?settings.renew_every, "qd-node started");
@@ -98,6 +112,23 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let agent =
         Agent::new(settings, store, api, SystemClock, Processes::default()).with_renewals(metrics);
     Err(agent.run().await.into())
+}
+
+/// The role's images, pulled with the registry token, for as long as the
+/// agent runs.
+async fn pull_images(store: FileStore, api: HttpApi) {
+    let docker = node_agent::registry::DockerCli::default();
+    loop {
+        let pulled = node_agent::registry::pull_role(&store, &api, &docker).await;
+        match &pulled {
+            Pulled::All(n) => tracing::info!(images = n, "the role's images are pulled"),
+            Pulled::NotForRole => {
+                tracing::info!("no installed module declares this machine's role")
+            }
+            Pulled::Retry(why) => tracing::warn!("the role's images, again later: {why}"),
+        }
+        tokio::time::sleep(pulled.next_in()).await;
+    }
 }
 
 /// Dolt's follower, every `QD_HELD_ASK_EVERY`, for as long as the agent runs.
