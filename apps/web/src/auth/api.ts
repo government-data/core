@@ -56,28 +56,13 @@ export function logout(): Promise<unknown> {
   return api.POST("/auth/logout", { headers: csrfHeader() });
 }
 
-/**
- * The common account this installation signs in with (`https://cuenta.…`),
- * else `null`: «Sign out» goes through its /signout, and the menu offers
- * switching applications there.
- */
-export async function accountUrl(): Promise<string | null> {
-  const r = await fetch("/api/settings/account", { credentials: "same-origin" });
-  if (!r.ok) return null;
-  const { url } = (await r.json()) as { url: string | null };
-  return url;
-}
-
-/**
- * A place the common account lets this person go (`current`: this one). The
- * names come in Spanish; `kind` lets the menu translate the platform panel.
- */
+/** A place this person can go from the menu (`current`: this one). */
 export interface AccountApp {
   /**
    * `app`: one that signs in with this installation (RustFS…); `module`: an
    * installed module's page on this site (the user guide…), `url` a path.
    */
-  kind?: "management" | "instance" | "app" | "module";
+  kind?: "app" | "module";
   /** Of an `app`: its client id, for its page (`/apps/<id>`). */
   id?: string;
   name: string;
@@ -88,11 +73,7 @@ export interface AccountApp {
   current?: boolean;
 }
 
-/**
- * Where else this person can go: this installation's applications (RustFS…)
- * and, by the common account, the platform panel and their company's
- * instances.
- */
+/** Where else this person can go: this installation's applications (RustFS…) and modules. */
 export async function accountApps(): Promise<AccountApp[]> {
   const r = await fetch("/api/settings/account/apps", { credentials: "same-origin" });
   if (!r.ok) throw new Error(String(r.status));

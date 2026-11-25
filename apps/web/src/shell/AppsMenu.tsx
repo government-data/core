@@ -1,33 +1,13 @@
 import { For, Show } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { lang, t } from "@knime-orchestador/i18n";
+import { t } from "@knime-orchestador/i18n";
 import type { AccountApp } from "../auth/api";
-import { MenuIcon } from "./MenuIcon";
 
 /**
- * An account application in the interface language: the account sends the
- * names in Spanish, with their `kind`.
- */
-function inLang(app: AccountApp): AccountApp {
-  switch (app.kind) {
-    case "management":
-      return {
-        ...app,
-        name: t("web:shell.app.gestion"),
-        detail: t("web:shell.app.gestionDetail"),
-      };
-    default:
-      return app;
-  }
-}
-
-/**
- * In the profile menu (with the account, without other applications, it
- * offers its own list), where else to go: this installation's applications
- * (RustFS…) and the account's; without them, the account's own chooser.
+ * In the profile menu, where else to go: this installation's applications
+ * (RustFS…) and its modules' pages.
  */
 export function AppsMenu(props: {
-  account: string | null | undefined;
   /** The other applications; `null` when they did not answer. */
   apps: AccountApp[] | null | undefined;
   onClose: () => void;
@@ -39,7 +19,7 @@ export function AppsMenu(props: {
     props.apps?.filter((a) => !(a.kind === "app" && a.id && location.pathname === `/apps/${a.id}`));
   // Inside one, Quality Data is one more to go to (the way back).
   const inApp = () => location.pathname.startsWith("/apps/");
-  const hasApps = () => inApp() || !!props.account || (shownApps()?.length ?? 0) > 0;
+  const hasApps = () => inApp() || (shownApps()?.length ?? 0) > 0;
   return (
     <Show when={hasApps()}>
       <>
@@ -62,34 +42,17 @@ export function AppsMenu(props: {
               </span>
             </A>
           </Show>
-          <Show
-            when={shownApps()?.length ? shownApps() : undefined}
-            fallback={
-              <Show when={props.account}>
-                <a
-                  class="profile-menu__item"
-                  role="menuitem"
-                  href={`${props.account}/home?choose&lang=${lang()}`}
-                  onClick={(e) => props.onLeave(e, t("web:shell.openingAccount"))}
-                >
-                  <span class="profile-menu__icon">
-                    <MenuIcon name="switch" />
-                  </span>
-                  <span>{t("web:shell.switchApp")}</span>
-                </a>
-              </Show>
-            }
-          >
+          <Show when={shownApps()?.length ? shownApps() : undefined}>
             {(list) => (
-              <For each={list().map(inLang)}>
+              <For each={list()}>
                 {(app) => (
                   <a
                     class="profile-menu__item profile-menu__app"
                     classList={{ "profile-menu__app--current": app.current }}
                     role="menuitem"
                     // This installation's (RustFS…) open inside the app;
-                    // a module's page (the user guide…) in this tab, and
-                    // the account's are other sites: both a full load.
+                    // a module's page (the user guide…) in this tab: a full
+                    // load.
                     href={app.kind === "app" && app.id ? `/apps/${app.id}` : app.url}
                     rel={app.kind === "app" ? undefined : "external"}
                     aria-current={app.current ? "page" : undefined}
