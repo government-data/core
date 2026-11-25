@@ -21,9 +21,9 @@ fn normalized<'a>(
             .is_some_and(|f| f.value.semantic == Some(Semantic::Document));
         let v = format!("CAST({} AS VARCHAR)", quoted(name)?);
         parts.push(if document {
-            format!("NULLIF(ltrim(regexp_replace({v}, '[^0-9]', '', 'g'), '0'), '')")
+            format!("NULLIF(trim(LEADING '0' FROM regexp_replace({v}, '[^0-9]', '', 'g')), '')")
         } else {
-            format!("NULLIF(upper(trim({v})), '')")
+            format!("NULLIF(upper(trim(BOTH ' ' FROM {v})), '')")
         });
     }
     Ok((!parts.is_empty()).then(|| parts.join(" || '|' || ")))
