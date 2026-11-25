@@ -52,9 +52,10 @@ data:
       critical: true
 
 # Dolt's root and application user's passwords (decision 0080's
-# amendment): made by the update agent when missing, before the start (an
-# installation from before Dolt), owned by the API's user, which reads the
-# application's; Dolt runs as root. Backed up as critical keys.
+# amendment), the lake's STS issuer's keys and the OIDC signing keys: made
+# by the update agent when missing, before the start (an installation from
+# before them), owned by the API's user, which reads them; Dolt runs as
+# root. Backed up as critical keys.
 secrets:
   uid: 65532
   generate:
@@ -65,6 +66,13 @@ secrets:
     - name: rustfs-sts-issuer-access-key
       bytes: 16
     - name: rustfs-sts-issuer-secret-key
+    # The OIDC provider's signing keys (quality-sdk decision 0012, ruling
+    # 7): PKCS#8 in base64, as `server oidc-keygen` prints them. Made once
+    # and kept; a key kind needs agent 0.4.0.
+    - name: oidc-signing-key
+      kind: ed25519
+    - name: oidc-signing-key-es256
+      kind: p256
 
 # No `drain`: the core counts its own work (it is not one of the modules it
 # asks).

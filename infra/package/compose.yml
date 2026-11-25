@@ -39,6 +39,11 @@
 #   secrets/rustfs-sts-issuer-access-key, secrets/rustfs-sts-issuer-secret-key
 #              the lake's STS issuer's keys (decision 0091, point 4), made
 #              the same way, critical keys; the API reads them as files
+#   secrets/oidc-signing-key, secrets/oidc-signing-key-es256
+#              the OIDC provider's Ed25519 and ES256 signing keys
+#              (quality-sdk decision 0012), PKCS#8 in base64, made the same
+#              way. Only the files reach the API: an OIDC_SIGNING_KEY in
+#              the .env is not passed, so the file wins
 #
 # The lake (decision 0091, point 4): the API reaches it at LAKE_ENDPOINT
 # and its admin adapter at LAKE_ADMIN_URL, both from the .env and empty
@@ -113,6 +118,10 @@ secrets:
     file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/rustfs-sts-issuer-access-key
   rustfs_sts_issuer_secret_key:
     file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/rustfs-sts-issuer-secret-key
+  oidc_signing_key:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/oidc-signing-key
+  oidc_signing_key_es256:
+    file: ${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/secrets/oidc-signing-key-es256
 
 services:
   traefik:
@@ -181,11 +190,18 @@ services:
       RUSTFS_STS_ISSUER_ACCESS_KEY_FILE: /run/secrets/rustfs_sts_issuer_access_key
       RUSTFS_STS_ISSUER_SECRET_KEY: ""
       RUSTFS_STS_ISSUER_SECRET_KEY_FILE: /run/secrets/rustfs_sts_issuer_secret_key
+      # The OIDC provider's signing keys (see above), from their files.
+      OIDC_SIGNING_KEY: ""
+      OIDC_SIGNING_KEY_FILE: /run/secrets/oidc_signing_key
+      OIDC_SIGNING_KEY_ES256: ""
+      OIDC_SIGNING_KEY_ES256_FILE: /run/secrets/oidc_signing_key_es256
     secrets:
       - database_url
       - dolt_app_password
       - rustfs_sts_issuer_access_key
       - rustfs_sts_issuer_secret_key
+      - oidc_signing_key
+      - oidc_signing_key_es256
     volumes:
       - "${QD_MODULE_DIR:?set QD_MODULE_DIR to the module's directory}/ca:/run/qd-ca:ro"
       # The application machine's certificate, presented to Dolt.
