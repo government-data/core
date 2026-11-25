@@ -3237,6 +3237,7 @@ dependencies = [
  "quality-rules-compile",
  "quality-rules-model",
  "quality-rules-sql",
+ "quality-rules-tree",
 ]
 
 [[package]]
