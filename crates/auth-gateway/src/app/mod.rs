@@ -29,6 +29,7 @@ pub use password_reset::{
 pub use provider::{
     AuthorizationServer, AuthorizeOutcome, AuthorizeRequest, ClientChange, ModuleClients,
     ModuleClientsError, ModuleClientsRequest, TokenError, TokenRequest, TokenResponse,
+    TRINO_AUDIENCE,
 };
 pub use session::{AuthenticatedSession, IssuedSession, SessionError, SessionService};
 pub use users::{CreatedUser, NewUser, UserChanges, UsersError, UsersService, ASSIGNABLE_ROLES};

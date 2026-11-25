@@ -13,7 +13,7 @@ fn confidential() -> ClientAuth {
 }
 
 /// Signs as `alg:typ|claims`: a second key, told apart from [`PlainSigner`].
-struct TaggedSigner(&'static str);
+pub(super) struct TaggedSigner(pub(super) &'static str);
 impl TokenSigner for TaggedSigner {
     fn sign(&self, typ: &str, claims: &str) -> String {
         format!("{}:{typ}|{claims}", self.0)

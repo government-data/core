@@ -8,6 +8,7 @@
 
 pub mod auth;
 pub mod directory;
+pub mod job_subject;
 pub mod lake_admin;
 pub mod lake_pool;
 pub mod lake_replication;
@@ -31,6 +32,7 @@ pub use auth::{
     PasswordPolicyError, PasswordRequirement, ProfilePicture,
 };
 pub use directory::{DirectoryAccounts, DirectoryAuthenticator, DirectoryError, DirectoryUser};
+pub use job_subject::{InvalidJobSubject, JobSubject, JobUserKind};
 pub use lake_admin::{LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept};
 pub use lake_pool::{
     LakePool, LakePoolStore, PoolLayout, PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES,

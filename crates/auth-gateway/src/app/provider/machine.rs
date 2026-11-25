@@ -13,10 +13,13 @@ use serde_json::{json, Map, Value};
 use super::{
     epoch, AuthorizationServer, TokenError, TokenRequest, TokenResponse, MACHINE_CERT_TOKEN_TTL,
 };
-use crate::domain::{ClientAuth, ClientId, Machine, OidcClient};
+use crate::domain::{ClientAuth, ClientId, JobSubject, Machine, OidcClient};
 
 /// How long a job's token lasts (decision 0062): as a job's lake
 /// credentials (0030), whatever a client's lifetime is.
+/// The audience of jobs' Trino tokens (decision 0090, point 7.1).
+pub const TRINO_AUDIENCE: &str = "trino";
+
 const JOB_TOKEN_TTL: Duration = Duration::from_secs(15 * 60);
 
 impl AuthorizationServer {
@@ -79,6 +82,40 @@ impl AuthorizationServer {
         });
         Ok(TokenResponse {
             access_token: signer.sign("at+jwt", &claims.to_string()),
+            id_token: None,
+            expires_in: JOB_TOKEN_TTL.as_secs(),
+            scope: String::new(),
+        })
+    }
+
+    /// A job's Trino token (decision 0090, point 7.1): `sub` its
+    /// [`JobSubject`], one Trino user per kind and dataset, `aud` `trino`,
+    /// `act` the job runner's machine client, 15 minutes, always ES256.
+    /// `client_id` is the installation's own machine client allowed
+    /// `trino`. The caller records it before giving it (decision 0030,
+    /// point 3); `None` without an ES256 key.
+    pub async fn trino_job_token(
+        &self,
+        client_id: &str,
+        subject: &JobSubject,
+        actor: &str,
+    ) -> Result<TokenResponse, TokenError> {
+        self.own_client(client_id, TRINO_AUDIENCE).await?;
+        let now = self.clock.now();
+        let claims = json!({
+            "iss": self.issuer,
+            "sub": subject.to_string(),
+            "aud": TRINO_AUDIENCE,
+            "act": { "sub": actor },
+            "iat": epoch(now),
+            "exp": epoch(now + JOB_TOKEN_TTL),
+            "jti": self.code_tokens.generate(),
+        });
+        let access_token = self
+            .sign_es256("at+jwt", &claims.to_string())
+            .ok_or_else(|| TokenError::Internal("no ES256 key".into()))?;
+        Ok(TokenResponse {
+            access_token,
             id_token: None,
             expires_in: JOB_TOKEN_TTL.as_secs(),
             scope: String::new(),
