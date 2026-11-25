@@ -13,49 +13,91 @@ use sha2::{Digest, Sha256};
 pub const BUNDLE_TYP: &str = "qd-bundle+jwt";
 
 /// What a statement's answer must look like (point 7.3); anything else
-/// fails the job and its data is discarded.
+/// fails the job and its data is discarded. The wire shape is the one
+/// `engine-trino`'s job runner proposed and the user accepted (2026-11-25).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Expect {
-    /// An `INSERT` or `DELETE`: one `bigint` row, the rows written.
-    Write,
-    /// One row of `bigint` counts, `columns` of them.
-    Counts { columns: u32 },
-    /// Rows of these columns, at most `max` (samples and pages, point 7.4;
+    /// A write: one of these update types (`INSERT`, `DELETE`) with one
+    /// `bigint` row, the rows written.
+    Count { update_types: Vec<String> },
+    /// A read: exactly these columns, as `(name, Trino type)`, at most
+    /// `max_rows` rows (counts read back, samples and pages, point 7.4;
     /// snapshot ids from `$snapshots`).
-    Rows { columns: Vec<String>, max: u32 },
+    Rows {
+        columns: Vec<(String, String)>,
+        max_rows: u64,
+    },
     /// A statement that answers nothing but success (`CREATE`, `ALTER`).
     Done,
 }
 
-/// One statement of a bundle.
+impl Expect {
+    /// An `INSERT`'s count.
+    pub fn insert() -> Self {
+        Self::Count {
+            update_types: vec!["INSERT".into()],
+        }
+    }
+
+    /// A `DELETE`'s count.
+    pub fn delete() -> Self {
+        Self::Count {
+            update_types: vec!["DELETE".into()],
+        }
+    }
+}
+
+/// Who a statement runs as: the job's own user, or its dataset's report
+/// user, which reads gold only (point 7.3).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunAs {
+    #[default]
+    Job,
+    Report,
+}
+
+/// One statement of a bundle. Its SQL is complete: nothing is bound to it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BundleStatement {
-    /// Its id within the job, as the job runner reports it.
+    /// Its id within the job (`[a-z0-9_]`, at most 64), as the job runner
+    /// reports it.
     pub id: String,
     pub sql: String,
-    /// How many times the cut is bound to it, in order.
-    #[serde(default)]
-    pub cut_params: u32,
     pub expects: Expect,
+    #[serde(default)]
+    pub run_as: RunAs,
+    /// Whether it reads the source, and so takes the source's secrets as
+    /// extra credentials (point 7.5).
+    #[serde(default)]
+    pub reads_source: bool,
 }
 
 /// The job contract (point 2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Bundle {
     pub job_id: String,
     pub kind: String,
-    pub dataset: String,
-    #[serde(default)]
+    pub dataset: Option<String>,
     pub cut: Option<String>,
     pub attempt: u32,
-    #[serde(default)]
     pub run_id: Option<String>,
-    #[serde(default)]
-    pub run_seq: Option<i64>,
-    pub catalog_commit: String,
-    pub compiler: String,
+    pub run_seq: Option<u64>,
+    pub catalog_commit: Option<String>,
+    pub compiler_version: String,
     pub statements: Vec<BundleStatement>,
+}
+
+/// Whether `id` is a statement id the job runner accepts.
+pub fn is_statement_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
 impl Bundle {
@@ -68,6 +110,17 @@ impl Bundle {
     /// SHA-256 of the canonical JSON.
     pub fn digest(&self) -> String {
         format!("{:x}", Sha256::digest(self.canonical().as_bytes()))
+    }
+
+    /// Whether the job runner will take it: statements, each with a well
+    /// formed id used once.
+    pub fn well_formed(&self) -> bool {
+        let mut ids = std::collections::BTreeSet::new();
+        !self.statements.is_empty()
+            && self
+                .statements
+                .iter()
+                .all(|s| is_statement_id(&s.id) && ids.insert(s.id.as_str()))
     }
 }
 
@@ -107,7 +160,7 @@ pub fn verify(
         .verify(BUNDLE_TYP, token)
         .ok_or(BundleError::Signature)?;
     let bundle: Bundle = serde_json::from_str(&claims).map_err(|_| BundleError::Shape)?;
-    if bundle.job_id != job_id || bundle.digest() != digest {
+    if bundle.job_id != job_id || bundle.digest() != digest || !bundle.well_formed() {
         return Err(BundleError::NotThisJob);
     }
     Ok(bundle)
@@ -149,18 +202,19 @@ mod tests {
         Bundle {
             job_id: "0b9c6a1e-0000-4000-8000-000000000001".into(),
             kind: "evaluate".into(),
-            dataset: "loans".into(),
+            dataset: Some("loans".into()),
             cut: Some("2026-10-31".into()),
             attempt: 1,
             run_id: Some("r-1".into()),
             run_seq: Some(7),
-            catalog_commit: "c0ffee".into(),
-            compiler: "quality-rules 0.1.0".into(),
+            catalog_commit: Some("c0ffee".into()),
+            compiler_version: "quality-rules 0.1.0".into(),
             statements: vec![BundleStatement {
                 id: "rules".into(),
                 sql: "INSERT INTO t SELECT 1".into(),
-                cut_params: 1,
-                expects: Expect::Write,
+                expects: Expect::insert(),
+                run_as: RunAs::Job,
+                reads_source: false,
             }],
         }
     }
@@ -172,8 +226,18 @@ mod tests {
         let token = sign(&key, &b);
         assert_eq!(verify(&key, &token, &b.job_id, &b.digest()), Ok(b.clone()));
         assert_eq!(b.digest().len(), 64);
+        let rows = Expect::Rows {
+            columns: vec![("n".into(), "bigint".into())],
+            max_rows: 1,
+        };
+        assert_eq!(
+            serde_json::to_string(&rows).unwrap(),
+            "{\"kind\":\"rows\",\"columns\":[[\"n\",\"bigint\"]],\"max_rows\":1}"
+        );
         assert!(b.canonical().starts_with("{\"job_id\":"));
-        assert!(b.canonical().contains("\"expects\":{\"kind\":\"write\"}"));
+        assert!(b.canonical().contains(
+            "\"expects\":{\"kind\":\"count\",\"update_types\":[\"INSERT\"]},\"run_as\":\"job\""
+        ));
     }
 
     #[test]
@@ -206,6 +270,14 @@ mod tests {
         assert_eq!(
             verify(&key, &other, &b.job_id, &b.digest()),
             Err(BundleError::Signature)
+        );
+        let mut repeated = b.clone();
+        repeated.statements.push(b.statements[0].clone());
+        let token = sign(&key, &repeated);
+        assert_eq!(
+            verify(&key, &token, &b.job_id, &repeated.digest()),
+            Err(BundleError::NotThisJob),
+            "a repeated statement id"
         );
         let not_a_bundle = key.sign(BUNDLE_TYP, "{\"sub\":\"x\"}");
         assert_eq!(
