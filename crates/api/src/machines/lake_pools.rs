@@ -9,7 +9,7 @@
 //! | `PUT /lake/pools/{name}`  | defines the pool (`main`) before any node     |
 
 use application::{MachinesError, MachinesService, PoolError, PoolNodes};
-use auth_gateway::{PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES, MIN_POOL_NODES};
+use auth_gateway::{PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES, MIN_POOL_DRIVES, MIN_POOL_NODES};
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -156,6 +156,10 @@ fn error(e: PoolError) -> Response {
         PoolError::Layout(PoolRefusal::Drives) => invalid(
             "drives",
             texts::tr!("api.machines.poolDrives", max = MAX_POOL_DRIVES),
+        ),
+        PoolError::Layout(PoolRefusal::TooFewDrives) => invalid(
+            "drives",
+            texts::tr!("api.machines.poolTooFewDrives", min = MIN_POOL_DRIVES),
         ),
         PoolError::Joined => {
             ApiError::conflict("pool_joined", texts::tr!("api.machines.poolJoined")).into_response()

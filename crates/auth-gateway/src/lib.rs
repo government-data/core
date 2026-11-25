@@ -56,7 +56,7 @@ pub use self::domain::{
 pub use self::domain::{LakeAdminKeyStore, LakeAdminKeys, LakeAdminKeysKept};
 pub use self::domain::{
     LakePool, LakePoolStore, PoolLayout, PoolRefusal, MAX_POOL_DRIVES, MAX_POOL_NODES,
-    MIN_POOL_NODES, REPLICATION_ALIAS, RUSTFS_PEER_PORT,
+    MIN_POOL_DRIVES, MIN_POOL_NODES, REPLICATION_ALIAS, RUSTFS_PEER_PORT,
 };
 pub use self::domain::{
     Line, MachineCharts, MachineSeries, SeriesRange, SeriesUnavailable, SeriesWindow,

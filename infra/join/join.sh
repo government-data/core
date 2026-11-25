@@ -21,8 +21,8 @@
 # What it does, in this order, and nothing before its checks pass:
 #   1. checks what it needs: root, curl, sha256sum, base64, Docker and its
 #      compose plugin; for a lake role, its drives (each a directory where a
-#      filesystem of its own is mounted, none the same, empty unless this
-#      server's from a run before) and that the clock is in sync, which
+#      filesystem of its own is mounted, none the same nor on the same
+#      disk, as RustFS refuses, empty unless this server's from a run before) and that the clock is in sync, which
 #      stops it if not (for the worker, a warning);
 #   2. downloads the installation's CA and checks its SHA-256 (of its DER)
 #      against --ca-sha256: another CA stops it before the token is sent;
@@ -35,8 +35,9 @@
 #      root keys too, made by the installation (never printed): a refused
 #      token (401) stops it; for a pool's node, the pool's layout
 #      (pool.env), which must name this server and as many drives as given,
-#      and every other node's name (and the replica's, when known) must
-#      resolve here to an IPv4 address of another server (DNS), or it stops;
+#      and, in a pool of more than one node, every other node's name (and
+#      the replica's, when known) must resolve here to an IPv4 address of
+#      another server (DNS), or it stops;
 #   4. writes them into QD_JOIN_DIR (default /opt/qd/<role>): compose.yml,
 #      the role's entrypoints (0755) and Alloy configuration (0644), ca.crt,
 #      .env (the agent's settings, OBS_VM and METRICS_PUSH_URL for Alloy,
@@ -225,11 +226,32 @@ empty() {
     [ "$e" = "$1/lost+found" ] || return 1
   done
 }
+# disks_of DEV: the disks DEV (as `stat -c %d` gives it) is on, by sysfs:
+# a partition's disk, or each of a mapped device's (LVM); DEV itself when
+# sysfs does not name it. RustFS refuses two drives of one disk on a node
+# (decision 0091, V1).
+disks_of() {
+  dk_mm="$((($1 >> 8) & 0xfff)):$((($1 & 0xff) | (($1 >> 12) & 0xfff00)))"
+  dk_sys=$(readlink -f "/sys/dev/block/$dk_mm" 2>/dev/null || true)
+  if [ -z "$dk_sys" ] || [ ! -d "$dk_sys" ]; then
+    echo "dev-$dk_mm"
+    return
+  fi
+  set -- "$dk_sys"
+  if [ -d "$dk_sys/slaves" ] && [ -n "$(ls "$dk_sys/slaves")" ]; then
+    set --
+    for dk_s in "$dk_sys"/slaves/*; do set -- "$@" "$(readlink -f "$dk_s")"; done
+  fi
+  for dk_s; do
+    [ ! -f "$dk_s/partition" ] || dk_s=${dk_s%/*}
+    echo "${dk_s##*/}"
+  done
+}
 # A lake's drives: this server's from a run before may hold RustFS's data.
 if [ -n "$LAKE" ]; then
   [ -n "$DRIVES" ] || die "give each drive with --drive PATH (a filesystem of its own, mounted there, empty); nothing was done"
   before=$(sed -n 's/^QD_LAKE_DRIVES=//p' "$DIR/.env" 2>/dev/null || true)
-  seen=''
+  seen='' disks=''
   for d in $DRIVES; do
     printf '%s' "$d" | grep -Eq '^/[A-Za-z0-9._/-]+$' && ! printf '%s' "$d" | grep -Eq '(^|/)\.\.?(/|$)' ||
       die "a drive must be an absolute path of letters, digits, . _ - and /: $d"
@@ -239,6 +261,10 @@ if [ -n "$LAKE" ]; then
       die "the drive $d is not a filesystem of its own mounted there; nothing was done"
     case " $seen " in *" $dev "*) die "the drive $d is on the same filesystem as another; nothing was done" ;; esac
     seen="$seen $dev"
+    for disk in $(disks_of "$dev"); do
+      case " $disks " in *" $disk "*) die "the drive $d is on the disk $disk, as another drive: RustFS needs each drive on a disk of its own; nothing was done" ;; esac
+      disks="$disks $disk"
+    done
     case " $before " in
     *" $d "*) ;;
     *) empty "$d" || die "the drive $d is not empty; nothing was done" ;;

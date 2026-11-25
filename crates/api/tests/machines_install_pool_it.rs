@@ -32,9 +32,8 @@ async fn get(app: &axum::Router, uri: &str, token: &str) -> (StatusCode, String)
     (status, String::from_utf8(bytes.unwrap().to_vec()).unwrap())
 }
 
-#[tokio::test]
-async fn a_pool_node_gets_its_layout_and_the_lakes_root_keys_for_its_token() {
-    let db = testkit::spawn_test_db().await;
+/// The service and the install routes over the test database.
+fn install(db: &testkit::TestDb) -> (MachinesService, axum::Router) {
     let made = Ca::create("test", DEFAULT_CA_VALIDITY).unwrap();
     let pg = Arc::new(PgMachines::new(db.pool.clone()));
     let files = EmbeddedInstallFiles::new(Some(&made.cert_pem)).unwrap();
@@ -54,6 +53,13 @@ async fn a_pool_node_gets_its_layout_and_the_lakes_root_keys_for_its_token() {
         window: Duration::from_secs(60),
     };
     let app = api::machines::install::routes(machines.clone(), limit);
+    (machines, app)
+}
+
+#[tokio::test]
+async fn a_pool_node_gets_its_layout_and_the_lakes_root_keys_for_its_token() {
+    let db = testkit::spawn_test_db().await;
+    let (machines, app) = install(&db);
     let (by, from) = (admin(), origin());
     let nodes: Vec<String> = ["lake-a", "lake-b", "lake-c", "lake-d"]
         .map(String::from)
@@ -129,4 +135,38 @@ async fn a_pool_node_gets_its_layout_and_the_lakes_root_keys_for_its_token() {
         .await
         .unwrap();
     assert_eq!(lakes, ["pool:main"]);
+}
+
+/// The `pool.env` a lone node `lake-a` of `drives` drives gets.
+async fn one_node_env(drives: u16) -> String {
+    let db = testkit::spawn_test_db().await;
+    let (machines, app) = install(&db);
+    let (by, from) = (admin(), origin());
+    let one = vec!["lake-a".to_string()];
+    machines
+        .define_pool("main", &one, drives, &by, &from)
+        .await
+        .unwrap();
+    let token = machines
+        .issue_node_token("main", "lake-a", 0, &by, &from)
+        .await
+        .unwrap();
+    let (status, env) = get(&app, "/install/lake/pool.env", &token.token).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(env.contains("QD_POOL_NODES=\"lake-a\"\n"), "{env}");
+    env
+}
+
+/// A lake on one node (decision 0091, point 3): one drive by path, as
+/// RustFS asks of a single drive, or four by URL, so it can take a pool.
+#[tokio::test]
+async fn a_one_node_pool_gets_one_drive_by_path_or_several_by_url() {
+    let one = one_node_env(1).await;
+    assert!(one.contains("\nRUSTFS_VOLUMES=\"/data/1\"\n"), "{one}");
+    let four = one_node_env(4).await;
+    let urls: Vec<String> = (1..=4)
+        .map(|n| format!("https://lake-a:9010/data/{n}"))
+        .collect();
+    let volumes = format!("\nRUSTFS_VOLUMES=\"{}\"\n", urls.join(" "));
+    assert!(four.contains(&volumes), "{four}");
 }
