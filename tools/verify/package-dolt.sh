@@ -89,10 +89,18 @@ APPPW=$(openssl rand -hex 16)
 printf '%s' "$SUPER" >"$MOD/secrets/postgres_superuser_password"
 printf 'postgres://quality_data_app:%s@%s:5432/quality_data?sslmode=verify-full&sslrootcert=/run/qd-ca/ca.crt' \
   "$APPPW" "$NAME" >"$MOD/secrets/database_url"
-# As the update agent makes them: 32 random bytes, base64url, no newline.
-for s in dolt-root-password dolt-app-password; do
+# As the update agent makes them: random bytes, base64url, no newline; the
+# OIDC keys PKCS#8 in base64 (module.yaml's secrets).
+for s in dolt-root-password dolt-app-password rustfs-sts-issuer-secret-key; do
   openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' >"$MOD/secrets/$s"
 done
+openssl rand -base64 16 | tr '+/' '-_' | tr -d '=\n' >"$MOD/secrets/rustfs-sts-issuer-access-key"
+# The OIDC keys as the agent's (ring's PKCS#8), by the API's own command.
+keygen() { docker run --rm --network none --entrypoint /usr/local/bin/server "$API" oidc-keygen "$@" | tr -d '
+'; }
+keygen >"$MOD/secrets/oidc-signing-key"
+keygen --es256 >"$MOD/secrets/oidc-signing-key-es256"
+GEN="dolt-root-password dolt-app-password rustfs-sts-issuer-access-key rustfs-sts-issuer-secret-key oidc-signing-key oidc-signing-key-es256"
 DOLT_APP=$(cat "$MOD/secrets/dolt-app-password")
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 1 \
   -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" \
@@ -100,8 +108,8 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 
 chmod 644 "$MOD/secrets/postgres_superuser_password" "$MOD/secrets/database_url" "$MOD"/certs/*
 # The Dolt passwords as the agent leaves them: 0400, the API's user's, in a
 # 0700 root folder (quality-sdk decision 0009).
-asroot "chown 65532:65532 '$MOD/ca' '$NODE' '$UPD' '$MOD/secrets/dolt-root-password' '$MOD/secrets/dolt-app-password' &&
-  chmod 400 '$MOD/secrets/dolt-root-password' '$MOD/secrets/dolt-app-password' && chmod 700 '$MOD/secrets'"
+asroot "chown 65532:65532 '$MOD/ca' '$NODE' '$UPD' && cd '$MOD/secrets' && chown 65532:65532 $GEN &&
+  chmod 400 $GEN && chmod 700 ."
 sed -e "s|^QD_MODULE_DIR=.*|QD_MODULE_DIR=$MOD|" -e "s|^QD_MACHINE_DIR=.*|QD_MACHINE_DIR=$NODE|" \
   -e "s|^QD_CA_DIR=.*|QD_CA_DIR=$MOD/ca|" -e "s|^QD_UPDATER_DIR=.*|QD_UPDATER_DIR=$UPD|" \
   -e "s|^IMAGE_API=.*|IMAGE_API=$API|" -e "s|^IMAGE_WEB=.*|IMAGE_WEB=$WEB|" -e "s|^IMAGE_DOLT=.*|IMAGE_DOLT=$DOLT|" \

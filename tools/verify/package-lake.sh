@@ -12,7 +12,10 @@
 #      application machine's certificate and trusting the installation's
 #      CA by default; it does not log "no lake admin adapter";
 #   3. with no lake in the .env (the package's default), the API starts
-#      and says the lake is not reached, as before.
+#      and says the lake is not reached, as before;
+#   4. the OIDC signing keys (quality-sdk decision 0012, step 3) reach the
+#      API as files: its provider is on, and its JWK Set has an Ed25519 and
+#      a P-256 key, asked of the API on its PostgreSQL network.
 #
 # The fake adapter is a few lines of Python on the API's PostgreSQL network
 # (data-quality-backend), by the name lake-admin.<machine>, with a
@@ -88,11 +91,15 @@ gen dolt-root-password 32
 gen dolt-app-password 32
 gen rustfs-sts-issuer-access-key 16
 gen rustfs-sts-issuer-secret-key 32
+# The OIDC keys as the agent's (ring's PKCS#8), by the API's own command.
+keygen() { docker run --rm --network none --entrypoint /usr/local/bin/server "$API" oidc-keygen "$@" | tr -d '\n'; }
+keygen >"$MOD/secrets/oidc-signing-key"
+keygen --es256 >"$MOD/secrets/oidc-signing-key-es256"
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 1 \
   -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost" \
   -keyout "$MOD/certs/local.key" -out "$MOD/certs/local.crt" 2>/dev/null
 chmod 644 "$MOD/secrets/postgres_superuser_password" "$MOD/secrets/database_url" "$MOD"/certs/*
-GEN="dolt-root-password dolt-app-password rustfs-sts-issuer-access-key rustfs-sts-issuer-secret-key"
+GEN="dolt-root-password dolt-app-password rustfs-sts-issuer-access-key rustfs-sts-issuer-secret-key oidc-signing-key oidc-signing-key-es256"
 asroot "cd '$MOD/secrets' && chown 65532:65532 '$MOD/ca' '$NODE' '$UPD' $GEN && chmod 400 $GEN && chmod 700 ."
 # env FILE [LAKE]: the .env, naming the lake and its adapter when LAKE is 1.
 env_file() {
@@ -165,11 +172,13 @@ fi
 
 # --- 1. The issuer's keys, as files ---------------------------------------------------
 API_ID=$(dc ps -q api)
-files=$(docker exec "$API_ID" sh -c 'ls /run/secrets' 2>/dev/null || docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' "$API_ID")
-case $files in
-  *rustfs_sts_issuer_access_key*rustfs_sts_issuer_secret_key*) ok "1. both keys are secrets of the API" ;;
-  *) ko "1. the API's secrets: $files" ;;
-esac
+mounts=$(docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' "$API_ID")
+for f in rustfs_sts_issuer_access_key rustfs_sts_issuer_secret_key; do
+  case " $mounts " in
+    *" /run/secrets/$f "*) ok "1. $f is a secret of the API" ;;
+    *) ko "1. $f is not among the API's mounts: $mounts" ;;
+  esac
+done
 vars=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$API_ID")
 for v in RUSTFS_STS_ISSUER_ACCESS_KEY= RUSTFS_STS_ISSUER_SECRET_KEY=; do
   line=$(printf '%s\n' "$vars" | grep "^$v" || true)
@@ -204,5 +213,19 @@ for _ in $(seq 15); do
   sleep 2
 done
 [ "$(dc ps -q api)" != "$API_ID" ] && ok "3. the API was recreated with the new .env" || ko "3. the API was not recreated"
+
+# --- 4. The OIDC signing keys, as files ---------------------------------------------------
+dc logs --no-log-prefix api 2>&1 | grep -q "oidc provider enabled" && ok "4. the OIDC provider is on" ||
+  ko "4. the OIDC provider is not on"
+jwks=''
+for _ in $(seq 15); do
+  jwks=$(docker run --rm --network data-quality-backend "$ALPINE" wget -qO- http://api:8080/oauth/jwks 2>/dev/null || true)
+  [ -z "$jwks" ] || break
+  sleep 2
+done
+case $jwks in
+  *'"OKP"'*'"EC"'* | *'"EC"'*'"OKP"'*) ok "4. the JWK Set has an Ed25519 and a P-256 key" ;;
+  *) ko "4. the JWK Set: ${jwks:-nothing}" ;;
+esac
 
 [ "$FAILED" = 0 ] && echo "ALL OK" || { echo "SOME CHECKS FAILED"; exit 1; }
