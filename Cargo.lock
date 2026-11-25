@@ -146,6 +146,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "auth-gateway",
+ "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "contracts",
@@ -155,6 +156,7 @@ dependencies = [
  "schedule-core",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "texts",
  "tokio",
  "tracing",

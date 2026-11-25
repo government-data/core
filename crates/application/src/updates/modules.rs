@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::module_menu::{self, ModuleMenu, Refusal};
 use super::module_permissions::{self, ModulePermissions};
+use super::module_roles::{self, ModuleRole};
 use super::{UpdatesError, UpdatesService};
 
 /// The longest name, version or drain path taken.
@@ -41,6 +42,10 @@ pub struct InstalledModule {
     /// without naming the module (decision 0078).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub provides: Vec<String>,
+    /// Its machine roles, with their images and files (quality-sdk
+    /// decision 0013), none when it declares none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<ModuleRole>,
 }
 
 impl UpdatesService {
@@ -143,8 +148,53 @@ fn check(modules: &[InstalledModule]) -> Result<(), String> {
         let requires = m.menu.as_ref().and_then(|menu| menu.requires.as_deref());
         module_permissions::check(&m.name, m.permissions.as_ref(), requires)
             .map_err(|refusal| permissions_refusal(&m.name, refusal))?;
+        module_roles::check(&m.roles).map_err(|refusal| roles_refusal(&m.name, refusal))?;
     }
     Ok(())
+}
+
+fn roles_refusal(module: &str, refusal: module_roles::Refusal) -> String {
+    use module_roles::Refusal as R;
+    match refusal {
+        R::TooMany => texts::tr!("app.updates.modules.tooManyRoles", name = module),
+        R::BadName(role) => texts::tr!("app.updates.modules.badRole", name = module, role = role),
+        R::Reserved(role) => {
+            texts::tr!(
+                "app.updates.modules.reservedRole",
+                name = module,
+                role = role
+            )
+        }
+        R::Repeated(role) => {
+            texts::tr!(
+                "app.updates.modules.repeatedRole",
+                name = module,
+                role = role
+            )
+        }
+        R::BadServices(role) => {
+            texts::tr!(
+                "app.updates.modules.badRoleServices",
+                name = module,
+                role = role
+            )
+        }
+        R::BadImages(role) => {
+            texts::tr!(
+                "app.updates.modules.badRoleImages",
+                name = module,
+                role = role
+            )
+        }
+        R::BadFile(role) => {
+            texts::tr!(
+                "app.updates.modules.badRoleFile",
+                name = module,
+                role = role
+            )
+        }
+        R::FilesTooLarge => texts::tr!("app.updates.modules.roleFilesTooLarge", name = module),
+    }
 }
 
 fn permissions_refusal(module: &str, refusal: module_permissions::Refusal) -> String {
@@ -217,7 +267,33 @@ mod tests {
             menu: None,
             permissions: None,
             provides: Vec::new(),
+            roles: Vec::new(),
         }
+    }
+
+    #[tokio::test]
+    async fn a_modules_roles_are_kept_and_a_bad_list_keeps_the_one_before() {
+        use crate::updates::module_roles::tests::{file, role};
+        let service = UpdatesService::new(Arc::new(MemoryMaintenance::default()));
+        let mut lake = role("lake");
+        lake.files = vec![file("compose.yml", b"services: {}\n")];
+        let kept = vec![InstalledModule {
+            roles: vec![lake],
+            ..module("lake-rustfs", None)
+        }];
+        service.set_modules(kept.clone()).await.unwrap();
+        assert_eq!(service.installed_modules().await.unwrap(), kept);
+        let refused = service
+            .set_modules(vec![InstalledModule {
+                roles: vec![role("app")],
+                ..module("lake-rustfs", None)
+            }])
+            .await;
+        assert!(matches!(refused, Err(UpdatesError::Invalid("modules", _))));
+        assert_eq!(service.installed_modules().await.unwrap(), kept, "kept");
+        let older = serde_json::json!({"name": "docs", "version": "1.0.0"});
+        let older: InstalledModule = serde_json::from_value(older).unwrap();
+        assert!(older.roles.is_empty(), "an agent that does not send them");
     }
 
     #[tokio::test]
