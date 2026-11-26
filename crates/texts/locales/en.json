@@ -10,6 +10,12 @@
     }
   },
   "api": {
+    "events": {
+      "badEvent": "the event is {id, topic, version, occurred_at, data} with id a UUID and occurred_at in RFC 3339",
+      "invalid": "the event's data does not validate against the topic's schema",
+      "notDeclared": "the calling module does not declare this topic at this version",
+      "tooBig": "the event's data is over 256 KiB"
+    },
     "machines": {
       "certificateNotTrusted": "This server does not take a machine's certificate: it is not reached only through the internal entry point (INTERNAL_CLIENT_CERT_HEADER).",
       "certificateRefused": "The machine's certificate is not accepted: it is unknown, replaced, or the machine is retired. Join it again with a new token.",

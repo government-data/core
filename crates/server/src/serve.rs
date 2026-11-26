@@ -130,23 +130,8 @@ fn app(
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
     let (machines, modules) = machines_and_modules(&db, provider.clone(), &secret_box)?;
-    // What the update agent waits for: each module's own work, and each
-    // installed application module's as the agent tells them (0003).
-    let app_modules =
-        drain_wiring::AppModules::from_env(updates.clone(), drain_wiring::ANSWER_WITHIN)?;
-    let updates = updates
-        .with_modules_work(Arc::new(drain_wiring::CodeModules::of(
-            &modules,
-            drain_wiring::ANSWER_WITHIN,
-        )))
-        .with_modules_work(Arc::new(app_modules))
-        // Whether a module may be removed: every installed module's
-        // removal path (quality-sdk 0015).
-        .with_removal_checks(Arc::new(
-            infrastructure::module_removal::HttpModuleRemovals::from_env(
-                drain_wiring::ANSWER_WITHIN,
-            )?,
-        ));
+    // What the update agent waits for, and whether a module may be removed.
+    let updates = drain_wiring::with_module_checks(updates, &modules)?;
     // The machines: Settings → Execution, the install routes (their own
     // limit) and the route they join with (the login's).
     let machine_routes = machines_wiring::routes(
@@ -198,8 +183,12 @@ fn app(
             certificates.clone(),
         ))
         // What a module asks the core with its machine client (quality-sdk
-        // 0002, 0015).
-        .merge(api::platform_v1::routes(provider.clone(), updates.clone()))
+        // 0002, 0015), and their events (0017).
+        .merge(crate::events_wiring::module_routes(
+            provider.clone(),
+            updates.clone(),
+            &db.pool,
+        ))
         // A module's purge and the agent's own audit (quality-sdk 0009).
         .merge(api::updater_v1_purge::routes(
             provider,
