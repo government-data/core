@@ -30,8 +30,10 @@ rcgen.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-# The CA's fingerprint (0029's `--ca-sha256`).
+# The CA's fingerprint (0029's `--ca-sha256`), and a role's files' digests.
 sha2.workspace = true
+# A role's files, in base64 from the core (quality-sdk decision 0013).
+base64.workspace = true
 # The hooks and the readiness check are commands.
 tokio = { workspace = true, features = ["process"] }
 tracing.workspace = true

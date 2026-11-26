@@ -199,6 +199,19 @@ pub(super) fn update_requested(
     )
 }
 
+/// A machine's call (`action`, never a secret) on `machine/<name>`, by no
+/// person; `machine` is `None` when the certificate named none.
+pub(super) fn machine_call(
+    event_type: AuditEventType,
+    machine: Option<&str>,
+    action: String,
+    origin: &Origin,
+    at: SystemTime,
+) -> NewActionAudit {
+    let on = resource(machine.unwrap_or("unknown"));
+    event(event_type, None, machine, action, on, origin, at)
+}
+
 /// What the update agent's machine did, or had done, to a module
 /// (quality-sdk decision 0009): `detail` (its version, outcome and, on
 /// failure, the step and the error; never a secret) on `module/<module>`,

@@ -33,6 +33,7 @@ pub mod lake_replica;
 pub mod lake_replication;
 pub mod lifecycle;
 pub mod metrics;
+pub mod registry;
 pub mod renew;
 
 use std::collections::BTreeMap;

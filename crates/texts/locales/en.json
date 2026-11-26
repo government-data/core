@@ -52,7 +52,10 @@
       "alertsNotApp": "Only the application VM's certificate delivers Grafana's alerts.",
       "alertsUnavailable": "This API does not keep the machines' alerts.",
       "invalidRange": "The range is 1h, 24h or 7d.",
-      "invalidAlert": "An alert of the delivery is not as Grafana sends it: a status firing or resolved, a fingerprint of letters and digits, and a start time."
+      "invalidAlert": "An alert of the delivery is not as Grafana sends it: a status firing or resolved, a fingerprint of letters and digits, and a start time.",
+      "registryNoRole": "No installed module declares this machine's role.",
+      "registryNoToken": "The core holds no registry token now: ask again later.",
+      "registryRefused": "Only an approved machine's certificate in use gets the registry token."
     },
     "platform": {
       "notFoundOrNoAccess": "It does not exist or you do not have access.",

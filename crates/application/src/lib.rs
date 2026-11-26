@@ -27,7 +27,7 @@ pub use machines::{
 pub use machines::{AlertsApplied, AlertsError, DeliveredAlert, MachineMetrics};
 pub use machines::{Drives, DrivesError, MAX_DRIVES};
 pub use machines::{Lakes, ReplicationReadiness, ReplicationStatus, RECONCILER};
-pub use machines::{PoolError, PoolNodes};
+pub use machines::{PoolError, PoolNodes, RegistryOutcome};
 pub use platform::{
     CreatedServiceAccount, GroupChange, MintedToken, PlatformError, PlatformService, PolicyView,
     TokenMint,
@@ -40,10 +40,11 @@ pub use settings::{
     SettingsTargets, SmtpSecurity, StoredSection,
 };
 pub use updates::{
-    DeclaredModule, DrainStatus, HistoryEntry, InLanguages, InstalledModule, Maintenance,
-    MaintenanceError, ModuleAction, ModuleMenu, ModulePermissions, ModulePolicy, ModuleRole,
-    ModuleWork, ModulesWork, RegistryToken, Requester, RoleFile, RoleStrategy, UpdatePolicy,
-    UpdateRequest, UpdaterRow, UpdatesError, UpdatesService, UpdatesStore, UpdatesView,
+    DeclaredModule, DrainStatus, GrantRefusal, HistoryEntry, InLanguages, InstalledModule,
+    Maintenance, MaintenanceError, ModuleAction, ModuleMenu, ModulePermissions, ModulePolicy,
+    ModuleRole, ModuleWork, ModulesWork, RegistryGrant, RegistryToken, Requester, RoleFile,
+    RoleModule, RoleStrategy, UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError,
+    UpdatesService, UpdatesStore, UpdatesView,
 };
 
 /// Application service exposing the health use case.
