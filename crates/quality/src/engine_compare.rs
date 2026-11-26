@@ -4,6 +4,10 @@
 //! doubles agree within a relative 1e-12 (absolute 1e-15 near zero, point
 //! 8.3: parallel summation, not approximation). What it gives is the kind
 //! of each mismatch and how many: never a value, a key or a hash.
+//!
+//! Trino's results are the reference, and a number field's shape is not
+//! compared: DuckDB's profile reads silver's `DOUBLE`, Trino's bronze's
+//! source type (ruled by the user 2026-11-25, rulings 32 and 37).
 
 use std::collections::BTreeMap;
 
@@ -79,7 +83,8 @@ impl Tally {
 /// The mismatches between `duckdb`'s and `trino`'s reports of one cut, by
 /// kind, in name order; none when they agree. Durations, stages, snapshot
 /// ids and the compiled SQL are each engine's own and are not compared.
-pub fn compare(duckdb: &Report, trino: &Report) -> Vec<Mismatch> {
+/// `numbers` are the mapping's number fields, whose shape is left out.
+pub fn compare(duckdb: &Report, trino: &Report, numbers: &[&str]) -> Vec<Mismatch> {
     let mut t = Tally::default();
     t.check("cut", duckdb.cut == trino.cut);
     t.check("records", duckdb.records == trino.records);
@@ -103,10 +108,11 @@ pub fn compare(duckdb: &Report, trino: &Report) -> Vec<Mismatch> {
         &trino.fields,
         |f| f.field.clone(),
         |t, a, b| {
+            let shape = numbers.contains(&a.field.as_str())
+                || (&a.pattern, a.pattern_count) == (&b.pattern, b.pattern_count);
             t.check(
                 "fields.profile",
-                (a.empty, a.distinct, &a.pattern, a.pattern_count)
-                    == (b.empty, b.distinct, &b.pattern, b.pattern_count),
+                (a.empty, a.distinct) == (b.empty, b.distinct) && shape,
             );
             t.check("fields.icd", close_opt(a.icd, b.icd));
             t.check("fields.recency", a.recency == b.recency);
@@ -214,7 +220,7 @@ mod tests {
         trino.duration_ms = 99;
         trino.compiler = "trino".into();
         trino.igcd = Some(0.75 * (1.0 + 1e-14));
-        assert_eq!(compare(&report(), &trino), []);
+        assert_eq!(compare(&report(), &trino, &[]), []);
     }
 
     #[test]
@@ -224,7 +230,7 @@ mod tests {
         trino.igcd = Some(0.76);
         trino.entities[0].0 = "cd".repeat(32);
         trino.queues[0].priority = 0.25 + 1e-9;
-        let seen = compare(&report(), &trino);
+        let seen = compare(&report(), &trino, &[]);
         let kinds: Vec<(&str, u64)> = seen.iter().map(|m| (m.kind, m.count)).collect();
         assert_eq!(
             kinds,
@@ -239,6 +245,27 @@ mod tests {
         for leaked in ["abab", "cdcd", "R1", "0.76", "O-1"] {
             assert!(!text.contains(leaked), "{leaked} in {text}");
         }
+    }
+
+    #[test]
+    fn a_number_fields_shape_is_left_out_but_its_counts_are_not() {
+        let mut duckdb = report();
+        duckdb.fields = serde_json::from_value(json!([
+            {"field": "Amount", "empty": 0, "distinct": 3, "pattern": "9.9", "pattern_count": 3},
+            {"field": "Code", "empty": 0, "distinct": 3, "pattern": "AA", "pattern_count": 3}
+        ]))
+        .unwrap();
+        let mut trino = duckdb.clone();
+        trino.fields[0].pattern = Some("999".into());
+        trino.fields[0].pattern_count = 2;
+        assert_eq!(compare(&duckdb, &trino, &["Amount"]), []);
+        trino.fields[0].distinct = 2;
+        trino.fields[1].pattern = Some("A9".into());
+        let kinds: Vec<(&str, u64)> = compare(&duckdb, &trino, &["Amount"])
+            .iter()
+            .map(|m| (m.kind, m.count))
+            .collect();
+        assert_eq!(kinds, [("fields.profile", 2)]);
     }
 
     #[test]
