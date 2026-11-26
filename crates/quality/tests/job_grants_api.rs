@@ -195,7 +195,7 @@ async fn the_people_s_grants_come_beside_the_job_users() {
         person,
         [
             &serde_json::json!({ "subject": "person-acct-1", "namespace": "quality_gold",
-            "tables": ["*"], "privileges": ["SELECT"],
+            "tables": quality::people_grants::PEOPLE_GOLD, "privileges": ["SELECT"],
             "rows": { "column": "dataset", "in": ["clients"] } })
         ]
     );
