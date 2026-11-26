@@ -11,7 +11,9 @@
   },
   "api": {
     "events": {
+      "badCursor": "the confirmation is {version, cursor}",
       "badEvent": "the event is {id, topic, version, occurred_at, data} with id a UUID and occurred_at in RFC 3339",
+      "badRead": "the read is ?topic=<topic>&version=<n>, with after=<cursor> and wait=<seconds> optional",
       "invalid": "the event's data does not validate against the topic's schema",
       "notDeclared": "the calling module does not declare this topic at this version",
       "tooBig": "the event's data is over 256 KiB"

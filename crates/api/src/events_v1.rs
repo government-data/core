@@ -1,5 +1,6 @@
 //! `/v1/events` (quality-sdk decision 0017): a module publishes the events
-//! of the topics it provides.
+//! of the topics it provides, reads with a cursor those it consumes
+//! (waiting up to 30 s when there are none) and confirms what it handled.
 //! The caller is its machine client's module, with a token for the core
 //! ([`crate::platform_v1::require_module_client`]). `data` is never logged,
 //! and a refusal of `data` names the schema paths, never the values.
@@ -7,13 +8,17 @@
 //! | Call                                | Does                              |
 //! | ----------------------------------- | --------------------------------- |
 //! | `POST /v1/events`                   | publish: `201`, `200` again       |
+//! | `GET /v1/events?topic&version&after&wait` | `{"events", "cursor"}`      |
+//! | `PUT /v1/events/cursors/{topic}`    | `{"version", "cursor"}` confirmed |
+
+use std::time::Duration;
 
 use application::events::{EventsError, EventsService, NewEvent, Published};
 use auth_gateway::AuthorizationServer;
-use axum::extract::{DefaultBodyLimit, State};
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::routing::{get, put};
 use axum::{Extension, Json, Router};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -24,6 +29,8 @@ use crate::updater_v1::refusal;
 
 /// The largest request: `data` at its most and the event around it.
 const BODY_LIMIT: usize = application::events::MAX_DATA_BYTES + 16 * 1024;
+/// The longest a read waits for an event.
+const MAX_WAIT: Duration = Duration::from_secs(30);
 
 /// What the routes call.
 #[derive(Clone)]
@@ -32,7 +39,7 @@ struct Events {
     events: EventsService,
 }
 
-/// Mount `/v1/events`; `provider` is `None` without `OIDC_SIGNING_KEY`,
+/// Mount `/v1/events…`; `provider` is `None` without `OIDC_SIGNING_KEY`,
 /// and then every call is a 503.
 pub fn routes(provider: Option<AuthorizationServer>, events: EventsService) -> Router {
     let state = Events {
@@ -40,7 +47,8 @@ pub fn routes(provider: Option<AuthorizationServer>, events: EventsService) -> R
         events,
     };
     Router::new()
-        .route("/v1/events", post(publish))
+        .route("/v1/events", get(read).post(publish))
+        .route("/v1/events/cursors/{topic}", put(confirm))
         .with_state(state)
         .layer(DefaultBodyLimit::max(BODY_LIMIT))
         .layer(axum::middleware::from_fn_with_state(
@@ -128,6 +136,72 @@ async fn publish(
         Ok(Published::Stored) => StatusCode::CREATED.into_response(),
         Ok(Published::Again) => StatusCode::OK.into_response(),
         Err(why) => refused("publish", why),
+    }
+}
+
+#[derive(Deserialize)]
+struct ReadQuery {
+    topic: String,
+    version: u32,
+    after: Option<i64>,
+    /// Seconds, at most 30; none does not wait.
+    wait: Option<u64>,
+}
+
+/// `GET /v1/events?topic=<t>&version=<v>&after=<cursor>&wait=<s>`.
+async fn read(
+    State(e): State<Events>,
+    Extension(caller): Extension<ModuleCaller>,
+    query: Result<Query<ReadQuery>, axum::extract::rejection::QueryRejection>,
+) -> Response {
+    let module = match module(&e, &caller).await {
+        Ok(module) => module,
+        Err(refused) => return *refused,
+    };
+    let Ok(Query(q)) = query else {
+        return refusal(StatusCode::BAD_REQUEST, texts::tr!("api.events.badRead"));
+    };
+    let wait = Duration::from_secs(q.wait.unwrap_or(0)).min(MAX_WAIT);
+    let deadline = tokio::time::sleep(wait);
+    match e
+        .events
+        .read(&module, &q.topic, q.version, q.after, deadline)
+        .await
+    {
+        Ok(batch) => {
+            Json(json!({ "events": batch.events, "cursor": batch.cursor })).into_response()
+        }
+        Err(why) => refused("read", why),
+    }
+}
+
+#[derive(Deserialize)]
+struct Confirm {
+    version: u32,
+    cursor: i64,
+}
+
+/// `PUT /v1/events/cursors/{topic}`: `204`, handled up to `cursor`.
+async fn confirm(
+    State(e): State<Events>,
+    Extension(caller): Extension<ModuleCaller>,
+    Path(topic): Path<String>,
+    body: Result<Json<Confirm>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let module = match module(&e, &caller).await {
+        Ok(module) => module,
+        Err(refused) => return *refused,
+    };
+    let Ok(Json(body)) = body else {
+        return refusal(StatusCode::BAD_REQUEST, texts::tr!("api.events.badCursor"));
+    };
+    match e
+        .events
+        .confirm(&module, &topic, body.version, body.cursor)
+        .await
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(why) => refused("confirm", why),
     }
 }
 
