@@ -44,9 +44,7 @@ services:
       - "443:443"
       # The machines' entry point (decision 0066) has no port of its own:
       # it is reached on 443 by INTERNAL_DOMAIN (dynamic/internal-sni.yml).
-      # The lake's gates' entry point (0066, point 10): the API's lake check
-      # alone, asked by the Traefik in front of RustFS on each lake node.
-      - "${TRAEFIK_INTERNAL_BIND:+${TRAEFIK_INTERNAL_BIND}:}${TRAEFIK_LAKEGATE_PORT:-9444}:9444"
+      # Nor the lake gates' check: on 443 by lakegate.<INTERNAL_DOMAIN>.
     networks:
       - edge
     volumes:

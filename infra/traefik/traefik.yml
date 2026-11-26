@@ -27,8 +27,10 @@ global:
 #                     (SNI), passed through as it comes with the client's
 #                     address (dynamic/internal-sni.yml; ruling 71,
 #                     tools/verify/traefik_one_port.sh).
-#   lakegate  :9444 — the lake's gates' entry point (0066, point 10): the
-#                     same TLS, one route, forwarded headers kept.
+#   lakegate  127.0.0.1:9444 — the lake's gates' entry point (0066, point
+#                     10): the same TLS, one route, forwarded headers kept.
+#                     Reached on 443 by lakegate.<INTERNAL_DOMAIN> as
+#                     `internal` is (dynamic/internal-sni.yml).
 #   metrics   :9445 — development's plain metrics (dynamic/metrics-dev.yml),
 #                     published nowhere by the package: there the services'
 #                     metrics (decision 0071, point 7) are internal.yml's
@@ -85,9 +87,12 @@ entryPoints:
   # they come: a gate names the machine at its door in
   # X-Forwarded-Tls-Client-Cert-Info, and the API believes it only from a
   # machine of the lake, known by the certificate header this Traefik
-  # writes. Published as TRAEFIK_LAKEGATE_PORT.
+  # writes. Only Traefik's own passthrough connects here, with the PROXY
+  # protocol.
   lakegate:
-    address: ":9444"
+    address: "127.0.0.1:9444"
+    proxyProtocol:
+      trustedIPs: ["127.0.0.1/32"]
     forwardedHeaders:
       insecure: true
     transport:

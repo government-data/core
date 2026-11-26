@@ -143,7 +143,7 @@ services:
     entrypoint: ["/etc/qd/gate/entrypoint.sh"]
     environment:
       QD_MACHINE_NAME: ${QD_MACHINE_NAME:?set QD_MACHINE_NAME}
-      QD_LAKE_CHECK_URL: ${QD_LAKE_CHECK_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}:${TRAEFIK_LAKEGATE_PORT:-9444}/api/internal/machines/lake/check}
+      QD_LAKE_CHECK_URL: ${QD_LAKE_CHECK_URL:-https://lakegate.${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}/api/internal/machines/lake/check}
       QD_GATE_UPSTREAM: https://rustfs:9010
       QD_GATE_READ_TIMEOUT: 0s
     tmpfs:

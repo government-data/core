@@ -99,10 +99,10 @@ http:
 
     # The lake's check, asked by the gate in front of RustFS (0066, point
     # 10), on the gates' entry point, where the header that names the
-    # machine at the gate arrives. The certificate header is the gate's
+    # machine at the gate arrives, by its own name (lakegate.<internal>). The certificate header is the gate's
     # own, written here. No rate limit: one check per request to the lake.
     lake-check:
-      rule: "Host(`{{ $internal }}`) && Path(`/api/internal/machines/lake/check`)"
+      rule: "Host(`lakegate.{{ $internal }}`) && Path(`/api/internal/machines/lake/check`)"
       entryPoints: [lakegate]
       tls:
         options: machines

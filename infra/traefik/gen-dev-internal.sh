@@ -39,7 +39,7 @@ openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj "/O=qd
   -keyout "$work/internal.key" -out "$work/internal.csr" 2>/dev/null
 openssl x509 -req -in "$work/internal.csr" -CA "$ca/ca.crt" -CAkey "$ca/ca.key" -CAcreateserial \
   -CAserial "$work/ca.srl" -days 30 -out "$work/internal.crt" \
-  -extfile <(printf 'subjectAltName=DNS:%s\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n' "$domain") \
+  -extfile <(printf 'subjectAltName=DNS:%s,DNS:lakegate.%s\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth\n' "$domain" "$domain") \
   2>/dev/null
 cp "$ca/ca.crt" "$work/machines-ca.crt"
 cp infra/traefik/internal.yml "$work/internal.yml"

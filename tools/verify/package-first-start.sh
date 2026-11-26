@@ -31,9 +31,8 @@
 # 0087): with the package's default, `file`, Traefik serves certs/local.crt,
 # has no resolver and logs no ACME line; the `acme` rendering carries
 # ACME_EMAIL and starts Traefik (offline); a wrong mode, or `acme` without an
-# address, does not; the internal entry point is on 443 by the machine's
-# name, its own port published nowhere; TRAEFIK_INTERNAL_BIND publishes 9444
-# there only.
+# address, does not; the internal entry point and the lake gates' check are
+# on 443 by name, their own ports published nowhere.
 #
 # The images are CI's (decision 0082, point 4), never built here:
 #
@@ -43,7 +42,7 @@
 #     bash tools/verify/package-first-start.sh
 #
 # PostgreSQL and Traefik are postgres:16-alpine and traefik:v3.6. It
-# publishes 80, 443, 9444, 9009 and 5432 (the last three on
+# publishes 80, 443, 9009 and 5432 (the last two on
 # 127.0.0.1) and uses the fixed networks data-quality-edge,
 # data-quality-backend and data-quality-api, so the dev stack must be down. Everything else is
 # named qs-verify-first… and removed on exit, also on failure. Run alone
@@ -98,7 +97,7 @@ fi
 for n in data-quality-edge data-quality-backend data-quality-api; do
   if docker network inspect "$n" >/dev/null 2>&1; then ko "the network $n exists: stop the dev stack"; exit 1; fi
 done
-for port in 80 443 9444 9009 5432; do
+for port in 80 443 9009 5432; do
   if ss -Hltn "sport = :$port" | grep -q .; then ko "port $port is in use"; exit 1; fi
 done
 
@@ -152,7 +151,6 @@ QD_TRAEFIK_CHECK_EVERY=5
 QD_PG_TLS_CHECK_EVERY=5
 QD_NODE_RENEW_EVERY=60s
 POSTGRES_BIND=127.0.0.1
-TRAEFIK_INTERNAL_BIND=127.0.0.1
 MIMIR_BIND=127.0.0.1
 EOF
 if out=$(dc config --quiet 2>&1); then ok "the package's compose reads with the .env"; else ko "config: $out"; exit 1; fi
@@ -293,8 +291,7 @@ expect "file: no resolver in the static configuration Traefik runs" 0 \
 # Traefik starts its TLS-ALPN challenge provider whatever its configuration.
 expect "file: no ACME line in Traefik's log" 0 \
   "$(docker logs "$TRAEFIK" 2>&1 | grep -iE 'acme|resolver' | grep -vc 'acme.ChallengeTLSALPN')"
-expect "TRAEFIK_INTERNAL_BIND publishes 9444" 127.0.0.1:9444 "$(docker port "$TRAEFIK" 9444/tcp | tr '\n' ' ' | sed 's/ $//')"
-for port in 9443 9445; do
+for port in 9443 9444 9445; do
   expect "$port is published nowhere" "" "$(docker port "$TRAEFIK" $port/tcp 2>/dev/null)"
 done
 TRAEFIK_IMAGE=$(docker inspect --format '{{.Config.Image}}' "$TRAEFIK")
