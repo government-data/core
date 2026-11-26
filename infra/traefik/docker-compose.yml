@@ -109,7 +109,7 @@ services:
       # Where a joined machine's Alloy pushes its metrics, given in its join
       # command (decision 0071, point 14): Mimir on the observability server,
       # by default the application VM's, named as its certificate names it.
-      MACHINES_METRICS_PUSH_URL: ${MACHINES_METRICS_PUSH_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN:-localhost}}:${MIMIR_HTTP_PORT:-9009}/api/v1/push}
+      MACHINES_METRICS_PUSH_URL: ${MACHINES_METRICS_PUSH_URL:-https://mimir.${INTERNAL_DOMAIN:-internal.${APP_DOMAIN:-localhost}}/api/v1/push}
       # Where the API asks each installed application module for its drain
       # (decision 0003): /modules/<name><drain_path> on Traefik's internal
       # entry point, with the VM's machine certificate (LAKE_CLIENT_CERT_FILE).

@@ -1,7 +1,7 @@
 //! The machines' series from Mimir (decision 0072, point 13, step 7): the
 //! five fixed queries of [`queries`], each for every machine at once, on
 //! Mimir's Prometheus API (`MIMIR_QUERY_URL`, e.g.
-//! `https://<INTERNAL_DOMAIN>:9009/prometheus`: the application VM's
+//! `https://mimir.<INTERNAL_DOMAIN>/prometheus`: the application VM's
 //! Traefik, which lets only role `app` read, 0071). The API presents its
 //! VM's `machine.pem` with the lake's client ([`LakeClient`]: `LAKE_CA_FILE`,
 //! `LAKE_CLIENT_CERT_FILE`, read again when renewed); in a development

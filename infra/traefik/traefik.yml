@@ -36,12 +36,12 @@ global:
 #                     metrics (decision 0071, point 7) are internal.yml's
 #                     routers on `internal`, with a client certificate of
 #                     the CA, which the VM's Alloy scrapes on 443.
-#   mimir     :9446 — Mimir (decision 0071, amended 2026-11-16): a client
-#                     certificate of the CA required; any machine may push
-#                     (/api/v1/push), only the application VM's
+#   mimir     127.0.0.1:9446 — Mimir (decision 0071, amended 2026-11-16): a
+#                     client certificate of the CA required; any machine
+#                     may push (/api/v1/push), only the application VM's
 #                     certificate (role `app`) may read (internal.yml's
-#                     routers). Published by certificate.yml as 9009,
-#                     where every VM's Alloy pushes.
+#                     routers). Reached on 443 by mimir.<INTERNAL_DOMAIN>
+#                     as `internal` is (ruling 82).
 #   mimircheck 127.0.0.1:9447 — on Traefik's own loopback, never published:
 #                     the read check that `mimir`'s forwardAuth asks.
 entryPoints:
@@ -108,7 +108,9 @@ entryPoints:
         writeTimeout: 30s
         idleTimeout: 90s
   mimir:
-    address: ":9446"
+    address: "127.0.0.1:9446"
+    proxyProtocol:
+      trustedIPs: ["127.0.0.1/32"]
     transport:
       respondingTimeouts:
         readTimeout: 30s

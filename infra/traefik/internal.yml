@@ -144,7 +144,8 @@ http:
 {{- if env "MIMIR_UPSTREAM" }}
 
     # Mimir (decision 0071, amended on 2026-11-16 by the user's ruling), on
-    # the `mimir` entry point that certificate.yml publishes as 9009. Any
+    # the `mimir` entry point, reached on 443 by mimir.<internal> (ruling
+    # 82, internal-sni.yml). Any
     # machine of the CA pushes (remote write) with its own certificate; only
     # the application VM's certificate (role `app`: the API's charts, this
     # VM's Alloy scraping Mimir's /metrics) reads, everything else goes
@@ -155,7 +156,7 @@ http:
     # header passTLSClientCert wrote. Grafana reads Mimir by its service
     # name on the observability stack's network, not through here.
     mimir-push:
-      rule: "Host(`{{ $internal }}`) && Path(`/api/v1/push`)"
+      rule: "Host(`mimir.{{ $internal }}`) && Path(`/api/v1/push`)"
       entryPoints: [mimir]
       tls:
         options: machines
@@ -163,7 +164,7 @@ http:
       observability:
         accessLogs: false
     mimir-read:
-      rule: "Host(`{{ $internal }}`) && PathPrefix(`/`)"
+      rule: "Host(`mimir.{{ $internal }}`) && PathPrefix(`/`)"
       entryPoints: [mimir]
       tls:
         options: machines

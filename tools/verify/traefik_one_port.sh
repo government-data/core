@@ -16,7 +16,10 @@
 #
 # For each: a client with no SNI, an unknown SNI, the public SNI with the
 # internal Host (domain fronting), with no certificate, a certificate of
-# another CA, or the CA's. And what happens to a forwarded certificate
+# another CA, or the CA's. A third name (loki.app-1) is passed through,
+# without the PROXY protocol, to a backend that terminates its own mTLS,
+# as Loki does (ruling 82; Mimir's `mimir` entry point is reached as
+# `internal` is). And what happens to a forwarded certificate
 # header (X-Forwarded-Tls-Client-Cert-Info, which the lake check needs from
 # the gate) on an entry point that does not trust forwarded headers.
 #
@@ -53,7 +56,7 @@ cert() { # FILE CA SUBJECT USAGE SANS
 ca ca
 ca other
 cert public other "/CN=app.qd.test" serverAuth "DNS:app.qd.test"
-cert machine ca "/O=qd/OU=app/CN=app-1" serverAuth "DNS:app-1,DNS:lakegate.app-1"
+cert machine ca "/O=qd/OU=app/CN=app-1" serverAuth "DNS:app-1,DNS:lakegate.app-1,DNS:mimir.app-1,DNS:loki.app-1"
 cert worker ca "/O=qd/OU=worker/CN=worker-7" clientAuth "DNS:worker-7"
 cert stranger other "/O=qd/OU=worker/CN=worker-7" clientAuth "DNS:worker-7"
 cat "$D/ca.crt" "$D/other.crt" >"$D/trust.crt"
@@ -92,7 +95,15 @@ tcp:
       rule: "HostSNI(\`lakegate.app-1\`)"
       tls: {passthrough: true}
       service: lakegate
+    loki:
+      entryPoints: [passthrough]
+      rule: "HostSNI(\`loki.app-1\`)"
+      tls: {passthrough: true}
+      service: loki
   services:
+    loki:
+      loadBalancer:
+        servers: [{address: "127.0.0.1:9448"}]
     internal:
       loadBalancer:
         serversTransport: proxy
@@ -126,6 +137,12 @@ http:
       tls: {options: machines}
       middlewares: [machine-certificate]
       service: whoami
+    # A stand-in for Loki: its own TLS, a client certificate required.
+    loki:
+      entryPoints: [ownmtls]
+      rule: "Host(\`loki.app-1\`)"
+      tls: {options: machines}
+      service: whoami
     lake-check:
       entryPoints: [lakegate]
       rule: "Host(\`lakegate.app-1\`) && Path(\`/api/internal/machines/lake/check\`)"
@@ -148,6 +165,7 @@ docker run -d --name "$NAME" -v "$Y:/dynamic:ro" -v "$C:/certs:ro" "$IMAGE" \
   --entryPoints.lakegate.address=127.0.0.1:9444 \
   --entryPoints.lakegate.proxyProtocol.trustedIPs=127.0.0.1/32 \
   --entryPoints.lakegate.forwardedHeaders.insecure=true \
+  --entryPoints.ownmtls.address=127.0.0.1:9448 \
   --providers.file.directory=/dynamic --log.level=INFO >/dev/null ||
   { echo "could not start $IMAGE"; exit 1; }
 IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$NAME")
@@ -201,6 +219,13 @@ expect "lakegate name, another CA's certificate" "000 alert unknown ca" "$(get 4
 get 443 app-1 app-1 worker "$CHECK" -H "$INFO: $NAMED" >/dev/null
 expect "internal name, the check's path: the gate's $INFO is removed there" "" "$(header "$INFO")"
 expect "public name, Host lakegate" 404 "$(get 443 app.qd.test lakegate.app-1 - "$CHECK")"
+
+echo "== (B) a backend with its own mTLS on its own name (Loki's way)"
+expect "loki name, the CA's certificate" 200 "$(get 443 loki.app-1 loki.app-1 worker /ready)"
+expect "loki name, no certificate" "000 alert certificate required" "$(get 443 loki.app-1 loki.app-1 - /ready)"
+expect "loki name, another CA's certificate" "000 alert unknown ca" "$(get 443 loki.app-1 loki.app-1 stranger /ready)"
+expect "public name, Host loki" 404 "$(get 443 app.qd.test loki.app-1 - /ready)"
+expect "internal name, Host loki" 404 "$(get 443 app-1 loki.app-1 worker /ready)"
 
 echo "== The loopback entry points are not reachable from outside the container"
 expect "9443 from outside" "000" "$(get 9443 app-1 app-1 worker / | cut -c1-3)"
