@@ -18,6 +18,7 @@ pub mod draft_catalog;
 pub mod draft_history;
 pub mod drain;
 pub mod edit_api;
+pub mod engine_compare;
 pub mod entity_key;
 pub mod field_api;
 pub mod firing;
