@@ -12,9 +12,11 @@ name: CI
 # infra/aws/ci; without it, on GitHub's.
 
 on:
-  # Only on PRs: they are merged rebased onto main and with a green CI, so what
-  # reaches main is already tested (running it again was 35 % of the minutes).
+  # On PRs and in the merge queue, not on main: a PR reaches main only through
+  # the queue, which tests it on top of main first, so what reaches main is
+  # already tested (running it again was 35 % of the minutes).
   pull_request:
+  merge_group:
   # Weekly re-audit of dependencies: a vulnerability disclosed against an
   # unchanged dependency is caught even when no one pushes.
   schedule:
@@ -37,7 +39,8 @@ jobs:
     # CI_RUNNER_LIVIANO (like CI_RUNNER) sends it to the AWS runners when
     # GitHub has no minutes; without it, on GitHub's.
     runs-on: ${{ fromJSON(vars.CI_RUNNER_LIVIANO || '"ubuntu-latest"') }}
-    # On a PR, paths-filter asks GitHub's API for the list of files.
+    # On a PR, paths-filter asks GitHub's API for the list of files; in the
+    # merge queue it diffs the group's base and head commits with git.
     permissions:
       contents: read
       pull-requests: read
@@ -55,7 +58,7 @@ jobs:
           fetch-depth: 0
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         with:
           filters: |
             backend:
@@ -147,22 +150,22 @@ jobs:
       # Justified, dated exceptions live in deny.toml (Rust) and pnpm's audit
       # config (JS); see deny.toml for the process.
       - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
-        if: github.event_name != 'pull_request' || steps.filter.outputs.dependencies == 'true'
+        if: steps.filter.outcome == 'skipped' || steps.filter.outputs.dependencies == 'true'
       - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2.90.6
-        if: github.event_name != 'pull_request' || steps.filter.outputs.dependencies == 'true'
+        if: steps.filter.outcome == 'skipped' || steps.filter.outputs.dependencies == 'true'
         with:
           tool: cargo-deny
       - name: cargo-deny (advisories)
-        if: github.event_name != 'pull_request' || steps.filter.outputs.dependencies == 'true'
+        if: steps.filter.outcome == 'skipped' || steps.filter.outputs.dependencies == 'true'
         run: cargo deny check advisories
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-        if: github.event_name != 'pull_request' || steps.filter.outputs.dependencies == 'true'
+        if: steps.filter.outcome == 'skipped' || steps.filter.outputs.dependencies == 'true'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: github.event_name != 'pull_request' || steps.filter.outputs.dependencies == 'true'
+        if: steps.filter.outcome == 'skipped' || steps.filter.outputs.dependencies == 'true'
         with:
           node-version: 22
       - name: pnpm audit (high+critical)
-        if: github.event_name != 'pull_request' || steps.filter.outputs.dependencies == 'true'
+        if: steps.filter.outcome == 'skipped' || steps.filter.outputs.dependencies == 'true'
         # It audits the lockfile: nothing needs installing.
         run: pnpm audit --audit-level high
 
