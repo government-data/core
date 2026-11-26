@@ -4,8 +4,8 @@
 use std::time::{Duration, SystemTime};
 
 use application::lake::{
-    Lake, LakeAdmin, LakeCredentialKind, LakeError, LakeGrant, ManagedAccess, ManagedPolicy,
-    ReplicaTarget, RetentionRules, WarehouseMade, WriteOnce,
+    Lake, LakeAdmin, LakeCredentialKind, LakeError, LakeGrant, LakeKeys, ManagedAccess,
+    ManagedPolicy, ReplicaTarget, RetentionRules, WarehouseMade, WriteOnce,
 };
 
 /// The provisioning: a warehouse, its replication, the managed policies, a
@@ -75,16 +75,30 @@ pub async fn lake_admin(admin: &dyn LakeAdmin, warehouse: &str) {
         .await;
     assert!(matches!(bad, Err(LakeError::Invalid(_))), "{bad:?}");
 
-    for kind in [LakeCredentialKind::Admin, LakeCredentialKind::StsIssuer] {
-        let made = admin
-            .ensure_credentials(kind, None)
+    let made = admin
+        .ensure_credentials(LakeCredentialKind::Admin, None)
+        .await
+        .expect("keys made");
+    let kept = admin
+        .ensure_credentials(LakeCredentialKind::Admin, Some(&made))
+        .await
+        .expect("kept");
+    assert_eq!(kept, made, "the keys the core holds are kept while taken");
+    for kind in [
+        LakeCredentialKind::StsIssuer,
+        LakeCredentialKind::QueryEngine,
+    ] {
+        let given = LakeKeys {
+            access_key: format!("{kind:?}-given").to_lowercase(),
+            secret_key: "a-secret-the-agent-generated".into(),
+        };
+        let taken = admin
+            .ensure_credentials(kind, Some(&given))
             .await
-            .expect("keys made");
-        let kept = admin
-            .ensure_credentials(kind, Some(&made))
-            .await
-            .expect("kept");
-        assert_eq!(kept, made, "the keys the core holds are kept while taken");
+            .expect("given keys taken");
+        assert_eq!(taken, given, "given keys are taken as they are");
+        let none = admin.ensure_credentials(kind, None).await;
+        assert!(matches!(none, Err(LakeError::Invalid(_))), "{none:?}");
     }
     admin.health().await.expect("its health");
 }

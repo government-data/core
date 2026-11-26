@@ -208,6 +208,9 @@ pub enum CredentialKind {
     Root,
     Admin,
     StsIssuer,
+    /// A query engine's user (Trino's coordinator), limited to the
+    /// installation's warehouses (decision 0091, ruling 50).
+    QueryEngine,
 }
 
 impl CredentialKind {
@@ -217,6 +220,7 @@ impl CredentialKind {
             Self::Root => "root",
             Self::Admin => "admin",
             Self::StsIssuer => "sts-issuer",
+            Self::QueryEngine => "query-engine",
         }
     }
 }
@@ -367,6 +371,14 @@ mod tests {
         assert_eq!(
             paths::credentials(CredentialKind::StsIssuer),
             "/lake-admin/v1/credentials/sts-issuer"
+        );
+        assert_eq!(
+            paths::credentials(CredentialKind::QueryEngine),
+            "/lake-admin/v1/credentials/query-engine"
+        );
+        assert_eq!(
+            serde_json::to_value(CredentialKind::QueryEngine).unwrap(),
+            "query-engine"
         );
     }
 

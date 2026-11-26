@@ -222,6 +222,15 @@ impl LakeAdmin for InMemoryLake {
         held: Option<&LakeKeys>,
     ) -> Result<LakeKeys, LakeError> {
         let mut state = self.state.lock().unwrap();
+        if kind.keys_are_given() {
+            let keys = held.ok_or_else(|| {
+                LakeError::Invalid(format!("{kind:?}: its keys are given, none came"))
+            })?;
+            state
+                .keys
+                .insert(keys.access_key.clone(), keys.secret_key.clone());
+            return Ok(keys.clone());
+        }
         if let Some(keys) = held {
             if state.keys.get(&keys.access_key) == Some(&keys.secret_key) {
                 return Ok(keys.clone());
