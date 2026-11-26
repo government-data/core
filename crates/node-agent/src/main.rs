@@ -10,7 +10,7 @@
 //!   (certificate then key), `machine.key`, `machine.crt`, and `next.pem`
 //!   while a renewal waits;
 //! - `QD_INTERNAL_URL`: the API on Traefik's internal entry point,
-//!   `https://<INTERNAL_DOMAIN>:9443/api`, for renewing;
+//!   `https://<INTERNAL_DOMAIN>/api` (443), for renewing;
 //! - `QD_RENEW_EVERY`: how often to renew (`8h`; `s`, `m`, `h`, `d`), ±10%;
 //!   at start at once if under two thirds of the certificate is left;
 //! - `QD_AFTER_RENEW`: a command run after a new certificate is in place

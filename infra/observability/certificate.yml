@@ -60,9 +60,9 @@
 #                      too, unless MIMIR_S3_ENDPOINT names another)
 # Optional: LOKI_BIND (0.0.0.0), where Loki's port is published (Mimir's,
 # MIMIR_BIND, is Traefik's now); QD_EDGE_NETWORK (data-quality-edge), the
-# application's Traefik network; TRAEFIK_METRICS_PORT (9445) and
-# POSTGRES_PORT (5432), where Traefik's metrics entry point and PostgreSQL
-# are; LOKI_ADDRESS
+# application's Traefik network; POSTGRES_PORT (5432), where PostgreSQL
+# is (Traefik's metrics are on 443, under LOKI_SERVER_NAME's internal
+# entry point); LOKI_ADDRESS
 # (host-gateway, the VM itself), where Alloy and Grafana find
 # LOKI_SERVER_NAME: on another VM's Alloy, the application VM's address.
 #
@@ -142,7 +142,7 @@ services:
       METRICS_SCHEME: https
       METRICS_CA_FILE: /run/qd-node/ca.crt
       METRICS_CERT_FILE: /run/qd-node/machine.pem
-      METRICS_ROUTER_ADDRESS: ${LOKI_SERVER_NAME}:${TRAEFIK_METRICS_PORT:-9445}
+      METRICS_ROUTER_ADDRESS: ${LOKI_SERVER_NAME}:443
       LOKI_METRICS_ADDRESS: ${LOKI_SERVER_NAME}:${LOKI_HTTP_PORT:-3100}
       MIMIR_METRICS_ADDRESS: ${LOKI_SERVER_NAME}:${MIMIR_HTTP_PORT:-9009}
       METRICS_POSTGRES_DSN: postgresql://qd_metrics@${LOKI_SERVER_NAME}:${POSTGRES_PORT:-5432}/postgres?sslmode=verify-full&sslrootcert=/run/qd-node/ca.crt&sslcert=/run/qd-node/machine.pem&sslkey=/run/qd-node/machine.pem

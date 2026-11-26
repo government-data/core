@@ -237,7 +237,7 @@
       "addresses": "$GRAFANA_ALERT_EMAILS"
     },
     "webhook": {
-      "url": "https://${INTERNAL_DOMAIN}:9443/api/internal/machines/alerts"
+      "url": "https://${INTERNAL_DOMAIN}/api/internal/machines/alerts"
     },
     "heartbeat": {
       "name": "qd-api-heartbeat"

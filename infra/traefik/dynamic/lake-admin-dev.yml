@@ -1,7 +1,7 @@
 # Development only (decision 0078, step 13): the lake admin adapter of the
 # lake's dev stack (infra/rustfs/compose.dev.yml), which shares this
 # Traefik's network namespace and listens on its loopback (127.0.0.1:9020),
-# reached on the internal entry point by its name, lake-admin.<internal
+# reached on 443 (ruling 71) by its name, lake-admin.<internal
 # domain>. The adapter does its own mTLS (it answers the API's certificate
 # alone), so its TLS is passed through, routed by SNI before any HTTP
 # router of the entry point sees it (tools/verify/lake_admin_edge.sh).
@@ -14,7 +14,7 @@ tcp:
   routers:
     lake-admin-dev:
       rule: "HostSNI(`lake-admin.{{ $internal }}`)"
-      entryPoints: [internal]
+      entryPoints: [websecure]
       tls:
         passthrough: true
       service: lake-admin-dev

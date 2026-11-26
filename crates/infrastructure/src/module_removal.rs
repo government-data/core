@@ -32,11 +32,11 @@ impl HttpModuleRemovals {
 
     /// With the machine's certificate of the environment
     /// ([`LakeClient::from_env`]), at `https://<INTERNAL_DOMAIN>:<TRAEFIK_INTERNAL_PORT>`
-    /// (`internal.localhost` and 9443 by default, as Traefik's).
+    /// (`internal.localhost` and 443 by default, as Traefik's).
     pub fn from_env(within: Duration) -> Result<Self, String> {
         let var = |name: &str| std::env::var(name).ok().filter(|v| !v.trim().is_empty());
         let domain = var("INTERNAL_DOMAIN").unwrap_or_else(|| "internal.localhost".into());
-        let port = var("TRAEFIK_INTERNAL_PORT").unwrap_or_else(|| "9443".into());
+        let port = var("TRAEFIK_INTERNAL_PORT").unwrap_or_else(|| "443".into());
         let base = format!("https://{}:{}", domain.trim(), port.trim());
         Ok(Self::new(LakeClient::from_env(within)?, &base, within))
     }

@@ -110,15 +110,15 @@ http:
       middlewares: [api-strip, machine-certificate, security-headers]
 
     # The services' metrics, scraped by this VM's Alloy with its machine
-    # certificate (decision 0071, points 6 and 7) on the `metrics` entry
-    # point: Traefik's own, and those of Grafana and Dolt, which cannot
+    # certificate (decision 0071, points 6 and 7) on the internal entry
+    # point, reached on 443 like the machines' routes: Traefik's own, and those of Grafana and Dolt, which cannot
     # require a client certificate themselves. Grafana's `/grafana/metrics`
     # also asks for its basic auth (GF_METRICS_BASIC_AUTH_*), so the same
     # path on the public entry point gives nothing. No access log: a scrape
     # every 30 seconds is not a request anyone reads.
     metrics-traefik:
       rule: "Host(`{{ $internal }}`) && Path(`/metrics`)"
-      entryPoints: [metrics]
+      entryPoints: [internal]
       tls:
         options: machines
       service: prometheus@internal
@@ -126,7 +126,7 @@ http:
         accessLogs: false
     metrics-grafana:
       rule: "Host(`{{ $internal }}`) && Path(`/grafana/metrics`)"
-      entryPoints: [metrics]
+      entryPoints: [internal]
       tls:
         options: machines
       service: grafana
@@ -134,7 +134,7 @@ http:
         accessLogs: false
     metrics-dolt:
       rule: "Host(`{{ $internal }}`) && Path(`/dolt/metrics`)"
-      entryPoints: [metrics]
+      entryPoints: [internal]
       tls:
         options: machines
       middlewares: [metrics-dolt-strip]

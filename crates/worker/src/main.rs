@@ -24,7 +24,7 @@
 //!   (`postgres://qd_queue@<host>:5432/<database>`), TLS `verify-full`
 //!   added by the worker;
 //! - `QD_API_URL`: the API, `https://<domain>/api`; with a certificate the
-//!   internal entry point's, `https://<internal domain>:9443/api`;
+//!   internal entry point's, `https://<internal domain>/api` (443);
 //! - `QD_WORKER_CLIENT_ID`: its OIDC machine client, allowed the audience
 //!   `quality-api` (with a certificate, the role's client, e.g.
 //!   `qd-worker`, registered with `--machine-role worker`);

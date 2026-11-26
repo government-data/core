@@ -13,11 +13,10 @@
 #   INTERNAL_CERT_FILE and INTERNAL_KEY_FILE), so INTERNAL_DOMAIN must be
 #   the application VM's machine name, the only DNS name the CA gives it;
 #   the serversTransport `lake` presents it to the lake's gate.
-# - The `metrics` entry point (decision 0071) is published for this VM's
-#   Alloy, which reaches it as the machine's name through the Docker
-#   host's gateway (infra/observability/certificate.yml) and presents the
-#   same certificate. No other VM scrapes it: 0023's ports table has no row
-#   for it.
+# - The services' metrics (decision 0071) are routes of the internal entry
+#   point, which this VM's Alloy reaches on 443 as the machine's name
+#   through the Docker host's gateway (infra/observability/certificate.yml),
+#   presenting the same certificate. No port of their own (ruling 71).
 # - Mimir (decision 0071, amended on 2026-11-16) is reached through the
 #   `mimir` entry point, published as MIMIR_HTTP_PORT (9009), where every
 #   VM's Alloy pushes: any certificate of the CA may push, only role `app`
@@ -28,9 +27,7 @@
 # Required environment, besides docker-compose.yml's:
 #   QD_MACHINE_DIR   the application VM's node agent directory (QD_AGENT_DIR)
 # Optional: QD_TRAEFIK_CHECK_EVERY (30), seconds between looks at the
-# agent's machine.pem; TRAEFIK_METRICS_BIND (0.0.0.0) and
-# TRAEFIK_METRICS_PORT (9445), where the metrics entry point is published;
-# MIMIR_BIND (0.0.0.0) and MIMIR_HTTP_PORT (9009), where the `mimir` one
+# agent's machine.pem; MIMIR_BIND (0.0.0.0) and MIMIR_HTTP_PORT (9009), where the `mimir` one
 # is; MIMIR_UPSTREAM (https://mimir:9009), Mimir as Traefik reaches it.
 #
 # Verified with tools/verify/traefik_app_certificate.sh; this file itself
@@ -46,7 +43,6 @@ services:
       QD_TRAEFIK_CHECK_EVERY: ${QD_TRAEFIK_CHECK_EVERY:-30}
       MIMIR_UPSTREAM: ${MIMIR_UPSTREAM:-https://mimir:${MIMIR_HTTP_PORT:-9009}}
     ports:
-      - "${TRAEFIK_METRICS_BIND:-0.0.0.0}:${TRAEFIK_METRICS_PORT:-9445}:9445"
       - "${MIMIR_BIND:-0.0.0.0}:${MIMIR_HTTP_PORT:-9009}:9446"
     volumes:
       - "./dynamic:/etc/traefik/dynamic"

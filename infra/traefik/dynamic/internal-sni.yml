@@ -1,0 +1,29 @@
+# One published port (ruling 71; decision 0091): the machines' entry point
+# `internal` is on Traefik's loopback only (traefik.yml), reached on 443
+# (`websecure`) by its name. A TLS connection whose SNI is INTERNAL_DOMAIN
+# is passed through as it comes, not terminated here, to `internal`, which
+# requires the client certificate of the installation's CA with its own TLS
+# options, timeouts and routers (internal.yml), as before. The PROXY
+# protocol (v2) gives it the client's address. Any other name, or none, is
+# the web's: no router there answers for INTERNAL_DOMAIN, so a handshake
+# for the public name followed by `Host: <INTERNAL_DOMAIN>` gets 404
+# (tools/verify/traefik_one_port.sh).
+{{ $internal := env "INTERNAL_DOMAIN" | default "internal.localhost" }}
+tcp:
+  routers:
+    internal-entry:
+      rule: "HostSNI(`{{ $internal }}`)"
+      entryPoints: [websecure]
+      tls:
+        passthrough: true
+      service: internal-entry
+  services:
+    internal-entry:
+      loadBalancer:
+        serversTransport: internal-entry
+        servers:
+          - address: "127.0.0.1:9443"
+  serversTransports:
+    internal-entry:
+      proxyProtocol:
+        version: 2

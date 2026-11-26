@@ -9,7 +9,7 @@
 #   app.pem      the API's: role `app`, the one the adapter answers
 #
 # The adapter runs in the lake's dev stack (infra/rustfs/compose.dev.yml,
-# `task lake:up`) and is reached through the internal entry point (9443) by
+# `task lake:up`) and is reached through 443 by its name (SNI) by
 # that name, its TLS passed through to it (dynamic/lake-admin-dev.yml). Dev
 # only: the files are readable by the adapter's user, and renewed by
 # running this again (30 days).

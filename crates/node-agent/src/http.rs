@@ -23,7 +23,7 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 pub struct HttpApi {
     /// The public entry point's API, `https://<domain>/api`.
     public_url: String,
-    /// The internal one's, `https://<internal domain>:9443/api`.
+    /// The internal one's, `https://<internal domain>/api` (443).
     internal_url: String,
     /// The CA file trusted for the join, PEM.
     join_ca: Option<Vec<u8>>,

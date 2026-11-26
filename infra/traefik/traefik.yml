@@ -17,19 +17,23 @@ global:
 #                     resolver so certificates are issued automatically.
 #   traefik   :8080 — internal-only, backs the container healthcheck (/ping).
 #                     Not published to the host.
-#   internal  :9443 — the machines' entry point (decision 0066, point 5): TLS
-#                     with a client certificate of the installation's CA
-#                     required. Its routers and TLS options are in
-#                     dynamic/internal.yml, which exists only once the CA
-#                     does (infra/traefik/internal.yml); until then nothing
-#                     answers here. Published as TRAEFIK_INTERNAL_PORT.
+#   internal  127.0.0.1:9443 — the machines' entry point (decision 0066,
+#                     point 5): TLS with a client certificate of the
+#                     installation's CA required. Its routers and TLS
+#                     options are in dynamic/internal.yml, which exists only
+#                     once the CA does (infra/traefik/internal.yml); until
+#                     then nothing answers here. On Traefik's loopback,
+#                     published nowhere: reached on 443 by INTERNAL_DOMAIN
+#                     (SNI), passed through as it comes with the client's
+#                     address (dynamic/internal-sni.yml; ruling 71,
+#                     tools/verify/traefik_one_port.sh).
 #   lakegate  :9444 — the lake's gates' entry point (0066, point 10): the
 #                     same TLS, one route, forwarded headers kept.
-#   metrics   :9445 — the services' metrics (decision 0071, point 7): Alloy
-#                     scrapes Traefik's own, Grafana's and Dolt's here, a
-#                     client certificate of the CA required (internal.yml's
-#                     routers); nothing answers without them. Published by
-#                     certificate.yml for the VM's own Alloy alone.
+#   metrics   :9445 — development's plain metrics (dynamic/metrics-dev.yml),
+#                     published nowhere by the package: there the services'
+#                     metrics (decision 0071, point 7) are internal.yml's
+#                     routers on `internal`, with a client certificate of
+#                     the CA, which the VM's Alloy scrapes on 443.
 #   mimir     :9446 — Mimir (decision 0071, amended 2026-11-16): a client
 #                     certificate of the CA required; any machine may push
 #                     (/api/v1/push), only the application VM's
@@ -65,7 +69,11 @@ entryPoints:
   # No certificate resolver: its name is not public, so its server
   # certificate comes from the installation's CA (internal.yml).
   internal:
-    address: ":9443"
+    address: "127.0.0.1:9443"
+    # Only Traefik's own passthrough (internal-sni.yml) connects here: the
+    # PROXY protocol header it sends gives the client's address.
+    proxyProtocol:
+      trustedIPs: ["127.0.0.1/32"]
     transport:
       respondingTimeouts:
         readTimeout: 30s
@@ -113,7 +121,7 @@ entryPoints:
     address: ":8080"
 
 # Traefik's own metrics (decision 0071), served only through a router to
-# `prometheus@internal` (manualRouting): internal.yml's, on `metrics`, with
+# `prometheus@internal` (manualRouting): internal.yml's, on `internal`, with
 # a client certificate of the CA; in development dynamic/metrics-dev.yml's.
 # By entry point and by service; never by router.
 metrics:
