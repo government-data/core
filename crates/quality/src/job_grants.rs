@@ -55,6 +55,9 @@ pub struct DatasetJobs {
     pub sources: Vec<String>,
     /// The other datasets its approved rules reference.
     pub references: Vec<String>,
+    /// Its bronze and silver table (the mapping's `source`), whose `$refs`
+    /// its report user reads to pin the job (ruling 39).
+    pub table: Option<String>,
 }
 
 /// A name the rules merge takes: `[a-z0-9_]`, 1 to 63.
@@ -130,10 +133,16 @@ fn dataset_grants(out: &mut Vec<Grant>, d: &DatasetJobs, sources: &[&str]) {
         grant(&rules, SCRATCH, &[SCRATCH_TABLE], &writes),
         name,
     ));
-    out.push(of_dataset(
-        grant(&format!("job_report_{name}"), GOLD, &["*"], &[Select]),
-        name,
-    ));
+    let report = format!("job_report_{name}");
+    out.push(of_dataset(grant(&report, GOLD, &["*"], &[Select]), name));
+    // Snapshot ids only: one exact `<table>$refs` per layer, no wildcard
+    // (ruling 39; the spelling settled with `trino-rules` 2026-11-25).
+    if let Some(t) = d.table.as_deref().filter(|t| is_name(t)) {
+        let refs = format!("{t}$refs");
+        for ns in &layers {
+            out.push(grant(&report, ns, &[refs.as_str()], &[Select]));
+        }
+    }
     let extract = format!("job_extract_{name}");
     for s in sources {
         out.push(grant(&extract, &format!("src_{s}.*"), &["*"], &[Select]));
