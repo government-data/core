@@ -86,7 +86,8 @@ jobs:
               - 'crates/quality/charts/**'
               - 'crates/quality/src/charts.rs'
               - '.github/workflows/ci.yml'
-            # What goes into each image: a broken Dockerfile fails the PR. The
+            # What goes into each image: a broken Dockerfile fails in the merge queue
+            # (the image jobs do not run on pull_request). The
             # API's and the web's report version.txt's version.
             image-api:
               - 'infra/docker/api.Dockerfile'
@@ -287,7 +288,7 @@ jobs:
   # need more than the free space an ubuntu-latest runner starts with.
   image-api:
     needs: check
-    if: ${{ needs.check.outputs.image-api == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-api == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -331,7 +332,7 @@ jobs:
   # mismatch.
   image-worker:
     needs: check
-    if: ${{ needs.check.outputs.image-worker == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-worker == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -366,7 +367,7 @@ jobs:
   # lake-rustfs repository, step 15).
   image-lake-rustfs-admin:
     needs: check
-    if: ${{ needs.check.outputs.image-lake-rustfs-admin == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-lake-rustfs-admin == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -396,7 +397,7 @@ jobs:
 
   image-web:
     needs: check
-    if: ${{ needs.check.outputs.image-web == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-web == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -445,16 +446,22 @@ jobs:
             echo "check job did not succeed"; exit 1
           fi
           for stack in backend frontend image-api image-web image-worker image-lake-rustfs-admin; do
+            affected=""
             case "$stack" in
               backend) result="${{ needs.backend.result }}" ;;
               frontend) result="${{ needs.frontend.result }}" ;;
-              image-api) result="${{ needs.image-api.result }}" ;;
-              image-web) result="${{ needs.image-web.result }}" ;;
-              image-worker) result="${{ needs.image-worker.result }}" ;;
-              image-lake-rustfs-admin) result="${{ needs.image-lake-rustfs-admin.result }}" ;;
+              image-api) result="${{ needs.image-api.result }}"; affected="${{ needs.check.outputs.image-api }}" ;;
+              image-web) result="${{ needs.image-web.result }}"; affected="${{ needs.check.outputs.image-web }}" ;;
+              image-worker) result="${{ needs.image-worker.result }}"; affected="${{ needs.check.outputs.image-worker }}" ;;
+              image-lake-rustfs-admin) result="${{ needs.image-lake-rustfs-admin.result }}"; affected="${{ needs.check.outputs.image-lake-rustfs-admin }}" ;;
             esac
             if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
               echo "$stack job $result"; exit 1
+            fi
+            # Images build only in the merge queue (skipped on pull_request):
+            # there an affected image job must have run and passed.
+            if [ "${{ github.event_name }}" = "merge_group" ] && [ "$affected" = "true" ] && [ "$result" != "success" ]; then
+              echo "$stack job $result in the merge queue"; exit 1
             fi
           done
           echo "CI passed"
