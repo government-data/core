@@ -72,7 +72,8 @@
       "noSuchModule": "no module {{name}} is installed",
       "notTheAgent": "Only the update agent's certificate calls updater/v1.",
       "purgeInstalled": "module {{name}} is installed: remove it before purging it",
-      "unavailable": "The database does not answer."
+      "unavailable": "The database does not answer.",
+      "badRoleSecrets": "the role secrets are {\"roles\": {\"<role>\": {\"<name>\": \"<value>\"}}}"
     },
     "internal": {
       "invalidEmail": "Invalid email address.",
@@ -267,6 +268,11 @@
       "removal": {
         "noAnswer": "module {{name}} declares a removal check and did not answer: the removal waits until it answers",
         "unreadable": "module {{name}} refused the removal with an answer that does not read"
+      },
+      "roleSecrets": {
+        "notInstalled": "module {{name}} is not installed",
+        "noSuchRole": "module {{name}} declares no role {{role}}",
+        "bad": "module {{name}}: the secrets of role {{role}} are at most 32, named with letters, digits, «.», «_» or «-», each at most 64 KiB"
       }
     }
   },

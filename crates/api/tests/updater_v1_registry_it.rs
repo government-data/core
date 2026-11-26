@@ -174,3 +174,36 @@ async fn the_modules_roles_are_stored_and_a_bad_list_is_refused() {
     }
     assert_eq!(w.updates.installed_modules().await.unwrap(), stored, "kept");
 }
+
+#[tokio::test]
+async fn the_agent_hands_a_roles_secrets_and_a_bad_call_keeps_them() {
+    let w = world().await;
+    let cert = agent(&w.machines).await;
+    let image = format!("{HOST}/quality-data/engine-trino/trino@sha256:{DIGEST}");
+    let modules = json!({ "modules": [{ "name": "engine-trino", "version": "0.1.0",
+        "roles": [{ "name": "trino-worker", "strategy": "one", "services": ["trino"],
+                    "images": [image] }] }] });
+    assert_eq!(
+        put(&w, "/updater/v1/modules", &cert, modules).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let path = "/updater/v1/modules/engine-trino/role-secrets";
+    let body = json!({ "roles": { "trino-worker": { "trino-shared-secret": "s3cret-value" } } });
+    assert_eq!(put(&w, path, &cert, body).await.0, StatusCode::NO_CONTENT);
+    let held = w.updates.role_secrets("engine-trino", "trino-worker");
+    assert_eq!(held.0["trino-shared-secret"], "s3cret-value");
+    for bad in [
+        json!({ "roles": { "lake": { "a": "1" } } }),
+        json!({ "roles": { "trino-worker": { "a b": "1" } } }),
+        json!({ "nothing": true }),
+    ] {
+        let (status, body) = put(&w, path, &cert, bad.clone()).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{bad}");
+        assert!(!body.to_string().contains("s3cret-value"));
+    }
+    let docs = "/updater/v1/modules/docs/role-secrets";
+    let (status, _) = put(&w, docs, &cert, json!({ "roles": {} })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "not installed");
+    let kept = w.updates.role_secrets("engine-trino", "trino-worker");
+    assert_eq!(kept.0.len(), 1, "kept");
+}

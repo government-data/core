@@ -2754,8 +2754,16 @@ export interface components {
          *     its files, which the machine puts under `<module>/`.
          */
         RoleModuleOut: {
+            /** @description The role's `IMAGE_*` values, for its `compose.yml`. */
+            env: {
+                [key: string]: string;
+            };
             files: components["schemas"]["RoleFileOut"][];
             name: string;
+            /** @description The secrets the role declares, by name: only here, over mTLS. */
+            secrets: {
+                [key: string]: string;
+            };
             services: string[];
             version: string;
         };

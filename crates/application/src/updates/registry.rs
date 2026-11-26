@@ -83,6 +83,10 @@ pub struct RoleModule {
     pub version: String,
     pub services: Vec<String>,
     pub files: Vec<super::RoleFile>,
+    /// The role's resolved `IMAGE_*` values.
+    pub env: std::collections::BTreeMap<String, String>,
+    /// The role's declared secrets, as the agent handed them.
+    pub secrets: super::RoleSecrets,
 }
 
 impl std::fmt::Debug for RegistryGrant {
@@ -135,6 +139,8 @@ impl UpdatesService {
                     version: m.version.clone(),
                     services: r.services.clone(),
                     files: r.files.clone(),
+                    env: r.env.clone(),
+                    secrets: self.role_secrets(&m.name, role),
                 })
                 .collect(),
         })

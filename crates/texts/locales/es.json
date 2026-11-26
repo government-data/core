@@ -72,7 +72,8 @@
       "noSuchModule": "no hay ningún módulo {{name}} instalado",
       "notTheAgent": "Solo el certificado del agente de actualización llama a updater/v1.",
       "purgeInstalled": "el módulo {{name}} está instalado: quítalo antes de purgarlo",
-      "unavailable": "La base de datos no responde."
+      "unavailable": "La base de datos no responde.",
+      "badRoleSecrets": "los secretos de rol son {\"roles\": {\"<rol>\": {\"<nombre>\": \"<valor>\"}}}"
     },
     "internal": {
       "invalidEmail": "Correo inválido.",
@@ -267,6 +268,11 @@
       "removal": {
         "noAnswer": "el módulo {{name}} declara una comprobación de retiro y no respondió: el retiro espera a que responda",
         "unreadable": "el módulo {{name}} rechazó el retiro con una respuesta que no se puede leer"
+      },
+      "roleSecrets": {
+        "notInstalled": "el módulo {{name}} no está instalado",
+        "noSuchRole": "el módulo {{name}} no declara el rol {{role}}",
+        "bad": "módulo {{name}}: los secretos del rol {{role}} son 32 a lo sumo, con nombres de letras, dígitos, «.», «_» o «-», de 64 KiB cada uno a lo sumo"
       }
     }
   },
