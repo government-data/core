@@ -3,6 +3,7 @@
 //! module's migrations, router and use cases (datasets, runs, queues) come
 //! with M2, through `contracts`.
 
+pub mod bundle;
 pub mod catalog;
 pub mod chart_api;
 pub mod charts;
