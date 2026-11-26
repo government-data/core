@@ -4,7 +4,7 @@
 //! privileges, rows}`), never in Trino's syntax. Pure: the caller gives
 //! the datasets, their sources and the datasets their rules reference.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 
@@ -93,6 +93,16 @@ fn of_dataset(mut g: Grant, dataset: &str) -> Grant {
 pub fn job_grants(datasets: &[DatasetJobs]) -> Vec<Grant> {
     let mut out = Vec::new();
     let mut sources = BTreeSet::new();
+    let tables: BTreeMap<&str, &str> = datasets
+        .iter()
+        .filter(|d| is_name(&d.dataset))
+        .filter_map(|d| {
+            Some((
+                d.dataset.as_str(),
+                d.table.as_deref().filter(|t| is_name(t))?,
+            ))
+        })
+        .collect();
     for d in datasets.iter().filter(|d| is_name(&d.dataset)) {
         let srcs: Vec<&str> = d
             .sources
@@ -101,7 +111,7 @@ pub fn job_grants(datasets: &[DatasetJobs]) -> Vec<Grant> {
             .filter(|s| is_name(s))
             .collect();
         sources.extend(srcs.iter().copied());
-        dataset_grants(&mut out, d, &srcs);
+        dataset_grants(&mut out, d, &srcs, &tables);
     }
     out.push(grant("job_maint_gold", GOLD, &["*"], &[Select, Delete]));
     for s in sources {
@@ -115,7 +125,20 @@ pub fn job_grants(datasets: &[DatasetJobs]) -> Vec<Grant> {
     out
 }
 
-fn dataset_grants(out: &mut Vec<Grant>, d: &DatasetJobs, sources: &[&str]) {
+/// `user`'s `SELECT` on `dataset`'s bronze and silver `<table>$refs` only.
+fn refs_grants(out: &mut Vec<Grant>, user: &str, dataset: &str, table: &str) {
+    let refs = format!("{table}$refs");
+    for ns in &namespaces(dataset) {
+        out.push(grant(user, ns, &[refs.as_str()], &[Select]));
+    }
+}
+
+fn dataset_grants(
+    out: &mut Vec<Grant>,
+    d: &DatasetJobs,
+    sources: &[&str],
+    tables: &BTreeMap<&str, &str>,
+) {
     let name = d.dataset.as_str();
     let layers = namespaces(name);
     let rules = format!("job_rules_{name}");
@@ -138,9 +161,12 @@ fn dataset_grants(out: &mut Vec<Grant>, d: &DatasetJobs, sources: &[&str]) {
     // Snapshot ids only: one exact `<table>$refs` per layer, no wildcard
     // (ruling 39; the spelling settled with `trino-rules` 2026-11-25).
     if let Some(t) = d.table.as_deref().filter(|t| is_name(t)) {
-        let refs = format!("{t}$refs");
-        for ns in &layers {
-            out.push(grant(&report, ns, &[refs.as_str()], &[Select]));
+        refs_grants(out, &report, name, t);
+    }
+    // And its references' (ruling 61): the evaluate pins them too.
+    for r in d.references.iter().filter(|r| is_name(r) && *r != name) {
+        if let Some(t) = tables.get(r.as_str()) {
+            refs_grants(out, &report, r, t);
         }
     }
     let extract = format!("job_extract_{name}");

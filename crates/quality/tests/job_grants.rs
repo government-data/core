@@ -114,3 +114,41 @@ fn the_report_user_reads_its_tables_refs_by_exact_name() {
     let g = job_grants(&[d]);
     assert!(g.iter().all(|g| g.tables.iter().all(|t| !t.contains('$'))));
 }
+
+/// Ruling 61: the report user also reads its references' `$refs`, by the
+/// referenced dataset's own table, to pin them; a reference with no known
+/// table, or the dataset itself, adds nothing.
+#[test]
+fn the_report_user_reads_its_references_refs() {
+    let mut d = loans();
+    d.table = Some("loans_extract".into());
+    let branches = DatasetJobs {
+        dataset: "branches".into(),
+        sources: vec![],
+        references: vec![],
+        table: Some("offices".into()),
+    };
+    let g = job_grants(&[d.clone(), branches]);
+    let refs: Vec<(String, Vec<String>)> = of(&g, "job_report_loans")
+        .into_iter()
+        .filter(|g| g.namespace != "quality_gold")
+        .map(|g| (g.namespace.clone(), g.tables.clone()))
+        .collect();
+    assert_eq!(
+        refs,
+        [
+            ("loans_bronze".into(), vec!["loans_extract$refs".into()]),
+            ("loans_silver".into(), vec!["loans_extract$refs".into()]),
+            ("branches_bronze".into(), vec!["offices$refs".into()]),
+            ("branches_silver".into(), vec!["offices$refs".into()]),
+        ]
+    );
+    let alone = job_grants(&[d]);
+    assert_eq!(
+        of(&alone, "job_report_loans")
+            .iter()
+            .filter(|g| g.namespace.starts_with("branches"))
+            .count(),
+        0
+    );
+}
