@@ -30,8 +30,8 @@ pub use machines::{Drives, DrivesError, MAX_DRIVES};
 pub use machines::{Lakes, ReplicationReadiness, ReplicationStatus, RECONCILER};
 pub use machines::{PoolError, PoolNodes, RegistryOutcome};
 pub use platform::{
-    CreatedServiceAccount, GroupChange, MintedToken, PlatformError, PlatformService, PolicyView,
-    TokenMint,
+    CreatedServiceAccount, GroupChange, MintedToken, PlatformError, PlatformGrantees,
+    PlatformService, PolicyView, TokenMint,
 };
 pub use settings::{
     entra_own_tenant, DirectoryMember, DirectoryProbe, DirectoryProbeUser, EnvSettings,
