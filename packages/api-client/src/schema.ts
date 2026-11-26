@@ -2427,7 +2427,7 @@ export interface components {
             drives_online?: number | null;
             /**
              * @description Where the application reaches it (`LAKE_ENDPOINT`).
-             * @example https://lake-1:9000
+             * @example https://lake-1
              */
             endpoint?: string | null;
             /**

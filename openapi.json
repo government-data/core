@@ -6063,7 +6063,7 @@
               "null"
             ],
             "description": "Where the application reaches it (`LAKE_ENDPOINT`).",
-            "example": "https://lake-1:9000"
+            "example": "https://lake-1"
           },
           "state": {
             "type": "string",

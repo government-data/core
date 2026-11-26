@@ -2,7 +2,8 @@
 //! user's rulings of 2026-11-24): `application::lake::LakeAdmins` over the
 //! generic client of `lake-admin/1`. The main lake's adapter is at
 //! `LAKE_ADMIN_URL` (until the module's manifest declares it, step 17); a
-//! replica's on its machine, on port 443, its certificate of role
+//! replica's at `admin.<machine>` on port 443, the name its gate passes
+//! through to it (decision 0091, ruling 72), its certificate of role
 //! `lake-replica`. Every call presents the application VM's certificate
 //! (`LAKE_ADMIN_CERT_FILE`, by default `LAKE_CLIENT_CERT_FILE`) and trusts the installation's CA alone
 //! (`LAKE_ADMIN_CA_FILE`, by default `CA_CERT_FILE`), both read again for
@@ -56,6 +57,7 @@ pub struct AdapterLakeAdmins {
     main: Option<String>,
     pems: Pems,
     keys: Arc<dyn AdminKeySource>,
+    replica_prefix: &'static str,
     replica_port: u16,
 }
 
@@ -63,6 +65,7 @@ impl std::fmt::Debug for AdapterLakeAdmins {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AdapterLakeAdmins")
             .field("main", &self.main)
+            .field("replica_prefix", &self.replica_prefix)
             .field("replica_port", &self.replica_port)
             .finish_non_exhaustive()
     }
@@ -107,8 +110,23 @@ impl AdapterLakeAdmins {
             main,
             pems,
             keys,
+            replica_prefix: crate::ca::LAKE_ADMIN_PREFIX,
             replica_port: REPLICA_ADAPTER_PORT,
         }
+    }
+
+    /// A replica's adapter at `<prefix><machine>` instead (tests).
+    pub fn replica_prefix(mut self, prefix: &'static str) -> Self {
+        self.replica_prefix = prefix;
+        self
+    }
+
+    /// Where a replica's adapter answers, on its machine `node`.
+    fn replica_base(&self, node: &str) -> String {
+        format!(
+            "https://{}{node}:{}",
+            self.replica_prefix, self.replica_port
+        )
     }
 
     /// A replica's adapter on `port` instead (tests).
@@ -119,10 +137,7 @@ impl AdapterLakeAdmins {
 
     fn client(&self, lake: &Lake, node: &str) -> Result<LakeAdminClient, String> {
         let (base, role) = match lake {
-            Lake::Replica => (
-                format!("https://{node}:{}", self.replica_port),
-                REPLICA_ROLE,
-            ),
+            Lake::Replica => (self.replica_base(node), REPLICA_ROLE),
             Lake::Pool(_) => match &self.main {
                 Some(url) => (url.clone(), crate::lake_admin_client::ADAPTER_ROLE),
                 None => return Err("no LAKE_ADMIN_URL: the main lake's adapter".into()),
@@ -200,5 +215,30 @@ impl LakeAdmin for NotReached {
 
     async fn health(&self) -> Result<LakeHealth, LakeError> {
         self.answer()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct NoKeys;
+
+    #[async_trait]
+    impl AdminKeySource for NoKeys {
+        async fn open(
+            &self,
+            _: &Lake,
+        ) -> Result<Option<auth_gateway::LakeAdminKeys>, domain::RepositoryError> {
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn a_replicas_adapter_is_its_machines_admin_name_on_443() {
+        let admins = AdapterLakeAdmins::new(None, "ca", "identity", Arc::new(NoKeys));
+        assert_eq!(admins.replica_base("lake-2"), "https://admin.lake-2:443");
+        let named = admins.replica_prefix("").replica_port(9);
+        assert_eq!(named.replica_base("localhost"), "https://localhost:9");
     }
 }

@@ -18,7 +18,7 @@
 #
 # Required environment, besides docker-compose.yml's:
 #   QD_MACHINE_NAME   the machine's name, as in its certificate
-#   QD_LAKE_GATE      the lake's gate, <the lake node's name>:<port> (9000)
+#   QD_LAKE_GATE      the lake's gate, <the lake node's name>:<port> (443)
 # Optional: TRAEFIK_IMAGE (traefik:v3.6), QD_LAKE_CHECK_EVERY (30, seconds).
 #
 # Its entrypoint is verified with tools/verify/rustfs_lake_gate_api.sh;
