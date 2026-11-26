@@ -155,6 +155,7 @@ impl From<LakeCredentialKind> for wire::CredentialKind {
             LakeCredentialKind::Root => Self::Root,
             LakeCredentialKind::Admin => Self::Admin,
             LakeCredentialKind::StsIssuer => Self::StsIssuer,
+            LakeCredentialKind::QueryEngine => Self::QueryEngine,
         }
     }
 }
@@ -165,6 +166,7 @@ impl From<wire::CredentialKind> for LakeCredentialKind {
             wire::CredentialKind::Root => Self::Root,
             wire::CredentialKind::Admin => Self::Admin,
             wire::CredentialKind::StsIssuer => Self::StsIssuer,
+            wire::CredentialKind::QueryEngine => Self::QueryEngine,
         }
     }
 }
@@ -328,6 +330,7 @@ mod tests {
             LakeCredentialKind::Root,
             LakeCredentialKind::Admin,
             LakeCredentialKind::StsIssuer,
+            LakeCredentialKind::QueryEngine,
         ] {
             assert_eq!(
                 LakeCredentialKind::from(wire::CredentialKind::from(kind)),

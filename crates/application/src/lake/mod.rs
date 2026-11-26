@@ -219,6 +219,19 @@ pub enum LakeCredentialKind {
     Root,
     Admin,
     StsIssuer,
+    /// A query engine's user (Trino's coordinator), limited to the
+    /// installation's warehouses (decision 0091, ruling 50).
+    QueryEngine,
+}
+
+impl LakeCredentialKind {
+    /// Whether the keys are made outside the lake (read-only files the
+    /// agent generated: the STS issuer's, a query engine's) and the lake
+    /// takes them as they are: `held` is required and never replaced
+    /// (decision 0091, ruling 46).
+    pub fn keys_are_given(self) -> bool {
+        matches!(self, Self::StsIssuer | Self::QueryEngine)
+    }
 }
 
 /// A pair of the lake's own keys, kept sealed by the core (point 9). The
@@ -310,6 +323,10 @@ pub trait LakeAdmin: Send + Sync {
     async fn session_policy(&self, grant: &LakeGrant) -> Result<SessionPolicy, LakeError>;
     /// The lake's own keys of `kind`: `held` (the ones the core keeps) if
     /// the lake still takes them, else new ones made, for the core to seal.
+    /// For a kind whose keys are given ([`LakeCredentialKind::keys_are_given`])
+    /// the lake makes or updates its user with `held` and answers them;
+    /// without `held` it is [`LakeError::Invalid`], and it never answers
+    /// new ones (decision 0091, ruling 46).
     async fn ensure_credentials(
         &self,
         kind: LakeCredentialKind,

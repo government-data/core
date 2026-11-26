@@ -184,6 +184,7 @@ impl LakeAdminServer {
             "root" => CredentialKind::Root,
             "admin" => CredentialKind::Admin,
             "sts-issuer" => CredentialKind::StsIssuer,
+            "query-engine" => CredentialKind::QueryEngine,
             other => return Err(LakeError::Unknown(format!("credentials {other}"))),
         };
         let request = parse::<wire::CredentialsRequest>(body)?;
