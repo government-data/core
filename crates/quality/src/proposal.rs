@@ -51,6 +51,17 @@ impl Patterns {
         ]
     }
 
+    /// The first kind whose pattern is empty or not one the engine takes:
+    /// parsed as RE2's syntax in pure Rust (decision 0090, ruling 41), with
+    /// what RE2 and RE2J lack (look-around, back-references) refused by
+    /// the parser too.
+    pub fn refused(&self) -> Option<&'static str> {
+        self.all()
+            .into_iter()
+            .find(|(_, p)| p.trim().is_empty() || regex_syntax::Parser::new().parse(p).is_err())
+            .map(|(kind, _)| kind)
+    }
+
     /// The ones a map job was queued with, or the defaults.
     pub fn of_job(parameters: &serde_json::Value) -> Self {
         parameters
@@ -299,4 +310,26 @@ pub(crate) fn table_name(table: &str) -> String {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod pattern_tests {
+    use super::Patterns;
+
+    #[test]
+    fn the_defaults_are_re2_and_broken_or_unsupported_patterns_are_refused() {
+        assert_eq!(Patterns::default().refused(), None);
+        for (bad, kind) in [
+            ("(unclosed", "mobile"),
+            (" ", "mobile"),
+            (r"(\d)\1", "mobile"),
+            (r"3(?=\d)", "mobile"),
+        ] {
+            let p = Patterns {
+                mobile: bad.into(),
+                ..Patterns::default()
+            };
+            assert_eq!(p.refused(), Some(kind), "{bad}");
+        }
+    }
 }

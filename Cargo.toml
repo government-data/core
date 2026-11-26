@@ -123,6 +123,8 @@ serde_json = "1"
 # Module event schemas (quality-sdk decision 0017): Draft 2020-12; default
 # features off, so no HTTP or file resolver (tools/verify/jsonschema-draft).
 jsonschema = { version = "=0.61.1", default-features = false }
+# RE2-style syntax of the semantic patterns, checked in pure Rust (decision 0090, ruling 41).
+regex-syntax = "0.8"
 # The rules' YAML (decision 0033, verified in tools/verify/rules-yaml): line
 # and column of every error and of every value, duplicate keys refused, a node
 # budget against alias bombs.
