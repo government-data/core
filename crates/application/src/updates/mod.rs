@@ -26,6 +26,7 @@ mod module_roles;
 mod modules;
 mod policy;
 mod registry;
+mod removal;
 mod report;
 mod store;
 #[cfg(test)]
@@ -38,6 +39,7 @@ pub use module_roles::{ModuleRole, RoleFile, RoleStrategy};
 pub use modules::{DeclaredModule, InstalledModule};
 pub use policy::UpdatePolicy;
 pub use registry::{GrantRefusal, RegistryGrant, RegistryToken, RoleModule};
+pub use removal::{RemovalAnswer, RemovalChecks, RemovalEndpoint, RemovalRefusal};
 pub use report::{DaemonReport, Outcome};
 pub use store::{
     HistoryEntry, Maintenance, MaintenanceError, Requester, UpdateRequest, UpdaterRow,
@@ -62,6 +64,8 @@ pub struct UpdatesService {
     modules: Vec<Arc<dyn ModulesWork>>,
     /// The registry's pull credential, in memory only (quality-sdk 0013).
     registry: registry::Held,
+    /// Asks the modules whether one may be removed (quality-sdk 0015).
+    removal: Option<Arc<dyn RemovalChecks>>,
 }
 
 impl std::fmt::Debug for UpdatesService {
@@ -77,6 +81,7 @@ impl UpdatesService {
             notices: None,
             modules: Vec::new(),
             registry: registry::Held::default(),
+            removal: None,
         }
     }
 

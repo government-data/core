@@ -139,7 +139,14 @@ fn app(
             &modules,
             drain_wiring::ANSWER_WITHIN,
         )))
-        .with_modules_work(Arc::new(app_modules));
+        .with_modules_work(Arc::new(app_modules))
+        // Whether a module may be removed: every installed module's
+        // removal path (quality-sdk 0015).
+        .with_removal_checks(Arc::new(
+            infrastructure::module_removal::HttpModuleRemovals::from_env(
+                drain_wiring::ANSWER_WITHIN,
+            )?,
+        ));
     // The machines: Settings → Execution, the install routes (their own
     // limit) and the route they join with (the login's).
     let machine_routes = machines_wiring::routes(
@@ -190,6 +197,9 @@ fn app(
             machines.clone(),
             certificates.clone(),
         ))
+        // What a module asks the core with its machine client (quality-sdk
+        // 0002, 0015).
+        .merge(api::platform_v1::routes(provider.clone(), updates.clone()))
         // A module's purge and the agent's own audit (quality-sdk 0009).
         .merge(api::updater_v1_purge::routes(
             provider,

@@ -149,6 +149,7 @@ mod tests {
             permissions: None,
             provides: Vec::new(),
             roles: Vec::new(),
+            removal_path: None,
         }
     }
 

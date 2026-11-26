@@ -9,7 +9,7 @@ http:
     # Not the machines' or the update agent's routes: those only on the
     # internal entry point (internal.yml).
     api-host:
-      rule: "Host(`localhost`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`)"
+      rule: "Host(`localhost`) && PathPrefix(`/api`) && !PathPrefix(`/api/internal/machines/`) && !PathPrefix(`/api/updater/`) && !PathPrefix(`/api/v1/`)"
       entryPoints: [websecure]
       tls: {}
       priority: 100

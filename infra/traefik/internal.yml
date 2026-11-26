@@ -86,6 +86,17 @@ http:
       service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
       middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
 
+    # An installed module asks the core (quality-sdk decision 0002):
+    # /api/v1/…, with its machine certificate here and its machine
+    # client's token, which the API checks.
+    modules-api:
+      rule: "Host(`{{ $internal }}`) && PathPrefix(`/api/v1/`)"
+      entryPoints: [internal]
+      tls:
+        options: machines
+      service: "{{ env "INTERNAL_API_SERVICE" | default "api@docker" }}"
+      middlewares: [api-strip, machine-certificate, api-ratelimit, security-headers]
+
     # The lake's check, asked by the gate in front of RustFS (0066, point
     # 10), on the gates' entry point, where the header that names the
     # machine at the gate arrives. The certificate header is the gate's

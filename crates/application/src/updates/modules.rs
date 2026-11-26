@@ -46,6 +46,10 @@ pub struct InstalledModule {
     /// decision 0013), none when it declares none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub roles: Vec<ModuleRole>,
+    /// Where it answers whether a module may be removed (quality-sdk
+    /// decision 0015), `None` when it declares none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removal_path: Option<String>,
 }
 
 impl UpdatesService {
@@ -123,6 +127,12 @@ fn check(modules: &[InstalledModule]) -> Result<(), String> {
                     name = m.name
                 ));
             }
+        }
+        if m.removal_path.as_deref().is_some_and(|p| !is_drain_path(p)) {
+            return Err(texts::tr!(
+                "app.updates.modules.badRemovalPath",
+                name = m.name
+            ));
         }
         if m.provides.len() > MAX_PROVIDES || !m.provides.iter().all(|c| is_name(c)) {
             return Err(texts::tr!("app.updates.modules.badProvides", name = m.name));
@@ -226,7 +236,7 @@ fn permissions_refusal(module: &str, refusal: module_permissions::Refusal) -> St
     }
 }
 
-fn is_name(name: &str) -> bool {
+pub(super) fn is_name(name: &str) -> bool {
     let mut chars = name.chars();
     name.len() <= MAX_LEN
         && chars
@@ -268,6 +278,7 @@ mod tests {
             permissions: None,
             provides: Vec::new(),
             roles: Vec::new(),
+            removal_path: None,
         }
     }
 

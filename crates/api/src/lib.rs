@@ -21,6 +21,7 @@ pub mod language;
 pub mod machines;
 pub mod openapi;
 pub mod platform;
+pub mod platform_v1;
 pub mod settings;
 pub mod updater_v1;
 pub mod updater_v1_clients;
