@@ -4,7 +4,10 @@
 //! The application machine's also carries [`DOLT_NAME`]: Dolt serves it, and
 //! in the core's package the API reaches Dolt by that name and verifies it
 //! (decision 0080's amendment, point 9), the machine's own name being
-//! PostgreSQL's there. A lake machine's (`lake`, `lake-replica`) also carries
+//! PostgreSQL's there, and `lakegate.<name>` ([`LAKE_GATE_PREFIX`]): the
+//! name the lake's gates ask the core's lake check by, on 443, which
+//! Traefik passes to the gates' entry point by SNI (ruling 71, decision
+//! 0091). A lake machine's (`lake`, `lake-replica`) also carries
 //! `admin.<name>`: its gate passes that name through to the lake admin
 //! adapter, which terminates its own TLS, on the machine's one port (443).
 
@@ -23,9 +26,16 @@ pub(crate) const DOLT_NAME: &str = "dolt";
 /// The prefix of a lake machine's second name: its admin adapter's.
 pub const LAKE_ADMIN_PREFIX: &str = "admin.";
 
+/// The prefix of the application machine's third name: the lake check's.
+pub(crate) const LAKE_GATE_PREFIX: &str = "lakegate.";
+
 fn identity(role: MachineRole, name: &str) -> Result<MachineIdentity, SigningRefusal> {
     let names: Vec<String> = match role {
-        MachineRole::App => vec![name.to_string(), DOLT_NAME.to_string()],
+        MachineRole::App => vec![
+            name.to_string(),
+            DOLT_NAME.to_string(),
+            format!("{LAKE_GATE_PREFIX}{name}"),
+        ],
         MachineRole::Lake | MachineRole::LakeReplica => {
             vec![name.to_string(), format!("{LAKE_ADMIN_PREFIX}{name}")]
         }
@@ -158,8 +168,11 @@ mod tests {
     }
 
     #[test]
-    fn the_application_machine_is_also_dolt() {
-        assert_eq!(signed_names(MachineRole::App), ["qd-app", DOLT_NAME]);
+    fn the_application_machine_is_also_dolt_and_the_lake_check() {
+        assert_eq!(
+            signed_names(MachineRole::App),
+            ["qd-app", DOLT_NAME, "lakegate.qd-app"]
+        );
     }
 
     #[test]

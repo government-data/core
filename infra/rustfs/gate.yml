@@ -24,8 +24,8 @@
 #
 # Required environment, besides those files':
 #   QD_MACHINE_NAME     the lake node's name, as in its certificate
-#   QD_LAKE_CHECK_URL   https://<internal domain>:<TRAEFIK_LAKEGATE_PORT>
-#                       /api/internal/machines/lake/check
+#   QD_LAKE_CHECK_URL   https://lakegate.<internal domain>
+#                       /api/internal/machines/lake/check (443)
 # Optional: TRAEFIK_IMAGE (traefik:v3.6), QD_GATE_CHECK_EVERY (30, seconds),
 # QD_GATE_READ_TIMEOUT (0s: an upload takes what it takes).
 #

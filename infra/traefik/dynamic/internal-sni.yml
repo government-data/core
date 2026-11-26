@@ -7,7 +7,10 @@
 # protocol (v2) gives it the client's address. Any other name, or none, is
 # the web's: no router there answers for INTERNAL_DOMAIN, so a handshake
 # for the public name followed by `Host: <INTERNAL_DOMAIN>` gets 404
-# (tools/verify/traefik_one_port.sh).
+# (tools/verify/traefik_one_port.sh). The lake gates' check is the same
+# for its own name, lakegate.<INTERNAL_DOMAIN> (the application machine's
+# certificate carries it), to the gates' entry point `lakegate`, the one
+# that keeps the gate's forwarded headers.
 {{ $internal := env "INTERNAL_DOMAIN" | default "internal.localhost" }}
 tcp:
   routers:
@@ -17,12 +20,23 @@ tcp:
       tls:
         passthrough: true
       service: internal-entry
+    lakegate-entry:
+      rule: "HostSNI(`lakegate.{{ $internal }}`)"
+      entryPoints: [websecure]
+      tls:
+        passthrough: true
+      service: lakegate-entry
   services:
     internal-entry:
       loadBalancer:
         serversTransport: internal-entry
         servers:
           - address: "127.0.0.1:9443"
+    lakegate-entry:
+      loadBalancer:
+        serversTransport: internal-entry
+        servers:
+          - address: "127.0.0.1:9444"
   serversTransports:
     internal-entry:
       proxyProtocol:

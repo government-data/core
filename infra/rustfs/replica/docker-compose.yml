@@ -22,7 +22,7 @@
 #   .env             QD_MACHINE_NAME, QD_CA_SHA256, QD_PUBLIC_URL, APP_DOMAIN,
 #                    QD_JOIN_TOKEN_DIR, QD_LAKE_DRIVES; lines a person adds
 #                    are kept (INTERNAL_DOMAIN when it is not
-#                    internal.<APP_DOMAIN>, TRAEFIK_LAKEGATE_PORT, images)
+#                    internal.<APP_DOMAIN>, images)
 #
 # - `node`, the agent (`qd-node`, from the worker's image), runs as RustFS's
 #   user (uid 10001), so RustFS and the gate read its 0600 files as they
@@ -136,7 +136,7 @@ services:
     entrypoint: ["/etc/qd/gate/entrypoint.sh"]
     environment:
       QD_MACHINE_NAME: ${QD_MACHINE_NAME:?set QD_MACHINE_NAME}
-      QD_LAKE_CHECK_URL: ${QD_LAKE_CHECK_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}:${TRAEFIK_LAKEGATE_PORT:-9444}/api/internal/machines/lake/check}
+      QD_LAKE_CHECK_URL: ${QD_LAKE_CHECK_URL:-https://lakegate.${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}/api/internal/machines/lake/check}
       QD_GATE_READ_TIMEOUT: 0s
     tmpfs:
       - /run/qd-gate:uid=10001,gid=10001,mode=0700
