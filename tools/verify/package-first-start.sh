@@ -42,7 +42,7 @@
 #     bash tools/verify/package-first-start.sh
 #
 # PostgreSQL and Traefik are postgres:16-alpine and traefik:v3.6. It
-# publishes 80, 443, 9009 and 5432 (the last two on
+# publishes 443 (80 only in `acme` mode), 9009 and 5432 (the last two on
 # 127.0.0.1) and uses the fixed networks data-quality-edge,
 # data-quality-backend and data-quality-api, so the dev stack must be down. Everything else is
 # named qs-verify-first… and removed on exit, also on failure. Run alone
@@ -289,6 +289,7 @@ expect "file: the web through it" 200 "$(curl -s -o /dev/null -w '%{http_code}' 
 expect "file: no resolver in the static configuration Traefik runs" 0 \
   "$(docker exec "$TRAEFIK" grep -c -e certificatesResolvers -e certResolver /run/qd-traefik/traefik.yml)"
 # Traefik starts its TLS-ALPN challenge provider whatever its configuration.
+expect "file: port 80 is published nowhere" "" "$(docker port "$TRAEFIK" 80/tcp 2>/dev/null)"
 expect "file: no ACME line in Traefik's log" 0 \
   "$(docker logs "$TRAEFIK" 2>&1 | grep -iE 'acme|resolver' | grep -vc 'acme.ChallengeTLSALPN')"
 for port in 9443 9444 9445; do

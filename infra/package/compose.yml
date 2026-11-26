@@ -77,9 +77,11 @@
 name: quality-data
 
 include:
+  # Its ports by the certificate source: 80 only for ACME (ruling 82).
   - path:
       - infra/traefik/docker-compose.yml
       - infra/traefik/certificate.yml
+      - infra/traefik/tls-source/${QD_TLS_MODE:-file}-ports.yml
   # PostgreSQL with TLS and the machines' certificates (decisions 0066,
   # 0082): healthy only once the node agent's machine.pem is there.
   - path:
