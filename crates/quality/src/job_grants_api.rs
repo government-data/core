@@ -79,8 +79,14 @@ async fn grants_of(
             .collect();
         datasets.push(DatasetJobs {
             dataset: m.dataset,
-            sources: mapping.from.map(|f| f.value.source).into_iter().collect(),
+            sources: mapping
+                .from
+                .as_ref()
+                .map(|f| f.value.source.clone())
+                .into_iter()
+                .collect(),
             references: references.into_iter().collect(),
+            table: Some(mapping.source.value),
         });
     }
     Ok(Json(JobGrants {

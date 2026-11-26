@@ -8,6 +8,7 @@ fn loans() -> DatasetJobs {
         dataset: "loans".into(),
         sources: vec!["crm".into()],
         references: vec!["branches".into(), "loans".into()],
+        table: None,
     }
 }
 
@@ -73,11 +74,13 @@ fn a_name_the_merge_would_refuse_gets_no_grant() {
         dataset: "Loans-2".into(),
         sources: vec!["crm".into()],
         references: vec![],
+        table: None,
     };
     let odd = DatasetJobs {
         dataset: "savings".into(),
         sources: vec!["c.rm".into()],
         references: vec!["x'y".into()],
+        table: None,
     };
     let g = job_grants(&[bad, odd]);
     assert!(g.iter().all(|g| !g.subject.contains("Loans")));
@@ -86,4 +89,28 @@ fn a_name_the_merge_would_refuse_gets_no_grant() {
         .all(|g| !g.namespace.contains("c.rm") && !g.namespace.contains('\'')));
     assert!(of(&g, "job_source_crm").is_empty());
     assert_eq!(of(&g, "job_rules_savings").len(), 4);
+}
+
+#[test]
+fn the_report_user_reads_its_tables_refs_by_exact_name() {
+    let mut d = loans();
+    d.table = Some("loans_extract".into());
+    let g = job_grants(&[d.clone()]);
+    let refs: Vec<Value> = of(&g, "job_report_loans")
+        .into_iter()
+        .filter(|g| g.namespace != "quality_gold")
+        .map(|g| serde_json::to_value(g).unwrap())
+        .collect();
+    assert_eq!(
+        refs,
+        [
+            json!({"subject": "job_report_loans", "namespace": "loans_bronze",
+                   "tables": ["loans_extract$refs"], "privileges": ["SELECT"]}),
+            json!({"subject": "job_report_loans", "namespace": "loans_silver",
+                   "tables": ["loans_extract$refs"], "privileges": ["SELECT"]}),
+        ]
+    );
+    d.table = Some("x$snapshots".into());
+    let g = job_grants(&[d]);
+    assert!(g.iter().all(|g| g.tables.iter().all(|t| !t.contains('$'))));
 }
