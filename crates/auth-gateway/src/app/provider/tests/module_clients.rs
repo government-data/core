@@ -224,3 +224,43 @@ fn code_of(outcome: AuthorizeOutcome) -> String {
     let code = to.split("code=").nth(1).unwrap();
     code.split('&').next().unwrap().to_string()
 }
+
+#[tokio::test]
+async fn quality_jobs_is_granted_only_to_a_module_that_requires_orchestration() {
+    let f = fixture(ClientAuth::Public);
+    let machine = |requires: &[&str]| -> ModuleClientsRequest {
+        serde_json::from_value(json!({ "machine": {
+            "capabilities": ["sql-query"], "audiences": ["quality-jobs", "core"],
+            "requires": requires, "secret": MACHINE } }))
+        .unwrap()
+    };
+    for refused in [&[][..], &["lake"][..]] {
+        let done = f
+            .server
+            .put_module_clients("engine-trino", &machine(refused), ORIGIN)
+            .await;
+        assert!(
+            matches!(done, Err(ModuleClientsError::Invalid(_))),
+            "{refused:?}"
+        );
+    }
+    let done = f
+        .server
+        .put_module_clients("orchestrator", &machine(&["orchestration", "lake"]), ORIGIN)
+        .await
+        .unwrap();
+    assert_eq!(
+        done.machine_client_id.as_deref(),
+        Some("orchestrator-machine")
+    );
+    let without: ModuleClientsRequest = serde_json::from_value(json!({ "machine": {
+        "capabilities": ["sql-query"], "audiences": ["trino"], "secret": MACHINE } }))
+    .unwrap();
+    assert!(
+        f.server
+            .put_module_clients("bi-superset", &without, ORIGIN)
+            .await
+            .is_ok(),
+        "no requires and no quality-jobs: as before"
+    );
+}
