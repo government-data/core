@@ -13,6 +13,36 @@ use crate::job_grants::{is_name, Grant, Privilege, Rows, GOLD};
 /// The action that gives a dataset's results.
 pub const VIEW: &str = "quality:ViewResults";
 
+/// What people read in gold (decision 0090, ruling 73): its results and
+/// their current-run views, and the entities only through the aggregate
+/// views; never `entity_icd` (one row per entity), its view or the jobs'
+/// counts.
+pub const PEOPLE_GOLD: &[&str] = &[
+    "run_summary",
+    "rule_results",
+    "field_quality",
+    "group_metrics",
+    "distribution_checks",
+    "cells",
+    "queue_findings",
+    "findings",
+    "finding_groups",
+    "remediation_slas",
+    "current_run",
+    "v_run_summary",
+    "v_rule_results",
+    "v_field_quality",
+    "v_group_metrics",
+    "v_distribution_checks",
+    "v_cells",
+    "v_queue_findings",
+    "v_findings",
+    "v_finding_groups",
+    "v_icd_distribution",
+    "v_band_transitions",
+    "v_bands_by_segment",
+];
+
 /// The resource of a dataset.
 fn resource(dataset: &str) -> String {
     format!("pipeline/{dataset}")
@@ -20,8 +50,8 @@ fn resource(dataset: &str) -> String {
 
 /// One grant per person who may view the results of at least one of
 /// `datasets`: `{subject: person-<account>, namespace: quality_gold,
-/// tables: ["*"], privileges: [SELECT], rows: {column: dataset, in:
-/// [...]}}`. A dataset whose name the merge would refuse gets no grant.
+/// tables: [PEOPLE_GOLD], privileges: [SELECT], rows: {column: dataset,
+/// in: [...]}}`. A dataset whose name the merge would refuse gets no grant.
 pub async fn people_grants(
     grantees: &dyn Grantees,
     datasets: &[String],
@@ -40,7 +70,7 @@ pub async fn people_grants(
             (!values.is_empty()).then(|| Grant {
                 subject: format!("person-{}", g.account),
                 namespace: GOLD.into(),
-                tables: vec!["*".into()],
+                tables: PEOPLE_GOLD.iter().map(|t| (*t).to_string()).collect(),
                 privileges: vec![Privilege::Select],
                 rows: Some(Rows {
                     column: "dataset".into(),
@@ -101,11 +131,15 @@ mod tests {
                 ),
             ]
         );
+        let tables = &grants[0].tables;
+        assert!(!tables
+            .iter()
+            .any(|t| t.contains("entity") || t == "job_counts" || t == "*"));
         let json = serde_json::to_value(&grants[0]).unwrap();
         assert_eq!(
             json,
             serde_json::json!({ "subject": "person-a1", "namespace": "quality_gold",
-                "tables": ["*"], "privileges": ["SELECT"],
+                "tables": PEOPLE_GOLD, "privileges": ["SELECT"],
                 "rows": { "column": "dataset", "in": ["ventas"] } })
         );
     }
