@@ -71,6 +71,11 @@ pub struct RoleClaimRequest {
 pub struct MachineClient {
     pub capabilities: Vec<String>,
     pub audiences: Vec<String>,
+    /// The capabilities the module requires, from its manifest: what
+    /// decides an audience granted only to some (the user's ruling 47 of
+    /// 2026-11-25: [`QUALITY_JOBS_AUDIENCE`] needs [`ORCHESTRATION`]).
+    #[serde(default)]
+    pub requires: Vec<String>,
     pub secret: String,
     #[serde(default)]
     pub keep_previous: bool,
@@ -152,6 +157,12 @@ pub(super) fn people_client(
     Ok((client, p.secret.clone(), p.keep_previous))
 }
 
+/// The audience of the core's job routes for an orchestrator, its own
+/// (not the workers' `quality-api`).
+pub(super) const QUALITY_JOBS_AUDIENCE: &str = "quality-jobs";
+/// The capability a module must require to get [`QUALITY_JOBS_AUDIENCE`].
+pub(super) const ORCHESTRATION: &str = "orchestration";
+
 pub(super) fn machine_client(
     module: &str,
     id: &ClientId,
@@ -172,6 +183,16 @@ pub(super) fn machine_client(
     }
     if !names_ok(&m.audiences) {
         return Err(invalid("audiences: 1 to 8 names"));
+    }
+    if !m.requires.is_empty() && !names_ok(&m.requires) {
+        return Err(invalid("requires: at most 8 names"));
+    }
+    if m.audiences.iter().any(|a| a == QUALITY_JOBS_AUDIENCE)
+        && !m.requires.iter().any(|r| r == ORCHESTRATION)
+    {
+        return Err(invalid(
+            "audiences: quality-jobs is granted only to a module that requires orchestration",
+        ));
     }
     check_secret(&m.secret)?;
     let mut side = ModuleClient::of(module);
