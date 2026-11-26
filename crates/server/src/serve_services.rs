@@ -79,7 +79,8 @@ pub(crate) async fn services(db: &Database, auth: &AuthConfig) -> Result<Service
     // Update maintenance: while it lasts, no new work starts.
     let updates = UpdatesService::new(Arc::new(updates_wiring::Store(
         infrastructure::PgMaintenanceStore::new(pool.clone()),
-    )));
+    )))
+    .with_event_schemas(Arc::new(infrastructure::event_schemas::JsonSchemas));
     let platform = platform.with_updates(updates.clone());
     let sessions = SessionService::new(
         Arc::new(PgSessionRepository::new(pool.clone())),
