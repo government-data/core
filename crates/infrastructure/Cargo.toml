@@ -55,6 +55,8 @@ sigv4.workspace = true
 roxmltree.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Compiles the modules' event schemas (event_schemas.rs).
+jsonschema.workspace = true
 uuid.workspace = true
 ring.workspace = true
 # The installation's CA (src/ca, decision 0066): building and signing

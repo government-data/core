@@ -17,6 +17,7 @@ pub mod catalog_dolt;
 pub mod clock;
 pub mod db;
 pub mod directory_accounts;
+pub mod event_schemas;
 pub mod health;
 pub mod lake_admin_client;
 pub mod lake_admins;
