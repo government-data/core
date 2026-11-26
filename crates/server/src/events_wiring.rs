@@ -26,12 +26,14 @@ pub(crate) fn service(pool: &PgPool, updates: UpdatesService) -> EventsService {
 }
 
 /// What a module calls with its machine client: `/v1/modules`,
-/// `/v1/iam/effective` and `/v1/events…`.
+/// `/v1/iam/effective`, `/v1/machines` and `/v1/events…`.
 pub(crate) fn module_routes(
     provider: Option<AuthorizationServer>,
     updates: UpdatesService,
+    machines: application::MachinesService,
     pool: &PgPool,
 ) -> Router {
     api::platform_v1::routes(provider.clone(), updates.clone())
+        .merge(api::machines_v1::routes(provider.clone(), machines))
         .merge(api::events_v1::routes(provider, service(pool, updates)))
 }

@@ -183,10 +183,11 @@ fn app(
             certificates.clone(),
         ))
         // What a module asks the core with its machine client (quality-sdk
-        // 0002, 0015), and their events (0017).
+        // 0002, 0015), the live machines (0011) and the events (0017).
         .merge(crate::events_wiring::module_routes(
             provider.clone(),
             updates.clone(),
+            machines.clone(),
             &db.pool,
         ))
         // A module's purge and the agent's own audit (quality-sdk 0009).

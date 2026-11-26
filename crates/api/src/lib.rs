@@ -20,6 +20,7 @@ pub mod iam;
 pub mod internal;
 pub mod language;
 pub mod machines;
+pub mod machines_v1;
 pub mod openapi;
 pub mod platform;
 pub mod platform_v1;
