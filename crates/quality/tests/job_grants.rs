@@ -42,6 +42,29 @@ fn a_rules_job_reads_its_layers_and_references_and_writes_its_gold_rows() {
 #[test]
 fn each_kind_gets_only_its_own_places() {
     let g = job_grants(&[loans()]);
+    let extract = of(&g, "job_extract_loans");
+    let privileges = |ns: &str| {
+        serde_json::to_value(
+            &extract
+                .iter()
+                .find(|g| g.namespace == ns)
+                .unwrap()
+                .privileges,
+        )
+        .unwrap()
+    };
+    // Ruling 67: its own bronze's DELETE, and gold's job_counts by dataset.
+    assert_eq!(
+        privileges("loans_bronze"),
+        json!(["SELECT", "INSERT", "DELETE"])
+    );
+    assert_eq!(privileges("loans_silver"), json!(["SELECT", "INSERT"]));
+    let counts = extract
+        .iter()
+        .find(|g| g.namespace == "quality_gold")
+        .unwrap();
+    assert_eq!(counts.tables, ["job_counts"]);
+    assert!(counts.rows.is_some());
     let report = of(&g, "job_report_loans");
     assert_eq!(report.len(), 1);
     assert_eq!(report[0].namespace, "quality_gold");
@@ -49,7 +72,7 @@ fn each_kind_gets_only_its_own_places() {
     let places = |s| -> Vec<String> { of(&g, s).iter().map(|g| g.namespace.clone()).collect() };
     assert_eq!(
         places("job_extract_loans"),
-        ["src_crm.*", "loans_bronze", "loans_silver"]
+        ["src_crm.*", "loans_bronze", "loans_silver", "quality_gold"]
     );
     assert_eq!(places("job_sample_loans"), ["loans_bronze", "loans_silver"]);
     assert_eq!(

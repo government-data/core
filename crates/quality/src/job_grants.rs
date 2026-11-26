@@ -12,6 +12,8 @@ use crate::layers::namespaces;
 
 /// Gold's namespace in the warehouse.
 pub const GOLD: &str = "quality_gold";
+/// Gold's table of jobs' counts (ruling 53).
+pub const JOB_COUNTS: &str = "job_counts";
 /// The scratch namespace and its one table (point 8).
 pub const SCRATCH: &str = "quality_scratch";
 pub const SCRATCH_TABLE: &str = "record_icd";
@@ -149,8 +151,17 @@ fn dataset_grants(out: &mut Vec<Grant>, d: &DatasetJobs, sources: &[&str]) {
     }
     let sample = format!("job_sample_{name}");
     let maint = format!("job_maint_{name}");
+    // A retry deletes its own run's earlier load from bronze, after a
+    // count of it through gold's `job_counts` (ruling 67); the bundle's
+    // statement names the load.
+    let [bronze, silver] = &layers;
+    out.push(grant(&extract, bronze, &["*"], &[Select, Insert, Delete]));
+    out.push(grant(&extract, silver, &["*"], &[Select, Insert]));
+    out.push(of_dataset(
+        grant(&extract, GOLD, &[JOB_COUNTS], &writes),
+        name,
+    ));
     for ns in &layers {
-        out.push(grant(&extract, ns, &["*"], &[Select, Insert]));
         out.push(grant(&sample, ns, &["*"], &[Select]));
         out.push(grant(&maint, ns, &["*"], &writes));
     }
