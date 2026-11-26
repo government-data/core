@@ -221,14 +221,19 @@ async fn only_the_update_agents_certificate_in_use_is_accepted() {
         ("the application VM", Some(app.as_str())),
         ("a replaced certificate", Some(old.as_str())),
     ] {
+        let refused = if cert.is_some() {
+            StatusCode::FORBIDDEN
+        } else {
+            StatusCode::UNAUTHORIZED
+        };
         let (status, body) = call(&w, "GET", version, cert, None).await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED, "{who}");
+        assert_eq!(status, refused, "{who}");
         assert!(body["error"].is_string(), "{who}");
         let (status, _) = call(&w, "PUT", "/updater/v1/state", cert, Some(json!({}))).await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED, "{who}: nothing stored");
+        assert_eq!(status, refused, "{who}: nothing stored");
         let modules = json!({ "modules": [{ "name": "orchestrator", "version": "1.0.0" }] });
         let (status, _) = call(&w, "PUT", "/updater/v1/modules", cert, Some(modules)).await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED, "{who}: no module stored");
+        assert_eq!(status, refused, "{who}: no module stored");
     }
     assert!(w.updates.installed_modules().await.unwrap().is_empty());
     let (status, _) = call(&w, "GET", version, Some(&current), None).await;
@@ -396,7 +401,7 @@ async fn the_agent_asks_for_an_update_for_a_person_on_the_server() {
 
     let worker = joined(&w.machines, MachineRole::Worker, "worker-1").await;
     let (status, _) = call(&w, "POST", request, Some(&worker.cert), None).await;
-    assert_eq!(status, StatusCode::UNAUTHORIZED, "only the agent");
+    assert_eq!(status, StatusCode::FORBIDDEN, "only the agent");
 }
 
 #[tokio::test]

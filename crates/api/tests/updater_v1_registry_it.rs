@@ -127,7 +127,7 @@ async fn the_agent_hands_the_registry_token_and_a_bad_one_keeps_the_one_held() {
 
     let worker = joined(&w.machines, MachineRole::Worker, "worker-1").await;
     let (status, _) = put(&w, path, &worker.cert, token("stolen", 1)).await;
-    assert_eq!(status, StatusCode::UNAUTHORIZED, "not the agent");
+    assert_eq!(status, StatusCode::FORBIDDEN, "not the agent");
     assert_eq!(
         w.updates.registry_token().unwrap().password,
         "first-password"
