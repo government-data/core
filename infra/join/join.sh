@@ -4,7 +4,7 @@
 # its SHA-256 and runs it; run it as that command says, as root:
 #
 #   sh qd-join.sh --url 'https://<domain>' --role worker [--pool POOL] \
-#     [--metrics-url 'https://<observability server>:9009/api/v1/push'] \
+#     [--metrics-url 'https://mimir.<observability server>/api/v1/push'] \
 #     --ca-sha256 '<the CA's SHA-256>' --token 'qdj_…' [--name NAME] \
 #     [--pin 'sha256//<key pin>']
 #

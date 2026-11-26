@@ -7,7 +7,9 @@
 //! PostgreSQL's there, and `lakegate.<name>` ([`LAKE_GATE_PREFIX`]): the
 //! name the lake's gates ask the core's lake check by, on 443, which
 //! Traefik passes to the gates' entry point by SNI (ruling 71, decision
-//! 0091). A lake machine's (`lake`, `lake-replica`) also carries
+//! 0091); `mimir.<name>` and `loki.<name>` ([`MIMIR_PREFIX`],
+//! [`LOKI_PREFIX`]), where every VM's Alloy pushes, on 443 too (ruling 82).
+//! A lake machine's (`lake`, `lake-replica`) also carries
 //! `admin.<name>`: its gate passes that name through to the lake admin
 //! adapter, which terminates its own TLS, on the machine's one port (443).
 
@@ -29,12 +31,18 @@ pub const LAKE_ADMIN_PREFIX: &str = "admin.";
 /// The prefix of the application machine's third name: the lake check's.
 pub(crate) const LAKE_GATE_PREFIX: &str = "lakegate.";
 
+/// The prefixes of the application machine's names for Mimir and Loki.
+pub(crate) const MIMIR_PREFIX: &str = "mimir.";
+pub(crate) const LOKI_PREFIX: &str = "loki.";
+
 fn identity(role: MachineRole, name: &str) -> Result<MachineIdentity, SigningRefusal> {
     let names: Vec<String> = match role {
         MachineRole::App => vec![
             name.to_string(),
             DOLT_NAME.to_string(),
             format!("{LAKE_GATE_PREFIX}{name}"),
+            format!("{MIMIR_PREFIX}{name}"),
+            format!("{LOKI_PREFIX}{name}"),
         ],
         MachineRole::Lake | MachineRole::LakeReplica => {
             vec![name.to_string(), format!("{LAKE_ADMIN_PREFIX}{name}")]
@@ -171,7 +179,13 @@ mod tests {
     fn the_application_machine_is_also_dolt_and_the_lake_check() {
         assert_eq!(
             signed_names(MachineRole::App),
-            ["qd-app", DOLT_NAME, "lakegate.qd-app"]
+            [
+                "qd-app",
+                DOLT_NAME,
+                "lakegate.qd-app",
+                "mimir.qd-app",
+                "loki.qd-app"
+            ]
         );
     }
 

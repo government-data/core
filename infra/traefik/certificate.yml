@@ -18,17 +18,19 @@
 #   through the Docker host's gateway (infra/observability/certificate.yml),
 #   presenting the same certificate. No port of their own (ruling 71).
 # - Mimir (decision 0071, amended on 2026-11-16) is reached through the
-#   `mimir` entry point, published as MIMIR_HTTP_PORT (9009), where every
-#   VM's Alloy pushes: any certificate of the CA may push, only role `app`
-#   may read (internal.yml). Traefik reaches Mimir on its network
+#   `mimir` entry point, on 443 by mimir.<INTERNAL_DOMAIN> (ruling 82),
+#   where every VM's Alloy pushes: any certificate of the CA may push, only
+#   role `app` may read (internal.yml). Traefik reaches Mimir on its network
 #   (MIMIR_UPSTREAM), presenting the same certificate; Mimir's own port is
-#   published nowhere (infra/observability/certificate.yml).
+#   published nowhere (infra/observability/certificate.yml). Loki is
+#   passed through on 443 by loki.<INTERNAL_DOMAIN> to LOKI_UPSTREAM, on
+#   the same network, where it does its own mTLS.
 #
 # Required environment, besides docker-compose.yml's:
 #   QD_MACHINE_DIR   the application VM's node agent directory (QD_AGENT_DIR)
 # Optional: QD_TRAEFIK_CHECK_EVERY (30), seconds between looks at the
-# agent's machine.pem; MIMIR_BIND (0.0.0.0) and MIMIR_HTTP_PORT (9009), where the `mimir` one
-# is; MIMIR_UPSTREAM (https://mimir:9009), Mimir as Traefik reaches it.
+# agent's machine.pem; MIMIR_UPSTREAM (https://mimir:9009), Mimir as
+# Traefik reaches it; LOKI_UPSTREAM (loki:3100), Loki's address.
 #
 # Verified with tools/verify/traefik_app_certificate.sh; this file itself
 # only by `docker compose config`.
@@ -42,8 +44,7 @@ services:
       INTERNAL_KEY_FILE: /etc/traefik/dynamic/app-machine.pem
       QD_TRAEFIK_CHECK_EVERY: ${QD_TRAEFIK_CHECK_EVERY:-30}
       MIMIR_UPSTREAM: ${MIMIR_UPSTREAM:-https://mimir:${MIMIR_HTTP_PORT:-9009}}
-    ports:
-      - "${MIMIR_BIND:-0.0.0.0}:${MIMIR_HTTP_PORT:-9009}:9446"
+      LOKI_UPSTREAM: ${LOKI_UPSTREAM:-loki:${LOKI_HTTP_PORT:-3100}}
     volumes:
       - "./dynamic:/etc/traefik/dynamic"
       - "./machine/entrypoint.sh:/etc/qd/traefik/entrypoint.sh:ro"

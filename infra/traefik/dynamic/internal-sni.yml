@@ -10,7 +10,10 @@
 # (tools/verify/traefik_one_port.sh). The lake gates' check is the same
 # for its own name, lakegate.<INTERNAL_DOMAIN> (the application machine's
 # certificate carries it), to the gates' entry point `lakegate`, the one
-# that keeps the gate's forwarded headers.
+# that keeps the gate's forwarded headers. Mimir's `mimir` entry point is
+# reached the same way by mimir.<INTERNAL_DOMAIN>, and Loki, which does its
+# own mTLS with the same certificate, by loki.<INTERNAL_DOMAIN> at
+# LOKI_UPSTREAM (ruling 82; both only where the observability stack runs).
 {{ $internal := env "INTERNAL_DOMAIN" | default "internal.localhost" }}
 tcp:
   routers:
@@ -26,6 +29,22 @@ tcp:
       tls:
         passthrough: true
       service: lakegate-entry
+{{- if env "MIMIR_UPSTREAM" }}
+    mimir-entry:
+      rule: "HostSNI(`mimir.{{ $internal }}`)"
+      entryPoints: [websecure]
+      tls:
+        passthrough: true
+      service: mimir-entry
+{{- end }}
+{{- if env "LOKI_UPSTREAM" }}
+    loki-entry:
+      rule: "HostSNI(`loki.{{ $internal }}`)"
+      entryPoints: [websecure]
+      tls:
+        passthrough: true
+      service: loki-entry
+{{- end }}
   services:
     internal-entry:
       loadBalancer:
@@ -37,6 +56,19 @@ tcp:
         serversTransport: internal-entry
         servers:
           - address: "127.0.0.1:9444"
+{{- if env "MIMIR_UPSTREAM" }}
+    mimir-entry:
+      loadBalancer:
+        serversTransport: internal-entry
+        servers:
+          - address: "127.0.0.1:9446"
+{{- end }}
+{{- if env "LOKI_UPSTREAM" }}
+    loki-entry:
+      loadBalancer:
+        servers:
+          - address: "{{ env "LOKI_UPSTREAM" }}"
+{{- end }}
   serversTransports:
     internal-entry:
       proxyProtocol:

@@ -11,7 +11,10 @@
 # - Loki serves HTTPS only, with the application VM's machine certificate
 #   (its node agent's machine.pem, read again at each handshake, so a
 #   renewed one needs no restart), and requires a client certificate of the
-#   installation's CA (ca.crt, read once: a new CA takes a restart). Any
+#   installation's CA (ca.crt, read once: a new CA takes a restart). Its
+#   port is published nowhere (ruling 82): it joins the application's
+#   Traefik network, which passes TLS for loki.<LOKI_SERVER_NAME> on 443
+#   through to it unterminated. Any
 #   machine holding a certificate of the CA may push and also read every
 #   line until its certificate ends: Loki tells no subject apart. Its gRPC
 #   port listens on its own loopback alone. It runs as the agent's user
@@ -27,16 +30,16 @@
 #   machine's certificate, its blocks in a bucket of its own. Its port is
 #   published nowhere (amended on 2026-11-16, the user's ruling): it joins
 #   the application's Traefik network (QD_EDGE_NETWORK), and Traefik's
-#   `mimir` entry point, published as 9009 by infra/traefik/certificate.yml,
+#   `mimir` entry point, on 443 by mimir.<LOKI_SERVER_NAME> (ruling 82),
 #   is where every VM's Alloy pushes: any machine of the CA may push, only
 #   the application VM's certificate (role `app`) may read
 #   (infra/traefik/internal.yml). Grafana reads it on this stack's network.
-# - Alloy pushes to Loki under its name (LOKI_SERVER_NAME), trusting the CA
+# - Alloy pushes to Loki as loki.<LOKI_SERVER_NAME>, trusting the CA
 #   and presenting its own machine's certificate, read again when renewed.
 #   With the same certificate it scrapes this VM's services (decision 0071,
 #   alloy/app.alloy): Traefik's, Grafana's and Dolt's metrics on Traefik's
-#   metrics entry point, Loki's on its HTTPS port and Mimir's through
-#   Traefik's `mimir` entry point, all reached as LOKI_SERVER_NAME; PostgreSQL through its
+#   internal entry point, Loki's and Mimir's, all on 443 as
+#   LOKI_SERVER_NAME, loki.<it> and mimir.<it>; PostgreSQL through its
 #   embedded exporter (alloy/app-postgres.alloy) as `qd_metrics`, with
 #   verify-full and the certificate, on POSTGRES_PORT; and pushes to Mimir
 #   the same way.
@@ -48,9 +51,9 @@
 #   reads them only at its start, so the application VM's node agent
 #   restarts it after each renewal (QD_AFTER_RENEW: docker restart
 #   <the grafana container>).
-# - Loki is ready when https://<LOKI_SERVER_NAME>:3100/ready answers 200 to
+# - Loki is ready when https://loki.<LOKI_SERVER_NAME>/ready answers 200 to
 #   a client presenting a machine's certificate (its image has no shell for
-#   a healthcheck); Mimir at https://<LOKI_SERVER_NAME>:9009/ready the same,
+#   a healthcheck); Mimir at https://mimir.<LOKI_SERVER_NAME>/ready the same,
 #   through Traefik, with the application VM's certificate.
 #
 # Required environment, besides docker-compose.yml's:
@@ -58,8 +61,7 @@
 #   LOKI_SERVER_NAME   the application VM's machine name, its certificate's
 #   LOKI_S3_ENDPOINT   the lake's gate, <lake node name>:<port> (Mimir's
 #                      too, unless MIMIR_S3_ENDPOINT names another)
-# Optional: LOKI_BIND (0.0.0.0), where Loki's port is published (Mimir's,
-# MIMIR_BIND, is Traefik's now); QD_EDGE_NETWORK (data-quality-edge), the
+# Optional: QD_EDGE_NETWORK (data-quality-edge), the
 # application's Traefik network; POSTGRES_PORT (5432), where PostgreSQL
 # is (Traefik's metrics are on 443, under LOKI_SERVER_NAME's internal
 # entry point); LOKI_ADDRESS
@@ -97,8 +99,9 @@ services:
       LOKI_S3_INSECURE: "false"
     volumes:
       - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
-    ports:
-      - "${LOKI_BIND:-0.0.0.0}:${LOKI_HTTP_PORT:-3100}:${LOKI_HTTP_PORT:-3100}"
+    networks:
+      - default
+      - edge
     depends_on:
       loki-volume:
         condition: service_completed_successfully
@@ -135,16 +138,16 @@ services:
 
   alloy:
     environment:
-      LOKI_PUSH_URL: https://${LOKI_SERVER_NAME:?set LOKI_SERVER_NAME to the application VM's machine name}:${LOKI_HTTP_PORT:-3100}/loki/api/v1/push
+      LOKI_PUSH_URL: https://loki.${LOKI_SERVER_NAME:?set LOKI_SERVER_NAME to the application VM's machine name}/loki/api/v1/push
       LOKI_CA_FILE: /run/qd-node/ca.crt
       LOKI_CLIENT_CERT_FILE: /run/qd-node/machine.pem
-      METRICS_PUSH_URL: https://${LOKI_SERVER_NAME}:${MIMIR_HTTP_PORT:-9009}/api/v1/push
+      METRICS_PUSH_URL: https://mimir.${LOKI_SERVER_NAME}/api/v1/push
       METRICS_SCHEME: https
       METRICS_CA_FILE: /run/qd-node/ca.crt
       METRICS_CERT_FILE: /run/qd-node/machine.pem
       METRICS_ROUTER_ADDRESS: ${LOKI_SERVER_NAME}:443
-      LOKI_METRICS_ADDRESS: ${LOKI_SERVER_NAME}:${LOKI_HTTP_PORT:-3100}
-      MIMIR_METRICS_ADDRESS: ${LOKI_SERVER_NAME}:${MIMIR_HTTP_PORT:-9009}
+      LOKI_METRICS_ADDRESS: loki.${LOKI_SERVER_NAME}:443
+      MIMIR_METRICS_ADDRESS: mimir.${LOKI_SERVER_NAME}:443
       METRICS_POSTGRES_DSN: postgresql://qd_metrics@${LOKI_SERVER_NAME}:${POSTGRES_PORT:-5432}/postgres?sslmode=verify-full&sslrootcert=/run/qd-node/ca.crt&sslcert=/run/qd-node/machine.pem&sslkey=/run/qd-node/machine.pem
     volumes:
       - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
@@ -152,13 +155,15 @@ services:
       - ./infra/observability/alloy/postgres-queries.yml:/etc/qd-alloy-postgres/queries.yml:ro
     extra_hosts:
       - "${LOKI_SERVER_NAME}:${LOKI_ADDRESS:-host-gateway}"
+      - "loki.${LOKI_SERVER_NAME}:${LOKI_ADDRESS:-host-gateway}"
+      - "mimir.${LOKI_SERVER_NAME}:${LOKI_ADDRESS:-host-gateway}"
 
   grafana:
     user: "0:0"
     entrypoint: ["/etc/qd/grafana/entrypoint.sh"]
     environment:
       GF_PATHS_PROVISIONING: /run/qd-grafana/provisioning
-      LOKI_URL: https://${LOKI_SERVER_NAME}:${LOKI_HTTP_PORT:-3100}
+      LOKI_URL: https://loki.${LOKI_SERVER_NAME}
       MIMIR_URL: https://mimir:${MIMIR_HTTP_PORT:-9009}
       MIMIR_SERVER_NAME: ${LOKI_SERVER_NAME}
       GRAFANA_PG_SSLMODE: verify-full
@@ -169,3 +174,5 @@ services:
       - ${QD_MACHINE_DIR:?set QD_MACHINE_DIR to the node agent's directory}:/run/qd-node:ro
     extra_hosts:
       - "${LOKI_SERVER_NAME}:${LOKI_ADDRESS:-host-gateway}"
+      - "loki.${LOKI_SERVER_NAME}:${LOKI_ADDRESS:-host-gateway}"
+      - "mimir.${LOKI_SERVER_NAME}:${LOKI_ADDRESS:-host-gateway}"

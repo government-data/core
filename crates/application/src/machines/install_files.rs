@@ -82,7 +82,7 @@ impl MachinesService {
     }
 
     /// With where the machines it installs push their metrics (Mimir's
-    /// remote write, `https://<observability server>:9009/api/v1/push`);
+    /// remote write, `https://mimir.<observability server>/api/v1/push`);
     /// ignored before [`Self::with_install`], and when not quotable HTTPS.
     pub fn with_metrics_push_url(mut self, url: Option<&str>) -> Self {
         if let Some(install) = self.install.as_mut() {
