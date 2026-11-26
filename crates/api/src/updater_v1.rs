@@ -88,6 +88,9 @@ pub fn routes(
     machines: MachinesService,
     certificates: ClientCertificates,
 ) -> Router {
+    let secrets = Router::new()
+        .route("/updater/v1/modules/{name}/role-secrets", put(role_secrets))
+        .with_state((updates.clone(), machines.clone()));
     let gate = Gate::new(machines, certificates);
     Router::new()
         .route("/updater/v1/state", put(state))
@@ -99,12 +102,12 @@ pub fn routes(
         )
         .route("/updater/v1/registry", put(registry))
         .route("/updater/v1/removal/{module}", get(removal))
-        .route("/updater/v1/modules/{name}/role-secrets", put(role_secrets))
         .route("/updater/v1/modules/{name}/replica", get(replica))
         .route("/updater/v1/drain", get(drain))
         .route("/updater/v1/version", get(version))
         .route("/updater/v1/request", post(request))
         .with_state(updates)
+        .merge(secrets)
         .layer(axum::middleware::from_fn_with_state(gate, require_updater))
 }
 
@@ -262,9 +265,12 @@ struct RoleSecretsBody {
 /// {"<secret>": "<value>"}}}`, the secrets each of the installed module's
 /// roles declares (quality-sdk decision 0013), held in memory in place of
 /// the module's before; `204`, or `400` and the ones held are kept. The
-/// body is read here so that no refusal quotes it.
+/// body is read here so that no refusal quotes it. A role that carries the
+/// query engine's lake keys (`lake-query-engine-*`) gets its lake user on
+/// the main lake (decision 0091, ruling 51); if the lake cannot make it
+/// now, it is logged and the secrets are held all the same.
 async fn role_secrets(
-    State(updates): State<UpdatesService>,
+    State((updates, machines)): State<(UpdatesService, MachinesService)>,
     Path(name): Path<String>,
     body: Bytes,
 ) -> Response {
@@ -274,13 +280,26 @@ async fn role_secrets(
             texts::tr!("api.updater.badRoleSecrets"),
         );
     };
+    let lake_users: Vec<_> = body
+        .roles
+        .values()
+        .filter_map(application::machines::query_engine_keys)
+        .collect();
     let roles = body
         .roles
         .into_iter()
         .map(|(role, secrets)| (role, application::RoleSecrets(secrets)))
         .collect();
     match updates.hold_role_secrets(&name, roles).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Ok(()) => {
+            for keys in &lake_users {
+                let kind = application::lake::LakeCredentialKind::QueryEngine;
+                if let Err(e) = machines.ensure_lake_user(kind, keys).await {
+                    tracing::warn!(module = %name, error = %e, "the query engine's lake user");
+                }
+            }
+            StatusCode::NO_CONTENT.into_response()
+        }
         Err(UpdatesError::Invalid(field, e)) => {
             refusal(StatusCode::BAD_REQUEST, format!("{field}: {e}"))
         }
