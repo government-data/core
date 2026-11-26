@@ -18,6 +18,22 @@ pub(crate) const ANSWER_WITHIN: Duration = Duration::from_secs(5);
 /// What does not answer when the installed modules cannot be read.
 const INSTALLED: &str = "installed modules";
 
+/// `updates` with what the update agent waits for: each module's own work,
+/// and each installed application module's as the agent tells them
+/// (0003); and whether a module may be removed: every installed module's
+/// removal path (quality-sdk 0015).
+pub(crate) fn with_module_checks(
+    updates: UpdatesService,
+    modules: &ModuleRegistry,
+) -> Result<UpdatesService, Box<dyn std::error::Error>> {
+    let app_modules = AppModules::from_env(updates.clone(), ANSWER_WITHIN)?;
+    let removals = infrastructure::module_removal::HttpModuleRemovals::from_env(ANSWER_WITHIN)?;
+    Ok(updates
+        .with_modules_work(Arc::new(CodeModules::of(modules, ANSWER_WITHIN)))
+        .with_modules_work(Arc::new(app_modules))
+        .with_removal_checks(Arc::new(removals)))
+}
+
 /// The registry's [`Drain`]s as the application's [`ModulesWork`].
 pub(crate) struct CodeModules {
     drains: Vec<(&'static str, Arc<dyn Drain>)>,

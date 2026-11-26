@@ -130,23 +130,8 @@ fn app(
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
     let (machines, modules) = machines_and_modules(&db, provider.clone(), &secret_box)?;
-    // What the update agent waits for: each module's own work, and each
-    // installed application module's as the agent tells them (0003).
-    let app_modules =
-        drain_wiring::AppModules::from_env(updates.clone(), drain_wiring::ANSWER_WITHIN)?;
-    let updates = updates
-        .with_modules_work(Arc::new(drain_wiring::CodeModules::of(
-            &modules,
-            drain_wiring::ANSWER_WITHIN,
-        )))
-        .with_modules_work(Arc::new(app_modules))
-        // Whether a module may be removed: every installed module's
-        // removal path (quality-sdk 0015).
-        .with_removal_checks(Arc::new(
-            infrastructure::module_removal::HttpModuleRemovals::from_env(
-                drain_wiring::ANSWER_WITHIN,
-            )?,
-        ));
+    // What the update agent waits for, and whether a module may be removed.
+    let updates = drain_wiring::with_module_checks(updates, &modules)?;
     // The machines: Settings → Execution, the install routes (their own
     // limit) and the route they join with (the login's).
     let machine_routes = machines_wiring::routes(
