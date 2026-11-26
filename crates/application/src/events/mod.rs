@@ -9,11 +9,13 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
+mod retention;
 mod service;
 mod store;
 #[cfg(test)]
 mod tests;
 
+pub use retention::{Retained, RETENTION};
 pub use service::{Batch, EventsError, EventsService, Published, MAX_DATA_BYTES, MAX_READ};
 pub use store::{Consumer, EventsStore, NewEvent, StoredEvent};
 

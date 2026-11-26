@@ -1,7 +1,8 @@
 //! `/v1/events` (quality-sdk decision 0017) end to end on PostgreSQL: a
 //! module publishes its declared topic with its machine client, validated
 //! by the real schema adapter and stored once per id; another reads it
-//! after a cursor, waits for the next one and confirms. Needs Docker.
+//! after a cursor, waits for the next one and confirms; retention deletes
+//! only what was confirmed. Needs Docker.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -96,10 +97,10 @@ fn event(id: &str, data: Value) -> Value {
         "occurred_at": "2026-11-25T18:00:00Z", "data": data })
 }
 
-#[tokio::test]
-async fn a_module_publishes_and_another_reads_waits_and_confirms() {
-    let db = testkit::spawn_test_db().await;
-    let pool = db.pool.clone();
+/// The routes on `pool`, the events' use case, and the tokens of
+/// `orchestrator` and `bi-superset`.
+async fn served(pool: &sqlx::PgPool) -> (axum::Router, EventsService, String, String) {
+    let pool = pool.clone();
     let signer = Ed25519Signer::from_pkcs8_base64(&Ed25519Signer::generate().unwrap()).unwrap();
     let provider = AuthorizationServer::new(
         Arc::new(PgOidcClients::new(pool.clone())),
@@ -123,9 +124,17 @@ async fn a_module_publishes_and_another_reads_waits_and_confirms() {
     infrastructure::permission_notices::spawn_channel_listener(pool.clone(), CHANNEL, move |t| {
         woken.notified(t);
     });
-    let app = api::events_v1::routes(Some(provider.clone()), events);
+    let app = api::events_v1::routes(Some(provider.clone()), events.clone());
     let orchestrator = client(&provider, "orchestrator").await;
     let bi = client(&provider, "bi-superset").await;
+    (app, events, orchestrator, bi)
+}
+
+#[tokio::test]
+async fn a_module_publishes_and_another_reads_waits_and_confirms() {
+    let db = testkit::spawn_test_db().await;
+    let pool = db.pool.clone();
+    let (app, events, orchestrator, bi) = served(&pool).await;
 
     let first = event(ID, json!({ "run_id": "r1" }));
     let (status, _) = call(
@@ -196,6 +205,19 @@ async fn a_module_publishes_and_another_reads_waits_and_confirms() {
     assert!(
         started.elapsed() < Duration::from_secs(5),
         "woken by the notice"
+    );
+
+    // Retention: both are 31 days old; only the confirmed one goes.
+    sqlx::query("UPDATE module_events SET stored_at = now() - interval '31 days'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let done = events.retain(chrono::Utc::now()).await.unwrap();
+    assert_eq!(done.events, 1);
+    let (_, body) = call(&app, &bi, "GET", &read, None).await;
+    assert_eq!(
+        body["events"][0]["data"]["run_id"], "r2",
+        "the unconfirmed one stays"
     );
     drop(db);
 }

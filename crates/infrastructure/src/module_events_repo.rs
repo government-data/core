@@ -5,6 +5,7 @@
 
 use application::events::{Consumer, EventsStore, NewEvent, StoredEvent};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::postgres::PgPool;
 use sqlx::Row;
 
@@ -123,5 +124,49 @@ impl EventsStore for PgModuleEvents {
         .await
         .map_err(db)?;
         Ok(())
+    }
+
+    async fn forget_cursors(&self, kept: &[String]) -> Result<u64, String> {
+        let done = sqlx::query("DELETE FROM module_event_cursors WHERE NOT (module = ANY($1))")
+            .bind(kept)
+            .execute(&self.pool)
+            .await
+            .map_err(db)?;
+        Ok(done.rows_affected())
+    }
+
+    async fn delete_confirmed(
+        &self,
+        consumers: &[Consumer],
+        stored_before: DateTime<Utc>,
+    ) -> Result<u64, String> {
+        let modules: Vec<&str> = consumers.iter().map(|c| c.module.as_str()).collect();
+        let topics: Vec<&str> = consumers.iter().map(|c| c.topic.as_str()).collect();
+        let versions = consumers
+            .iter()
+            .map(|c| version(c.version))
+            .collect::<Result<Vec<i32>, _>>()?;
+        let done = sqlx::query(
+            "DELETE FROM module_events e
+             WHERE e.stored_at < $1
+               AND NOT EXISTS (
+                   SELECT 1 FROM module_event_cursors c
+                   WHERE c.topic = e.topic AND c.version = e.version AND c.cursor < e.seq)
+               AND NOT EXISTS (
+                   SELECT 1 FROM unnest($2::text[], $3::text[], $4::int[]) AS k(module, topic, version)
+                   WHERE k.topic = e.topic AND k.version = e.version
+                     AND NOT EXISTS (
+                         SELECT 1 FROM module_event_cursors c
+                         WHERE c.module = k.module AND c.topic = k.topic
+                           AND c.version = k.version AND c.cursor >= e.seq))",
+        )
+        .bind(stored_before)
+        .bind(&modules)
+        .bind(&topics)
+        .bind(&versions)
+        .execute(&self.pool)
+        .await
+        .map_err(db)?;
+        Ok(done.rows_affected())
     }
 }
