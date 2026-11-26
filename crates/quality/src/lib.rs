@@ -39,6 +39,7 @@ pub mod mapping;
 pub mod mapping_field;
 pub mod mapping_rename;
 pub mod module;
+pub mod people_grants;
 pub mod personal_data;
 pub mod proposal;
 mod proposal_roles;
