@@ -8,9 +8,9 @@ mod trino;
 use duckdb::Connection;
 use quality_rules_duckdb::Runner;
 use quality_rules_lint::lint;
-use quality_rules_trino::ShapeKind;
+use quality_rules_trino::{Cut, ShapeKind};
 use serde_json::Value;
-use trino::{bound, rows, url};
+use trino::{rows, url};
 
 const CUT: &str = "2026-10-31";
 
@@ -72,7 +72,10 @@ fn runner() -> (Runner, std::path::PathBuf) {
 }
 
 fn loaded(name: &str, relation: &str) -> (Runner, std::path::PathBuf) {
-    let dir = std::env::temp_dir().join(format!("qd-tier-a-{name}-{}", std::process::id()));
+    // One directory per call: the tests run in parallel in one process.
+    static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = N.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let dir = std::env::temp_dir().join(format!("qd-tier-a-{name}-{}-{n}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("{name}.parquet")).display().to_string();
     Connection::open_in_memory()
@@ -98,8 +101,9 @@ async fn case_4_rule_counts_agree() {
     let file = quality_rules_model::parse(RULES).unwrap();
     let tables = r.tables(&file);
     let duck = r.test("loans", &report.compiled, &tables, CUT).unwrap();
-    let s = quality_rules_trino::rule_counts(&values(), &report.compiled, &tables).unwrap();
-    let t = rows(&base, &bound(&s.sql, CUT, s.cut_params)).await;
+    let cut = Cut::parse(CUT).unwrap();
+    let s = quality_rules_trino::rule_counts(&values(), &report.compiled, &tables, &cut).unwrap();
+    let t = rows(&base, &s.sql).await;
     for (i, c) in duck.iter().enumerate() {
         let got = (
             int(&t[0][3 * i]),
@@ -164,8 +168,8 @@ async fn case_7_recency_bands_agree() {
     let Some(base) = url() else { return };
     let (r, dir) = runner();
     let duck = r.recency("loans", "Opened", CUT).unwrap();
-    let s = quality_rules_trino::recency(&values(), "Opened").unwrap();
-    let t = rows(&base, &bound(&s.sql, CUT, s.cut_params)).await;
+    let s = quality_rules_trino::recency(&values(), "Opened", &Cut::parse(CUT).unwrap()).unwrap();
+    let t = rows(&base, &s.sql).await;
     let got: Vec<i64> = t[0].iter().map(int).collect();
     assert_eq!(got, duck);
     std::fs::remove_dir_all(dir).unwrap();
