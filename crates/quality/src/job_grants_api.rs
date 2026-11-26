@@ -1,7 +1,9 @@
 //! The job grants route (decision 0090, point 7.2; step 18): `engine-trino`'s
 //! rules merge asks the core, with its machine token, for the job users'
 //! neutral grants, filled from each dataset's mapping on the catalog's
-//! `main` (the source it is extracted from) and its approved rules' references. Names only.
+//! `main` (the source it is extracted from) and its approved rules' references,
+//! and, with the platform's IAM, the people's grants beside them (decision
+//! 0089, step 5: [`crate::people_grants`]). Names and account ids only.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -15,8 +17,11 @@ use axum::{
 use serde::Serialize;
 
 use crate::catalog::Catalog;
+use contracts::Grantees;
+
 use crate::job_grants::{job_grants, DatasetJobs, Grant};
 use crate::mapping::Mapping;
+use crate::people_grants::people_grants;
 use crate::worker_api::MachineTokens;
 
 /// The audience the rules merge asks its machine token for.
@@ -32,13 +37,36 @@ pub struct JobGrants {
 struct GrantsApi {
     catalog: Arc<dyn Catalog>,
     tokens: Arc<dyn MachineTokens>,
+    people: Option<Arc<dyn Grantees>>,
 }
 
-/// `GET /internal/quality/v1/job-grants`.
+/// `GET /internal/quality/v1/job-grants`, the job users' grants only.
 pub fn routes(catalog: Arc<dyn Catalog>, tokens: Arc<dyn MachineTokens>) -> Router {
+    serve(GrantsApi {
+        catalog,
+        tokens,
+        people: None,
+    })
+}
+
+/// The same, with the people's grants after the job users' (decision 0089,
+/// step 5): each person's gold rows of the datasets they may view.
+pub fn routes_with_people(
+    catalog: Arc<dyn Catalog>,
+    tokens: Arc<dyn MachineTokens>,
+    people: Arc<dyn Grantees>,
+) -> Router {
+    serve(GrantsApi {
+        catalog,
+        tokens,
+        people: Some(people),
+    })
+}
+
+fn serve(api: GrantsApi) -> Router {
     Router::new()
         .route("/internal/quality/v1/job-grants", get(grants_of))
-        .with_state(GrantsApi { catalog, tokens })
+        .with_state(api)
 }
 
 fn refused(status: StatusCode, class: &str) -> (StatusCode, Json<serde_json::Value>) {
@@ -89,7 +117,14 @@ async fn grants_of(
             table: Some(mapping.source.value),
         });
     }
-    Ok(Json(JobGrants {
-        grants: job_grants(&datasets),
-    }))
+    let mut grants = job_grants(&datasets);
+    if let Some(people) = &api.people {
+        let names: Vec<String> = datasets.iter().map(|d| d.dataset.clone()).collect();
+        let theirs = people_grants(people.as_ref(), &names).await.map_err(|e| {
+            tracing::error!("job grants: the people's: {e}");
+            refused(StatusCode::SERVICE_UNAVAILABLE, "iam_unavailable")
+        })?;
+        grants.extend(theirs);
+    }
+    Ok(Json(JobGrants { grants }))
 }

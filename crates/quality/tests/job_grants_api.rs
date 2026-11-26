@@ -7,8 +7,9 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use contracts::{Grantee, Grantees};
 use quality::catalog::{Catalog, CatalogSnapshot, DatasetMapping, RulesSource};
-use quality::job_grants_api::routes;
+use quality::job_grants_api::{routes, routes_with_people};
 use quality::worker_api::{MachineCaller, MachineTokens};
 use serde_json::Value;
 use tower::ServiceExt;
@@ -138,4 +139,70 @@ async fn no_token_or_a_failing_catalog_gets_no_grants() {
     let (status, body) = ask(true, Some("rules-merge")).await;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["error"], "catalog_unavailable");
+}
+
+/// One person may view `clients`; with `fails`, the IAM does not answer.
+struct People {
+    fails: bool,
+}
+
+#[async_trait::async_trait]
+impl Grantees for People {
+    async fn allowed(&self, _: &str, resources: &[String]) -> Result<Vec<Grantee>, String> {
+        if self.fails {
+            return Err("down".into());
+        }
+        let clients = resources.iter().filter(|r| *r == "pipeline/clients");
+        Ok(vec![Grantee {
+            account: "acct-1".into(),
+            resources: clients.cloned().collect(),
+        }])
+    }
+}
+
+async fn ask_with_people(fails: bool) -> (StatusCode, Value) {
+    let router = routes_with_people(
+        Arc::new(Main { fails: false }),
+        Arc::new(Tokens),
+        Arc::new(People { fails }),
+    );
+    let req = Request::get(URI).header("authorization", "Bearer rules-merge");
+    let res = router
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = res.status();
+    let bytes = axum::body::to_bytes(res.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+#[tokio::test]
+async fn the_people_s_grants_come_beside_the_job_users() {
+    let (status, body) = ask_with_people(false).await;
+    assert_eq!(status, StatusCode::OK);
+    let person: Vec<&Value> = body["grants"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|g| g["subject"] == "person-acct-1")
+        .collect();
+    assert_eq!(
+        person,
+        [
+            &serde_json::json!({ "subject": "person-acct-1", "namespace": "quality_gold",
+            "tables": ["*"], "privileges": ["SELECT"],
+            "rows": { "column": "dataset", "in": ["clients"] } })
+        ]
+    );
+    assert!(subjects(&body)
+        .iter()
+        .any(|s| s == "job_maint_gold quality_gold"));
+    let (status, body) = ask_with_people(true).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"], "iam_unavailable");
 }
