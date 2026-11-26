@@ -14,6 +14,7 @@ pub mod audit_chain;
 pub mod events;
 pub mod lake;
 pub mod machines;
+pub mod once_notices;
 pub mod platform;
 pub mod settings;
 pub mod updates;
