@@ -3958,7 +3958,6 @@ dependencies = [
  "quality",
  "quality-jobs",
  "quality-rules",
- "quality-rules-duckdb",
  "quality-rules-trino",
  "serde_json",
  "sqlx",
