@@ -24,6 +24,7 @@ pub mod entity_key;
 pub mod field_api;
 pub mod firing;
 pub mod job_grants;
+pub mod job_grants_api;
 mod job_lake;
 pub mod job_maintain;
 pub mod job_map;
