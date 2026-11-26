@@ -26,6 +26,7 @@ mod updates_wiring;
 use updates_wiring::Store;
 
 const PASSWORD: &str = "registry-password-not-to-be-logged";
+const ROLE_SECRET: &str = "shared-secret-not-to-be-logged";
 const PATH: &str = "/internal/machines/registry";
 
 fn image(module: &str, d: char) -> String {
@@ -68,6 +69,7 @@ fn a_machine_of_a_declared_role_gets_the_token_and_its_images_and_none_is_logged
     });
     let logged = serde_json::to_string(&lines).unwrap();
     assert!(!logged.contains(PASSWORD), "the token was logged");
+    assert!(!logged.contains(ROLE_SECRET), "a role secret was logged");
 }
 
 #[allow(clippy::too_many_lines)] // one scenario, in order
@@ -89,7 +91,8 @@ async fn scenario() {
     // Two test modules name the role `worker`; nothing names `trino-worker`.
     let role = |images: Vec<String>| {
         json!({ "name": "worker", "strategy": "one",
-        "services": ["runner"], "images": images })
+        "services": ["runner"], "images": images.clone(),
+        "env": { "IMAGE_RUNNER": images[0] } })
     };
     let modules = serde_json::from_value(json!([
         { "name": "engine-a", "version": "1.0.0",
@@ -99,6 +102,12 @@ async fn scenario() {
     ]))
     .unwrap();
     updates.set_modules(modules).await.unwrap();
+    let secrets =
+        application::RoleSecrets([("shared".to_string(), ROLE_SECRET.to_string())].into());
+    updates
+        .hold_role_secrets("engine-a", [("worker".to_string(), secrets)].into())
+        .await
+        .unwrap();
 
     let worker = joined(&machines, MachineRole::Worker, "worker-1").await;
     let other = joined(&machines, MachineRole::TrinoWorker, "trino-worker-1").await;
@@ -145,6 +154,19 @@ async fn scenario() {
     assert_eq!(names, [json!("engine-a"), json!("engine-b")], "by name");
     assert_eq!(body["modules"][0]["services"], json!(["runner"]));
     assert_eq!(body["modules"][0]["version"], "1.0.0");
+    assert_eq!(
+        body["modules"][0]["secrets"],
+        json!({ "shared": ROLE_SECRET })
+    );
+    assert_eq!(
+        body["modules"][0]["env"]["IMAGE_RUNNER"],
+        json!(image("engine-a", 'b'))
+    );
+    assert_eq!(
+        body["modules"][1]["secrets"],
+        json!({}),
+        "engine-b handed none"
+    );
 
     let (status, _, body) = get(&app, &other.cert).await;
     assert_eq!(status, StatusCode::FORBIDDEN, "a role no module declares");
@@ -192,5 +214,9 @@ async fn scenario() {
     assert!(
         rows.iter().all(|r| !r.contains(PASSWORD)),
         "the token was audited"
+    );
+    assert!(
+        rows.iter().all(|r| !r.contains(ROLE_SECRET)),
+        "a role secret was audited"
     );
 }

@@ -5,7 +5,7 @@
 //! (the module's `compose.yml` and what its services mount). A joined
 //! machine whose certificate carries a role's name gets that role's images.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use base64::Engine as _;
 use serde::{Deserialize, Serialize};
@@ -51,6 +51,10 @@ pub struct ModuleRole {
     /// them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub files: Vec<RoleFile>,
+    /// The `IMAGE_*` values its `compose.yml` reads, as the agent resolved
+    /// them from the signed index (the user's ruling 44): not secret.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
 }
 
 /// A file of a role, as the agent read it from the module's package.
@@ -113,6 +117,14 @@ pub(super) fn check(roles: &[ModuleRole]) -> Result<(), Refusal> {
         if !listed_once(&role.images, is_image) {
             return Err(Refusal::BadImages(name.clone()));
         }
+        let env_ok = role.env.len() <= MAX_ROLE_SERVICES
+            && role
+                .env
+                .iter()
+                .all(|(k, v)| is_image_variable(k) && is_image(v));
+        if !env_ok {
+            return Err(Refusal::BadImages(name.clone()));
+        }
         let mut paths = BTreeSet::new();
         for file in &role.files {
             let size = file_size(file).ok_or_else(|| Refusal::BadFile(name.clone()))?;
@@ -145,6 +157,17 @@ fn is_role_name(name: &str) -> bool {
         && name
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '_'))
+}
+
+/// `IMAGE_` then upper-case letters, digits and `_`.
+fn is_image_variable(name: &str) -> bool {
+    name.len() <= MAX_NAME
+        && name.strip_prefix("IMAGE_").is_some_and(|rest| {
+            !rest.is_empty()
+                && rest
+                    .chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        })
 }
 
 /// A Compose service's name.

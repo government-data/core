@@ -61,12 +61,16 @@ pub struct RegistryOut {
 
 /// A module of the machine's role: its version, the role's services and
 /// its files, which the machine puts under `<module>/`.
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Serialize, ToSchema)]
 pub struct RoleModuleOut {
     name: String,
     version: String,
     services: Vec<String>,
     files: Vec<RoleFileOut>,
+    /// The role's `IMAGE_*` values, for its `compose.yml`.
+    env: std::collections::BTreeMap<String, String>,
+    /// The secrets the role declares, by name: only here, over mTLS.
+    secrets: std::collections::BTreeMap<String, String>,
 }
 
 /// A file of a module's role.
@@ -172,8 +176,19 @@ async fn registry_handler(
     }
 }
 
+impl std::fmt::Debug for RoleModuleOut {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RoleModuleOut")
+            .field("name", &self.name)
+            .field("secrets", &self.secrets.keys().collect::<Vec<_>>())
+            .finish_non_exhaustive()
+    }
+}
+
 fn module_out(m: application::RoleModule) -> RoleModuleOut {
     RoleModuleOut {
+        env: m.env,
+        secrets: m.secrets.0,
         name: m.name,
         version: m.version,
         services: m.services,

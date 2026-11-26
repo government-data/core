@@ -1,5 +1,7 @@
 use sha2::{Digest, Sha256};
 
+use std::collections::BTreeMap;
+
 use super::*;
 
 const IMAGE: &str =
@@ -13,6 +15,7 @@ pub(crate) fn role(name: &str) -> ModuleRole {
         services: vec!["rustfs".into(), "gate".into()],
         images: vec![IMAGE.into()],
         files: Vec::new(),
+        env: BTreeMap::new(),
     }
 }
 
@@ -154,4 +157,23 @@ fn a_files_debug_does_not_show_its_content() {
     assert!(
         !shown.contains(&base64::engine::general_purpose::STANDARD.encode(b"password: hunter2"))
     );
+}
+
+#[test]
+fn a_roles_image_values_are_pinned_image_variables() {
+    let mut r = role("lake");
+    r.env = [("IMAGE_RUSTFS".to_string(), IMAGE.to_string())].into();
+    assert_eq!(check(&[r.clone()]), Ok(()));
+    for (k, v) in [
+        ("IMAGE_", IMAGE),
+        ("PASSWORD", IMAGE),
+        ("IMAGE_X", "rustfs:latest"),
+    ] {
+        r.env = [(k.to_string(), v.to_string())].into();
+        assert_eq!(
+            check(&[r.clone()]),
+            Err(Refusal::BadImages("lake".into())),
+            "{k}"
+        );
+    }
 }

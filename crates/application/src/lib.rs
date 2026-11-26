@@ -44,9 +44,9 @@ pub use updates::{
     DeclaredModule, DrainStatus, GrantRefusal, HistoryEntry, InLanguages, InstalledModule,
     Maintenance, MaintenanceError, ModuleAction, ModuleMenu, ModulePermissions, ModulePolicy,
     ModuleRole, ModuleWork, ModulesWork, RegistryGrant, RegistryToken, RemovalAnswer,
-    RemovalChecks, RemovalEndpoint, RemovalRefusal, Requester, RoleFile, RoleModule, RoleStrategy,
-    UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError, UpdatesService, UpdatesStore,
-    UpdatesView,
+    RemovalChecks, RemovalEndpoint, RemovalRefusal, Requester, RoleFile, RoleModule, RoleSecrets,
+    RoleStrategy, UpdatePolicy, UpdateRequest, UpdaterRow, UpdatesError, UpdatesService,
+    UpdatesStore, UpdatesView,
 };
 
 /// Application service exposing the health use case.

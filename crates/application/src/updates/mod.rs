@@ -29,6 +29,7 @@ mod policy;
 mod registry;
 mod removal;
 mod report;
+mod role_secrets;
 mod store;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -43,6 +44,7 @@ pub use policy::UpdatePolicy;
 pub use registry::{GrantRefusal, RegistryGrant, RegistryToken, RoleModule};
 pub use removal::{RemovalAnswer, RemovalChecks, RemovalEndpoint, RemovalRefusal};
 pub use report::{DaemonReport, Outcome};
+pub use role_secrets::RoleSecrets;
 pub use store::{
     HistoryEntry, Maintenance, MaintenanceError, Requester, UpdateRequest, UpdaterRow,
     UpdatesError, UpdatesStore, UpdatesView,
@@ -70,6 +72,8 @@ pub struct UpdatesService {
     removal: Option<Arc<dyn RemovalChecks>>,
     /// Compiles the modules' event schemas (quality-sdk decision 0017).
     event_schemas: Option<Arc<dyn crate::events::EventSchemas>>,
+    /// The roles' declared secrets, in memory only (quality-sdk 0013).
+    role_secrets: role_secrets::Held,
 }
 
 impl std::fmt::Debug for UpdatesService {
@@ -87,6 +91,7 @@ impl UpdatesService {
             registry: registry::Held::default(),
             removal: None,
             event_schemas: None,
+            role_secrets: role_secrets::Held::default(),
         }
     }
 

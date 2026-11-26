@@ -9,6 +9,7 @@
 //! | `PUT /updater/v1/modules`              | the installed modules, the whole list    |
 //! | `PUT /updater/v1/registry`             | the registry's pull token, held in memory |
 //! | `GET /updater/v1/removal/{module}`     | the modules' refusals of its removal     |
+//! | `PUT /updater/v1/modules/{name}/role-secrets` | a module's roles' secrets, in memory |
 //! | `GET /updater/v1/drain?horizon_secs=N` | what still runs, and whether it drained  |
 //! | `GET /updater/v1/modules/{name}/replica` | whether the replica of its data is in sync |
 //! | `GET /updater/v1/version`              | the version and the features it has      |
@@ -56,6 +57,7 @@ pub const FEATURES: &[&str] = &[
     "registry-credentials",
     "module-removal",
     "module-events",
+    "role-secrets",
 ];
 
 /// The most `PUT /updater/v1/modules` takes: every module with its roles'
@@ -97,6 +99,7 @@ pub fn routes(
         )
         .route("/updater/v1/registry", put(registry))
         .route("/updater/v1/removal/{module}", get(removal))
+        .route("/updater/v1/modules/{name}/role-secrets", put(role_secrets))
         .route("/updater/v1/modules/{name}/replica", get(replica))
         .route("/updater/v1/drain", get(drain))
         .route("/updater/v1/version", get(version))
@@ -246,6 +249,42 @@ async fn registry(State(updates): State<UpdatesService>, body: Bytes) -> Respons
     match updates.hold_registry_token(token) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(e) => refusal(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+/// A module's roles' secrets as the agent hands them.
+#[derive(Deserialize)]
+struct RoleSecretsBody {
+    roles: std::collections::BTreeMap<String, std::collections::BTreeMap<String, String>>,
+}
+
+/// `PUT /updater/v1/modules/{name}/role-secrets`: `{"roles": {"<role>":
+/// {"<secret>": "<value>"}}}`, the secrets each of the installed module's
+/// roles declares (quality-sdk decision 0013), held in memory in place of
+/// the module's before; `204`, or `400` and the ones held are kept. The
+/// body is read here so that no refusal quotes it.
+async fn role_secrets(
+    State(updates): State<UpdatesService>,
+    Path(name): Path<String>,
+    body: Bytes,
+) -> Response {
+    let Ok(body) = serde_json::from_slice::<RoleSecretsBody>(&body) else {
+        return refusal(
+            StatusCode::BAD_REQUEST,
+            texts::tr!("api.updater.badRoleSecrets"),
+        );
+    };
+    let roles = body
+        .roles
+        .into_iter()
+        .map(|(role, secrets)| (role, application::RoleSecrets(secrets)))
+        .collect();
+    match updates.hold_role_secrets(&name, roles).await {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(UpdatesError::Invalid(field, e)) => {
+            refusal(StatusCode::BAD_REQUEST, format!("{field}: {e}"))
+        }
+        Err(e) => logged_unavailable("role-secrets", &e.to_string()),
     }
 }
 

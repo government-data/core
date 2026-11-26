@@ -6798,9 +6798,21 @@
           "name",
           "version",
           "services",
-          "files"
+          "files",
+          "env",
+          "secrets"
         ],
         "properties": {
+          "env": {
+            "type": "object",
+            "description": "The role's `IMAGE_*` values, for its `compose.yml`.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
           "files": {
             "type": "array",
             "items": {
@@ -6809,6 +6821,16 @@
           },
           "name": {
             "type": "string"
+          },
+          "secrets": {
+            "type": "object",
+            "description": "The secrets the role declares, by name: only here, over mTLS.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
           },
           "services": {
             "type": "array",
