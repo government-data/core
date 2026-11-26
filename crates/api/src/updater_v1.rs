@@ -17,7 +17,8 @@
 //! them; those stay, on their own port with their token, for the daemons
 //! that still call them. Only the certificate of an approved machine of
 //! role `updater` (`server updater-certificate`), passed by Traefik in
-//! `X-Forwarded-Tls-Client-Cert`, is accepted: no session, no CSRF. A
+//! `X-Forwarded-Tls-Client-Cert`, is accepted (no certificate: `401`;
+//! another one: `403`): no session, no CSRF. A
 //! refusal is `{"error": …}`, as the agent reads it. Neither the request
 //! nor the certificate is logged.
 
@@ -129,7 +130,9 @@ pub(crate) async fn require_updater(
             req.extensions_mut().insert(Caller { machine, machines });
             next.run(req).await
         }
-        Ok(None) => not_the_agent(),
+        // Another certificate, or one replaced: known, and refused
+        // (quality-sdk decision 0013, contract b).
+        Ok(None) => refusal(StatusCode::FORBIDDEN, texts::tr!("api.updater.notTheAgent")),
         Err(e) => {
             tracing::error!("updater/v1: the machine of a certificate: {e:?}");
             unavailable()
