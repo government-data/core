@@ -1,0 +1,5 @@
+# The package's Traefik ports with Let's Encrypt (QD_TLS_MODE=acme,
+# decision 0087): 80 for the HTTP-01 challenge, and 443, as
+# infra/traefik/docker-compose.yml publishes them (ruling 82). Read by
+# infra/package/compose.yml's include.
+services: {}

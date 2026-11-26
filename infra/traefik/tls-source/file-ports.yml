@@ -1,0 +1,8 @@
+# The package's Traefik ports when the web's certificate is a file
+# (QD_TLS_MODE=file, decision 0087): 443 alone (ruling 82). Port 80 serves
+# only the ACME HTTP-01 challenge and the redirect to HTTPS, so without ACME
+# it is published nowhere. Read by infra/package/compose.yml's include.
+services:
+  traefik:
+    ports: !override
+      - "443:443"
