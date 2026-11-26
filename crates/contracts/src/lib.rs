@@ -23,6 +23,7 @@
 
 mod access;
 mod drain;
+mod grantees;
 pub mod lake_admin;
 mod lake_grant;
 mod migration;
@@ -32,6 +33,7 @@ mod view;
 
 pub use access::{Access, AuditEntry, AuditTrail, Caller, Change};
 pub use drain::{Drain, Work};
+pub use grantees::{Grantee, Grantees};
 pub use lake_grant::{LakeGrant, LakeGrantError, LakeRead, LakeTable};
 pub use migration::{
     InMemoryExecutor, Migration, MigrationError, MigrationExecutor, MigrationReport,
