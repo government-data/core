@@ -16,6 +16,8 @@ workspace = true
 # from YAML so it is versioned with the rules. Its migrations, router and
 # use cases come with M2: the module (contracts) carries its migrations.
 [dependencies]
+# The semantic patterns' syntax (src/proposal.rs), without an engine.
+regex-syntax.workspace = true
 contracts.workspace = true
 # Schedules (src/schedule.rs): cron in the schedule's timezone.
 chrono.workspace = true

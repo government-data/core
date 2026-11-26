@@ -134,13 +134,8 @@ fn patterns_from(json: Option<String>) -> Result<Patterns, Box<dyn std::error::E
     };
     let patterns: Patterns =
         serde_json::from_str(&json).map_err(|e| format!("QUALITY_SEMANTIC_PATTERNS: {e}"))?;
-    let engine = quality_rules_duckdb::Runner::new()?;
-    for (kind, pattern) in patterns.all() {
-        if pattern.trim().is_empty() || !engine.takes_pattern(pattern) {
-            return Err(
-                format!("QUALITY_SEMANTIC_PATTERNS: {kind} is not a pattern DuckDB takes").into(),
-            );
-        }
+    if let Some(kind) = patterns.refused() {
+        return Err(format!("QUALITY_SEMANTIC_PATTERNS: {kind} is not a valid RE2 pattern").into());
     }
     Ok(patterns)
 }
@@ -294,7 +289,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_installations_patterns_must_be_ones_duckdb_takes() {
+    fn an_installations_patterns_must_be_valid_re2() {
         assert_eq!(patterns_from(None).unwrap(), Patterns::default());
         let mobile = patterns_from(Some(r#"{ "mobile": "9\\d{8}" }"#.into())).unwrap();
         assert_eq!(

@@ -3122,6 +3122,7 @@ dependencies = [
  "logging",
  "prometheus-client",
  "quality-rules",
+ "regex-syntax",
  "schedule-core",
  "schemars 1.2.1",
  "serde",
