@@ -15,6 +15,7 @@ use domain::Readiness;
 
 pub mod audit;
 pub mod cors;
+pub mod events_v1;
 pub mod iam;
 pub mod internal;
 pub mod language;

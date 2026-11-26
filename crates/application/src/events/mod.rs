@@ -2,11 +2,20 @@
 //! validated against the JSON Schema it declares for the topic and
 //! version. The validator is a port, so the domain stays pure; the
 //! adapter compiles each schema as Draft 2020-12 and never fetches a
-//! remote `$ref`.
+//! remote `$ref`. [`EventsService`] publishes them
+//! through [`EventsStore`].
 
 use std::sync::Arc;
 
 use serde_json::Value;
+
+mod service;
+mod store;
+#[cfg(test)]
+mod tests;
+
+pub use service::{EventsError, EventsService, Published, MAX_DATA_BYTES};
+pub use store::{EventsStore, NewEvent};
 
 /// Compiles the schemas modules declare.
 pub trait EventSchemas: Send + Sync {

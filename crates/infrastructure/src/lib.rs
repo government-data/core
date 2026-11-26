@@ -31,6 +31,7 @@ pub mod machines;
 pub mod mail;
 pub mod mimir_series;
 pub mod module_drain;
+pub mod module_events_repo;
 pub mod module_migrations;
 pub mod module_removal;
 pub mod oauth_http;
