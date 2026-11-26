@@ -327,7 +327,14 @@ impl LakeAdmin for LakeAdminClient {
         };
         let path = paths::credentials(wire::CredentialKind::from(kind));
         let body = Some(to_value(&request));
-        let keys: wire::Credentials = self.typed("PUT", &path, body, &Vec::new()).await?;
+        // A user whose keys are given is made with the lake's admin keys
+        // (lake-rustfs's `/credentials/{kind}`, ruling 51).
+        let keys = if kind.keys_are_given() {
+            self.admin_keys().await?
+        } else {
+            Vec::new()
+        };
+        let keys: wire::Credentials = self.typed("PUT", &path, body, &keys).await?;
         Ok(keys.into())
     }
 

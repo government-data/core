@@ -109,6 +109,7 @@ pub(crate) fn service(
                 .with_main_lake(std::env::var("LAKE_ENDPOINT").ok());
             let machines = replication_wiring::with_replication(machines, pool);
             replication_wiring::spawn_reconcile(machines.clone());
+            tokio::spawn(sts_issuer_user(machines.clone()));
             machines
         }
         Err(e) => {
@@ -144,6 +145,42 @@ async fn about_the_main_lake(admins: AdapterLakeAdmins) {
             "the main lake's adapter does not serve {PROTOCOL}"
         ),
         Err(e) => tracing::warn!(error = %e, "the main lake's adapter did not answer"),
+    }
+}
+
+/// The STS issuer's lake user, made with the keys the package gives
+/// (`RUSTFS_STS_ISSUER_*`) once the API starts (decision 0091, ruling 51);
+/// asking again changes nothing. No key is logged.
+async fn sts_issuer_user(machines: MachinesService) {
+    use application::lake::{LakeCredentialKind, LakeKeys};
+    let (access_key, secret_key) = match infrastructure::rustfs_sts::issuer_keys_from_env() {
+        Ok(Some(keys)) => keys,
+        Ok(None) => return,
+        Err(e) => {
+            tracing::warn!(error = %e, "the STS issuer's keys cannot be read");
+            return;
+        }
+    };
+    let keys = LakeKeys {
+        access_key,
+        secret_key,
+    };
+    // The lake may start after the API: tried again each minute for an hour
+    // while the lake may answer later.
+    for _ in 0..60 {
+        match machines
+            .ensure_lake_user(LakeCredentialKind::StsIssuer, &keys)
+            .await
+        {
+            Ok(()) => return tracing::info!("the STS issuer's lake user is in place"),
+            Err(e) if e.retryable() => {
+                tracing::warn!(error = %e, "the STS issuer's lake user: the lake did not answer");
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            }
+            Err(e) => {
+                return tracing::warn!(error = %e, "the STS issuer's lake user could not be made");
+            }
+        }
     }
 }
 

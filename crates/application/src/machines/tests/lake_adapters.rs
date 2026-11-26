@@ -19,6 +19,8 @@ pub(super) enum Asked {
     Health(String, String),
     Warehouse(String, String, String),
     Replicate(String, String, String, ReplicaTarget),
+    /// The lake, the kind, and the access key held.
+    Credentials(String, LakeCredentialKind, Option<String>),
 }
 
 #[derive(Default)]
@@ -126,10 +128,14 @@ impl LakeAdmin for At {
 
     async fn ensure_credentials(
         &self,
-        _: LakeCredentialKind,
-        _: Option<&LakeKeys>,
+        kind: LakeCredentialKind,
+        held: Option<&LakeKeys>,
     ) -> Result<LakeKeys, LakeError> {
-        not_here()
+        let access = held.map(|k| k.access_key.clone());
+        let asked = Asked::Credentials(self.lake.clone(), kind, access);
+        self.all.asked.lock().unwrap().push(asked);
+        held.cloned()
+            .ok_or_else(|| LakeError::Invalid("no keys held".into()))
     }
 
     async fn health(&self) -> Result<LakeHealth, LakeError> {

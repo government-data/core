@@ -108,3 +108,43 @@ async fn an_adapter_that_does_not_answer_is_tried_again_then_unavailable() {
     // Three attempts, paused 10 ms then 20 ms between them.
     assert!(started.elapsed() >= Duration::from_millis(30));
 }
+
+/// The main lake's admin keys, kept.
+struct Kept;
+
+#[async_trait::async_trait]
+impl infrastructure::lake_admin_client::AdminKeySource for Kept {
+    async fn open(
+        &self,
+        _: &auth_gateway::Lake,
+    ) -> Result<Option<auth_gateway::LakeAdminKeys>, domain::RepositoryError> {
+        Ok(Some(auth_gateway::LakeAdminKeys {
+            access_key: "qd-admin".into(),
+            secret_key: "the-admin-secret".into(),
+        }))
+    }
+}
+
+#[tokio::test]
+async fn a_user_with_given_keys_is_made_with_the_lakes_admin_keys() {
+    let ca = TestCa::new();
+    let server = serve(Arc::new(InMemoryLake::default()), &ca).await;
+    let given = application::lake::LakeKeys {
+        access_key: "trino-coordinator".into(),
+        secret_key: "a-secret-the-agent-made-0123456789".into(),
+    };
+    let without = client(&server.url, &ca, CALLER_ROLE);
+    let refused = without
+        .ensure_credentials(LakeCredentialKind::QueryEngine, Some(&given))
+        .await;
+    assert!(matches!(refused, Err(LakeError::Invalid(_))), "{refused:?}");
+    let admin =
+        client(&server.url, &ca, CALLER_ROLE).with_keys(Arc::new(Kept), auth_gateway::Lake::main());
+    for kind in [
+        LakeCredentialKind::QueryEngine,
+        LakeCredentialKind::StsIssuer,
+    ] {
+        let made = admin.ensure_credentials(kind, Some(&given)).await;
+        assert_eq!(made.unwrap(), given, "{kind:?}");
+    }
+}

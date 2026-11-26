@@ -93,11 +93,11 @@ impl LakeAdminServer {
             .peer_certificates()
             .and_then(|c| c.first())
             .and_then(|c| role_of(c));
-        let Some((method, path, body)) = read_request(&mut tls).await else {
+        let Some((method, path, body, admin_keys)) = read_request(&mut tls).await else {
             return;
         };
         let (status, body) = if role.as_deref() == Some(CALLER_ROLE) {
-            self.route(&method, &path, &body).await
+            self.route(&method, &path, &body, admin_keys).await
         } else {
             let what = format!("{method} {path}: not the core server's certificate");
             error(&LakeError::Refused(what))
@@ -113,7 +113,7 @@ impl LakeAdminServer {
         let _ = tls.shutdown().await;
     }
 
-    async fn route(&self, method: &str, path: &str, body: &[u8]) -> Answer {
+    async fn route(&self, method: &str, path: &str, body: &[u8], admin_keys: bool) -> Answer {
         let Some(rest) = path.strip_prefix(wire::BASE) else {
             return error(&LakeError::Unknown(format!("{method} {path}")));
         };
@@ -164,7 +164,7 @@ impl LakeAdminServer {
                     .map(|p| json(&wire::SessionPolicy::from(p))),
                 Err(e) => Err(e),
             },
-            ("PUT", ["credentials", kind]) => self.credentials(kind, body).await,
+            ("PUT", ["credentials", kind]) => self.credentials(kind, body, admin_keys).await,
             ("GET", ["pools"]) => Ok(self.pools()),
             ("PUT", ["pools", id]) => match parse::<wire::PoolLayout>(body) {
                 Ok(layout) => {
@@ -179,7 +179,14 @@ impl LakeAdminServer {
         result.unwrap_or_else(|e| error(&e))
     }
 
-    async fn credentials(&self, kind: &str, body: &[u8]) -> Result<Answer, LakeError> {
+    /// A user whose keys are given is made only with the lake's admin keys
+    /// sent (as lake-rustfs's adapter asks).
+    async fn credentials(
+        &self,
+        kind: &str,
+        body: &[u8],
+        admin_keys: bool,
+    ) -> Result<Answer, LakeError> {
         let kind = match kind {
             "root" => CredentialKind::Root,
             "admin" => CredentialKind::Admin,
@@ -187,12 +194,16 @@ impl LakeAdminServer {
             "query-engine" => CredentialKind::QueryEngine,
             other => return Err(LakeError::Unknown(format!("credentials {other}"))),
         };
+        let kind = LakeCredentialKind::from(kind);
+        if kind.keys_are_given() && !admin_keys {
+            return Err(LakeError::Invalid(
+                "the lake's admin keys are not sent".into(),
+            ));
+        }
         let request = parse::<wire::CredentialsRequest>(body)?;
         let held = request.held.map(LakeKeys::from);
         let admin: &dyn LakeAdmin = self.lake.as_ref();
-        let keys = admin
-            .ensure_credentials(LakeCredentialKind::from(kind), held.as_ref())
-            .await?;
+        let keys = admin.ensure_credentials(kind, held.as_ref()).await?;
         Ok(json(&wire::Credentials::from(&keys)))
     }
 
@@ -257,7 +268,7 @@ fn role_of(der: &CertificateDer<'_>) -> Option<String> {
 /// The request line's method and path, and its body by `content-length`.
 async fn read_request(
     tls: &mut tokio_rustls::server::TlsStream<tokio::net::TcpStream>,
-) -> Option<(String, String, Vec<u8>)> {
+) -> Option<(String, String, Vec<u8>, bool)> {
     let mut raw = Vec::new();
     let mut buf = [0u8; 4096];
     let head_end = loop {
@@ -274,8 +285,12 @@ async fn read_request(
     let mut lines = head.lines();
     let mut first = lines.next()?.split_whitespace();
     let (method, path) = (first.next()?.to_string(), first.next()?.to_string());
-    let length: usize = lines
-        .filter_map(|l| l.split_once(':'))
+    let named: Vec<(&str, &str)> = lines.filter_map(|l| l.split_once(':')).collect();
+    let admin_keys = named
+        .iter()
+        .any(|(k, _)| k.trim().eq_ignore_ascii_case(wire::headers::ADMIN_KEYS));
+    let length: usize = named
+        .into_iter()
         .find(|(k, _)| k.trim().eq_ignore_ascii_case("content-length"))
         .and_then(|(_, v)| v.trim().parse().ok())
         .unwrap_or(0);
@@ -287,7 +302,7 @@ async fn read_request(
         raw.extend_from_slice(&buf[..n]);
     }
     let body = raw[head_end..].to_vec();
-    Some((method, path, body))
+    Some((method, path, body, admin_keys))
 }
 
 #[cfg(test)]
