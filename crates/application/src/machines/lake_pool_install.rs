@@ -9,8 +9,9 @@ use auth_gateway::{MachineRole, PoolLayout};
 
 use super::{InstallFileError, MachinesService};
 
-/// The port of the replica's gate, as its compose file publishes it.
-const REPLICA_GATE_PORT: u16 = 9000;
+/// The port of the replica's gate: the one port a lake machine publishes
+/// (lake-rustfs 0.4.0, decision 0091, ruling 71).
+const REPLICA_GATE_PORT: u16 = 443;
 
 impl MachinesService {
     /// The environment file a pool's node reads (`pool.env`): `QD_POOL`,
@@ -79,7 +80,7 @@ mod tests {
             "QD_POOL=main\nQD_POOL_NODE=lake-c\nQD_POOL_NODES=\"lake-a lake-b lake-c lake-d\"\n\
              QD_POOL_DRIVES=1\nRUSTFS_VOLUMES=\"https://lake-a:9010/data/1 \
              https://lake-b:9010/data/1 https://lake-c:9010/data/1 \
-             https://lake-d:9010/data/1\"\nQD_LAKE_REPLICA_GATE=replica-1:9000\n"
+             https://lake-d:9010/data/1\"\nQD_LAKE_REPLICA_GATE=replica-1:443\n"
         );
         assert!(!pool_env(&layout, "lake-c", None).contains("REPLICA"));
     }

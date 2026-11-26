@@ -37,6 +37,7 @@ pub use inspect::{
     X509CertificateReader,
 };
 pub use sign::{IssuedCertificate, Lifetime, MachineIdentity};
+pub use signer::LAKE_ADMIN_PREFIX;
 pub use updater_files::UpdaterFiles;
 
 /// The variable of the CA's certificate file (PEM).

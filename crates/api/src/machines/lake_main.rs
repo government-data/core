@@ -26,7 +26,7 @@ pub struct MainLakeStateOut {
     #[schema(example = "answered")]
     state: &'static str,
     /// Where the application reaches it (`LAKE_ENDPOINT`).
-    #[schema(example = "https://lake-1:9000")]
+    #[schema(example = "https://lake-1")]
     endpoint: Option<String>,
     /// With `answered`: its drives online and offline.
     drives_online: Option<u32>,

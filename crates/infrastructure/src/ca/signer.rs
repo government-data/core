@@ -4,7 +4,9 @@
 //! The application machine's also carries [`DOLT_NAME`]: Dolt serves it, and
 //! in the core's package the API reaches Dolt by that name and verifies it
 //! (decision 0080's amendment, point 9), the machine's own name being
-//! PostgreSQL's there.
+//! PostgreSQL's there. A lake machine's (`lake`, `lake-replica`) also carries
+//! `admin.<name>`: its gate passes that name through to the lake admin
+//! adapter, which terminates its own TLS, on the machine's one port (443).
 
 use std::time::SystemTime;
 
@@ -18,10 +20,16 @@ use super::{Ca, CaError, Lifetime, MachineIdentity};
 /// The application machine's second name: Dolt's in the core's package.
 pub(crate) const DOLT_NAME: &str = "dolt";
 
+/// The prefix of a lake machine's second name: its admin adapter's.
+pub const LAKE_ADMIN_PREFIX: &str = "admin.";
+
 fn identity(role: MachineRole, name: &str) -> Result<MachineIdentity, SigningRefusal> {
-    let names: &[&str] = match role {
-        MachineRole::App => &[name, DOLT_NAME],
-        _ => &[name],
+    let names: Vec<String> = match role {
+        MachineRole::App => vec![name.to_string(), DOLT_NAME.to_string()],
+        MachineRole::Lake | MachineRole::LakeReplica => {
+            vec![name.to_string(), format!("{LAKE_ADMIN_PREFIX}{name}")]
+        }
+        _ => vec![name.to_string()],
     };
     MachineIdentity::new(role.as_str(), name, names).map_err(refusal)
 }
@@ -155,11 +163,20 @@ mod tests {
     }
 
     #[test]
-    fn no_other_role_is_dolt() {
-        for role in MachineRole::ALL
-            .into_iter()
-            .filter(|r| *r != MachineRole::App)
-        {
+    fn a_lake_machine_is_also_its_adapter() {
+        for role in [MachineRole::Lake, MachineRole::LakeReplica] {
+            assert_eq!(signed_names(role), ["qd-app", "admin.qd-app"], "{role:?}");
+        }
+    }
+
+    #[test]
+    fn no_other_role_has_a_second_name() {
+        let two = [
+            MachineRole::App,
+            MachineRole::Lake,
+            MachineRole::LakeReplica,
+        ];
+        for role in MachineRole::ALL.into_iter().filter(|r| !two.contains(r)) {
             assert_eq!(signed_names(role), ["qd-app"], "{role:?}");
         }
     }

@@ -169,7 +169,9 @@ async fn adapters(port: u16, keys: Arc<PgLakeAdminKeys>) -> AdapterLakeAdmins {
     let replica = serve("lake-replica").await;
     let core = ca.machine("app", "app-1").bundle();
     let url = format!("https://localhost:{main}");
-    AdapterLakeAdmins::new(Some(&url), &ca.pem, &core, keys).replica_port(replica)
+    AdapterLakeAdmins::new(Some(&url), &ca.pem, &core, keys)
+        .replica_prefix("")
+        .replica_port(replica)
 }
 
 /// One tenant's warehouse, for the replication.
