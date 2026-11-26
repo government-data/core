@@ -55,6 +55,7 @@ pub const FEATURES: &[&str] = &[
     "agent-audit",
     "registry-credentials",
     "module-removal",
+    "module-events",
 ];
 
 /// The most `PUT /updater/v1/modules` takes: every module with its roles'
@@ -204,8 +205,10 @@ struct ModulesBody {
 /// `PUT /updater/v1/modules`: `{"modules": [{name, version, drain_path,
 /// route_path?, menu?, permissions?}]}` (`menu`: `{label: {en, es}, path:
 /// {en, es}, requires?}`; `permissions`: `{actions, policies}`; `roles`:
-/// `[{name, strategy, services, images, files?}]`), every installed module;
-/// it replaces the list before it.
+/// `[{name, strategy, services, images, files?}]`; `events`: `{provides:
+/// [{topic, version, schema}], consumes: [{topic, version}]}`), every
+/// installed module; it replaces the list before it. A schema that does not
+/// compile refuses the list, which is kept as it was.
 async fn modules(State(updates): State<UpdatesService>, Json(body): Json<ModulesBody>) -> Response {
     match updates.set_modules(body.modules).await {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),

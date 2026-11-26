@@ -20,6 +20,7 @@ use crate::admins::AdminContacts;
 use crate::settings::MailSlot;
 
 mod drain;
+mod module_events;
 mod module_menu;
 mod module_permissions;
 mod module_roles;
@@ -33,6 +34,7 @@ mod store;
 pub(crate) mod tests;
 
 pub use drain::{DrainStatus, ModuleWork, ModulesWork};
+pub use module_events::{ConsumedEvent, ModuleEvents, ProvidedEvent};
 pub use module_menu::{InLanguages, ModuleMenu};
 pub use module_permissions::{ModuleAction, ModulePermissions, ModulePolicy};
 pub use module_roles::{ModuleRole, RoleFile, RoleStrategy};
@@ -66,6 +68,8 @@ pub struct UpdatesService {
     registry: registry::Held,
     /// Asks the modules whether one may be removed (quality-sdk 0015).
     removal: Option<Arc<dyn RemovalChecks>>,
+    /// Compiles the modules' event schemas (quality-sdk decision 0017).
+    event_schemas: Option<Arc<dyn crate::events::EventSchemas>>,
 }
 
 impl std::fmt::Debug for UpdatesService {
@@ -82,7 +86,14 @@ impl UpdatesService {
             modules: Vec::new(),
             registry: registry::Held::default(),
             removal: None,
+            event_schemas: None,
         }
+    }
+
+    /// Compile the event schemas modules declare with `schemas`.
+    pub fn with_event_schemas(mut self, schemas: Arc<dyn crate::events::EventSchemas>) -> Self {
+        self.event_schemas = Some(schemas);
+        self
     }
 
     /// Email the administrators about each new version and how each attempt

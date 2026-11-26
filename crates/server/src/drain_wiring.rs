@@ -213,6 +213,7 @@ mod tests {
             provides: Vec::new(),
             roles: Vec::new(),
             removal_path: None,
+            events: None,
         }
     }
 
