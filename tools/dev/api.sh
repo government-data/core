@@ -43,7 +43,7 @@ fi
 # infra/rustfs/gen-dev-lake-admin.sh made its certificates: through the
 # internal entry point by its name, which resolves to this machine.
 if [ -f .dev/lake-admin/app.pem ]; then
-  export LAKE_ADMIN_URL="https://lake-admin.${INTERNAL_DOMAIN:-internal.localhost}:${TRAEFIK_INTERNAL_PORT:-9443}"
+  export LAKE_ADMIN_URL="https://lake-admin.${INTERNAL_DOMAIN:-internal.localhost}:${TRAEFIK_INTERNAL_PORT:-443}"
   export LAKE_ADMIN_CA_FILE="$PWD/.dev/lake-admin/ca.crt" LAKE_ADMIN_CERT_FILE="$PWD/.dev/lake-admin/app.pem"
 fi
 

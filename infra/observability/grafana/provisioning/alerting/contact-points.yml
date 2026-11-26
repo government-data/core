@@ -17,7 +17,7 @@ contactPoints:
       - uid: "qd-api"
         type: "webhook"
         settings:
-          url: "https://${INTERNAL_DOMAIN}:9443/api/internal/machines/alerts"
+          url: "https://${INTERNAL_DOMAIN}/api/internal/machines/alerts"
           httpMethod: "POST"
         disableResolveMessage: false
   - orgId: 1
@@ -26,6 +26,6 @@ contactPoints:
       - uid: "qd-api-heartbeat"
         type: "webhook"
         settings:
-          url: "https://${INTERNAL_DOMAIN}:9443/api/internal/machines/alerts"
+          url: "https://${INTERNAL_DOMAIN}/api/internal/machines/alerts"
           httpMethod: "POST"
         disableResolveMessage: false

@@ -70,7 +70,7 @@ services:
     environment:
       QD_AGENT_DIR: /var/lib/qd-node
       QD_PUBLIC_URL: ${QD_PUBLIC_URL:?set QD_PUBLIC_URL}
-      QD_INTERNAL_URL: ${QD_INTERNAL_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}:9443/api}
+      QD_INTERNAL_URL: ${QD_INTERNAL_URL:-https://${INTERNAL_DOMAIN:-internal.${APP_DOMAIN}}/api}
       QD_MACHINE_NAME: ${QD_MACHINE_NAME:?set QD_MACHINE_NAME}
       QD_JOIN_TOKEN_FILE: /run/qd-join/token
       QD_CA_SHA256: ${QD_CA_SHA256:?set QD_CA_SHA256}

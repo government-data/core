@@ -97,12 +97,12 @@ pub(crate) struct AppModules {
 impl AppModules {
     /// The modules the update agent told, asked at
     /// `https://<INTERNAL_DOMAIN>:<TRAEFIK_INTERNAL_PORT>` (by default
-    /// `internal.localhost` and 9443, as Traefik's) with
+    /// `internal.localhost` and 443, as Traefik's) with
     /// `LAKE_CLIENT_CERT_FILE`.
     pub(crate) fn from_env(installed: UpdatesService, within: Duration) -> Result<Self, String> {
         let var = |name: &str| std::env::var(name).ok().filter(|v| !v.trim().is_empty());
         let domain = var("INTERNAL_DOMAIN").unwrap_or_else(|| "internal.localhost".into());
-        let port = var("TRAEFIK_INTERNAL_PORT").unwrap_or_else(|| "9443".into());
+        let port = var("TRAEFIK_INTERNAL_PORT").unwrap_or_else(|| "443".into());
         let base = format!("https://{}:{}", domain.trim(), port.trim());
         let drains = HttpModuleDrains::from_env(within)?;
         Ok(Self::of(Arc::new(installed), &base, drains))

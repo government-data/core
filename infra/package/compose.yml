@@ -227,7 +227,7 @@ services:
     read_only: true
     environment:
       QD_AGENT_DIR: /run/qd-node
-      QD_INTERNAL_URL: https://${INTERNAL_DOMAIN:?set INTERNAL_DOMAIN to the VM's machine name}:${TRAEFIK_INTERNAL_PORT:-9443}/api
+      QD_INTERNAL_URL: https://${INTERNAL_DOMAIN:?set INTERNAL_DOMAIN to the VM's machine name}/api
       # How often it renews (8h by default).
       QD_RENEW_EVERY: ${QD_NODE_RENEW_EVERY:-8h}
       OBS_VM: ${OBS_VM:-}

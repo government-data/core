@@ -66,7 +66,7 @@ services:
       # The lake admin adapter (decision 0078, step 13), through the internal
       # entry point by its name, with the certificates of
       # infra/rustfs/gen-dev-lake-admin.sh.
-      LAKE_ADMIN_URL: https://lake-admin.${INTERNAL_DOMAIN:-internal.localhost}:${TRAEFIK_INTERNAL_PORT:-9443}
+      LAKE_ADMIN_URL: https://lake-admin.${INTERNAL_DOMAIN:-internal.localhost}:${TRAEFIK_INTERNAL_PORT:-443}
       LAKE_ADMIN_CA_FILE: /etc/qd/lake-admin/ca.crt
       LAKE_ADMIN_CERT_FILE: /etc/qd/lake-admin/app.pem
     extra_hosts:
