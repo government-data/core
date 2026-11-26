@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use chrono::{TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{json, Value};
 
 use super::*;
@@ -87,6 +87,34 @@ impl EventsStore for Memory {
         }
         Ok(())
     }
+
+    async fn forget_cursors(&self, kept: &[String]) -> Result<u64, String> {
+        let mut cursors = self.cursors.lock().unwrap();
+        let before = cursors.len();
+        cursors.retain(|(c, _)| kept.contains(&c.module));
+        Ok(u64::try_from(before - cursors.len()).unwrap())
+    }
+
+    /// The memory store takes `occurred_at` as when it was stored.
+    async fn delete_confirmed(
+        &self,
+        consumers: &[Consumer],
+        stored_before: DateTime<Utc>,
+    ) -> Result<u64, String> {
+        let cursors = self.cursors.lock().unwrap().clone();
+        let mut events = self.events.lock().unwrap();
+        let before = events.len();
+        events.retain(|e| {
+            let of = |c: &Consumer| c.topic == e.topic && c.version == e.version;
+            let paused_behind = cursors.iter().any(|(c, n)| of(c) && *n < e.seq);
+            let installed_behind = consumers
+                .iter()
+                .filter(|c| of(c))
+                .any(|c| !cursors.iter().any(|(k, n)| k == c && *n >= e.seq));
+            e.occurred_at >= stored_before || paused_behind || installed_behind
+        });
+        Ok(u64::try_from(before - events.len()).unwrap())
+    }
 }
 
 fn module(name: &str, provides: &[(&str, u32)], consumes: &[(&str, u32)]) -> InstalledModule {
@@ -122,7 +150,10 @@ fn module(name: &str, provides: &[(&str, u32)], consumes: &[(&str, u32)]) -> Ins
 }
 
 fn service() -> (EventsService, Arc<Memory>, Arc<Schemas>) {
-    let updates = Arc::new(MemoryMaintenance::default());
+    service_on(Arc::new(MemoryMaintenance::default()))
+}
+
+fn service_on(updates: Arc<MemoryMaintenance>) -> (EventsService, Arc<Memory>, Arc<Schemas>) {
     *updates.modules.lock().unwrap() = vec![
         module("orchestrator", &[("orchestrator.run.finished", 1)], &[]),
         module("bi", &[], &[("orchestrator.run.finished", 1)]),
@@ -263,4 +294,86 @@ async fn a_read_with_none_waits_until_one_is_stored() {
         .unwrap();
     assert!(waited.events.is_empty(), "the deadline ends the wait");
     assert_eq!(waited.cursor, 1);
+}
+
+#[tokio::test]
+async fn an_event_goes_once_old_and_confirmed_by_every_consumer_paused_ones_included() {
+    let (service, store, _) = service();
+    for id in ["a", "b"] {
+        let e = event(id, FINISHED, 1, json!({}));
+        service.publish("orchestrator", e).await.unwrap();
+    }
+    let stored = Utc.with_ymd_and_hms(2026, 11, 25, 18, 0, 0).unwrap();
+    let young = stored + chrono::Duration::days(29);
+    let old = stored + chrono::Duration::days(31);
+    let ids = || -> Vec<String> {
+        let events = store.events.lock().unwrap();
+        events.iter().map(|e| e.id.clone()).collect()
+    };
+    assert_eq!(
+        service.retain(old).await.unwrap().events,
+        0,
+        "bi confirmed nothing"
+    );
+    service.confirm("bi", FINISHED, 1, 1).await.unwrap();
+    assert_eq!(
+        service.retain(young).await.unwrap().events,
+        0,
+        "not 30 days old"
+    );
+    assert_eq!(service.retain(old).await.unwrap().events, 1);
+    assert_eq!(ids(), ["b"]);
+
+    // A removed consumer keeps its cursor (paused) and holds the rest.
+    let paused = Consumer {
+        module: "gone".into(),
+        topic: FINISHED.into(),
+        version: 1,
+    };
+    store.cursors.lock().unwrap().push((paused, 1));
+    service.confirm("bi", FINISHED, 1, 2).await.unwrap();
+    assert_eq!(
+        service.retain(old).await.unwrap(),
+        Retained {
+            cursors: 0,
+            events: 0
+        }
+    );
+    assert_eq!(ids(), ["b"]);
+}
+
+#[tokio::test]
+async fn a_purged_module_s_cursors_go_and_hold_nothing() {
+    let updates = Arc::new(MemoryMaintenance::default());
+    let (service, store, _) = service_on(updates.clone());
+    let e = event("a", FINISHED, 1, json!({}));
+    service.publish("orchestrator", e).await.unwrap();
+    service.confirm("bi", FINISHED, 1, 1).await.unwrap();
+    let purged = Consumer {
+        module: "purged".into(),
+        topic: FINISHED.into(),
+        version: 1,
+    };
+    store.cursors.lock().unwrap().push((purged, 0));
+    let old = Utc.with_ymd_and_hms(2026, 12, 30, 0, 0, 0).unwrap();
+    assert_eq!(
+        service.retain(old).await.unwrap(),
+        Retained {
+            cursors: 0,
+            events: 0
+        },
+        "before the list is told nothing counts as purged"
+    );
+    for name in ["orchestrator", "bi"] {
+        let mut kept = updates.permissions.lock().unwrap();
+        kept.insert(name.into(), crate::updates::ModulePermissions::default());
+    }
+    assert_eq!(
+        service.retain(old).await.unwrap(),
+        Retained {
+            cursors: 1,
+            events: 1
+        }
+    );
+    assert_eq!(store.cursors.lock().unwrap().len(), 1, "bi's stays");
 }

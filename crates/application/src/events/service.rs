@@ -58,8 +58,8 @@ type Compiled = HashMap<(String, String, u32), (Value, Arc<dyn EventSchema>)>;
 /// Publishes, reads and confirms the modules' events.
 #[derive(Clone)]
 pub struct EventsService {
-    store: Arc<dyn EventsStore>,
-    updates: UpdatesService,
+    pub(super) store: Arc<dyn EventsStore>,
+    pub(super) updates: UpdatesService,
     schemas: Arc<dyn EventSchemas>,
     /// Each declared schema compiled once, by module, topic and version,
     /// with the schema it was compiled from.

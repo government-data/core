@@ -61,4 +61,16 @@ pub trait EventsStore: Send + Sync {
 
     /// `consumer` handled up to `cursor`; a cursor never goes back.
     async fn confirm(&self, consumer: &Consumer, cursor: i64) -> Result<(), String>;
+
+    /// Delete the cursors of every module not in `kept` (purged ones).
+    async fn forget_cursors(&self, kept: &[String]) -> Result<u64, String>;
+
+    /// Delete the events stored before `stored_before` that every consumer
+    /// of their topic and version confirmed past: each of `consumers`, and
+    /// every module that keeps a cursor of it (a removed one, paused).
+    async fn delete_confirmed(
+        &self,
+        consumers: &[Consumer],
+        stored_before: DateTime<Utc>,
+    ) -> Result<u64, String>;
 }
