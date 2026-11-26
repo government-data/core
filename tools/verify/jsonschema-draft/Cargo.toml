@@ -1,0 +1,13 @@
+[package]
+name = "jsonschema-draft"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# Default features off: no HTTP or file resolver (decision 0017, section 5).
+jsonschema = { version = "=0.61.1", default-features = false }
+serde_json = "1"
+
+# Standalone: not part of the application workspace.
+[workspace]
