@@ -7,6 +7,7 @@
 //! ruling 52), so every statement is complete with nothing bound.
 
 mod cells;
+mod charts;
 mod distribution;
 mod extract;
 mod field_quality;
@@ -26,6 +27,7 @@ mod retract;
 mod rules;
 mod scratch;
 
+pub use charts::{chart, CHARTS};
 pub use distribution::{outliers, variable_percentiles, Method};
 pub use extract::{
     bronze_type, create_bronze, create_catalog, extract, split, Connector, Conversion, Range,
