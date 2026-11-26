@@ -42,7 +42,7 @@ pub fn issuer_from_env() -> Result<Option<StsIssuer>, String> {
     let Some(endpoint) = endpoint else {
         return Ok(None);
     };
-    let Some((access, secret)) = issuer_keys()? else {
+    let Some((access, secret)) = issuer_keys_from_env()? else {
         return Ok(None);
     };
     let http = LakeClient::from_env(Duration::from_secs(10))?;
@@ -56,7 +56,8 @@ pub fn issuer_from_env() -> Result<Option<StsIssuer>, String> {
 
 /// The issuer's access and secret keys, from the variables or their
 /// files; `None` without an access key, an error with one but no secret.
-fn issuer_keys() -> Result<Option<(String, String)>, String> {
+/// The core makes the lake's user of these keys at start (ruling 51).
+pub fn issuer_keys_from_env() -> Result<Option<(String, String)>, String> {
     let Some(access) = key_from_env(ACCESS_KEY)? else {
         return Ok(None);
     };
@@ -97,21 +98,21 @@ mod tests {
             }
         };
         clear();
-        assert_eq!(issuer_keys(), Ok(None));
+        assert_eq!(issuer_keys_from_env(), Ok(None));
 
         std::env::set_var(format!("{ACCESS_KEY}_FILE"), &access_file);
-        assert!(issuer_keys().unwrap_err().contains("needs"));
+        assert!(issuer_keys_from_env().unwrap_err().contains("needs"));
         std::env::set_var(format!("{SECRET_KEY}_FILE"), &secret_file);
-        let keys = issuer_keys().unwrap().unwrap();
+        let keys = issuer_keys_from_env().unwrap().unwrap();
         assert_eq!(keys, ("qd-access-file".into(), "secret-from-file".into()));
 
         // A variable wins over its file, as for every key.
         std::env::set_var(ACCESS_KEY, "qd-access-var");
-        assert_eq!(issuer_keys().unwrap().unwrap().0, "qd-access-var");
+        assert_eq!(issuer_keys_from_env().unwrap().unwrap().0, "qd-access-var");
 
         std::env::set_var(format!("{ACCESS_KEY}_FILE"), dir.join("missing"));
         std::env::remove_var(ACCESS_KEY);
-        assert!(issuer_keys().unwrap_err().contains("_FILE"));
+        assert!(issuer_keys_from_env().unwrap_err().contains("_FILE"));
         clear();
         std::fs::remove_dir_all(&dir).unwrap();
     }
