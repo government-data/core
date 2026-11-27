@@ -14,6 +14,10 @@
 # reached the same way by mimir.<INTERNAL_DOMAIN>, and Loki, which does its
 # own mTLS with the same certificate, by loki.<INTERNAL_DOMAIN> at
 # LOKI_UPSTREAM (ruling 82; both only where the observability stack runs).
+# The Trino coordinator, which terminates its own TLS with the same
+# certificate, is passed through by trino.<INTERNAL_DOMAIN> to
+# TRINO_UPSTREAM, so it publishes no port of its own (decision 0090,
+# ruling 90; only where the coordinator runs on this machine).
 {{ $internal := env "INTERNAL_DOMAIN" | default "internal.localhost" }}
 tcp:
   routers:
@@ -45,6 +49,14 @@ tcp:
         passthrough: true
       service: loki-entry
 {{- end }}
+{{- if env "TRINO_UPSTREAM" }}
+    trino-entry:
+      rule: "HostSNI(`trino.{{ $internal }}`)"
+      entryPoints: [websecure]
+      tls:
+        passthrough: true
+      service: trino-entry
+{{- end }}
   services:
     internal-entry:
       loadBalancer:
@@ -68,6 +80,12 @@ tcp:
       loadBalancer:
         servers:
           - address: "{{ env "LOKI_UPSTREAM" }}"
+{{- end }}
+{{- if env "TRINO_UPSTREAM" }}
+    trino-entry:
+      loadBalancer:
+        servers:
+          - address: "{{ env "TRINO_UPSTREAM" }}"
 {{- end }}
   serversTransports:
     internal-entry:

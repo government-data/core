@@ -8,7 +8,10 @@
 //! name the lake's gates ask the core's lake check by, on 443, which
 //! Traefik passes to the gates' entry point by SNI (ruling 71, decision
 //! 0091); `mimir.<name>` and `loki.<name>` ([`MIMIR_PREFIX`],
-//! [`LOKI_PREFIX`]), where every VM's Alloy pushes, on 443 too (ruling 82).
+//! [`LOKI_PREFIX`]), where every VM's Alloy pushes, on 443 too (ruling 82);
+//! and `trino.<name>` ([`TRINO_PREFIX`]), the Trino coordinator's, which
+//! Traefik passes through on 443 to the coordinator's own TLS (decision
+//! 0090, ruling 90).
 //! A lake machine's (`lake`, `lake-replica`) also carries
 //! `admin.<name>`: its gate passes that name through to the lake admin
 //! adapter, which terminates its own TLS, on the machine's one port (443).
@@ -34,6 +37,8 @@ pub(crate) const LAKE_GATE_PREFIX: &str = "lakegate.";
 /// The prefixes of the application machine's names for Mimir and Loki.
 pub(crate) const MIMIR_PREFIX: &str = "mimir.";
 pub(crate) const LOKI_PREFIX: &str = "loki.";
+/// The prefix of the application machine's name for the Trino coordinator.
+pub(crate) const TRINO_PREFIX: &str = "trino.";
 
 fn identity(role: MachineRole, name: &str) -> Result<MachineIdentity, SigningRefusal> {
     let names: Vec<String> = match role {
@@ -43,6 +48,7 @@ fn identity(role: MachineRole, name: &str) -> Result<MachineIdentity, SigningRef
             format!("{LAKE_GATE_PREFIX}{name}"),
             format!("{MIMIR_PREFIX}{name}"),
             format!("{LOKI_PREFIX}{name}"),
+            format!("{TRINO_PREFIX}{name}"),
         ],
         MachineRole::Lake | MachineRole::LakeReplica => {
             vec![name.to_string(), format!("{LAKE_ADMIN_PREFIX}{name}")]
@@ -184,7 +190,8 @@ mod tests {
                 DOLT_NAME,
                 "lakegate.qd-app",
                 "mimir.qd-app",
-                "loki.qd-app"
+                "loki.qd-app",
+                "trino.qd-app"
             ]
         );
     }

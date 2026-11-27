@@ -24,13 +24,18 @@
 #   (MIMIR_UPSTREAM), presenting the same certificate; Mimir's own port is
 #   published nowhere (infra/observability/certificate.yml). Loki is
 #   passed through on 443 by loki.<INTERNAL_DOMAIN> to LOKI_UPSTREAM, on
-#   the same network, where it does its own mTLS.
+#   the same network, where it does its own mTLS. The Trino coordinator is
+#   passed through by trino.<INTERNAL_DOMAIN> to TRINO_UPSTREAM, where it
+#   terminates its own TLS (decision 0090, ruling 90).
 #
 # Required environment, besides docker-compose.yml's:
 #   QD_MACHINE_DIR   the application VM's node agent directory (QD_AGENT_DIR)
 # Optional: QD_TRAEFIK_CHECK_EVERY (30), seconds between looks at the
 # agent's machine.pem; MIMIR_UPSTREAM (https://mimir:9009), Mimir as
-# Traefik reaches it; LOKI_UPSTREAM (loki:3100), Loki's address.
+# Traefik reaches it; LOKI_UPSTREAM (loki:3100), Loki's address;
+# TRINO_UPSTREAM (none: no route), the coordinator's TLS address, such as
+# engine-trino-coordinator:443 on data-quality-edge, where the coordinator
+# runs on this machine.
 #
 # Verified with tools/verify/traefik_app_certificate.sh; this file itself
 # only by `docker compose config`.
@@ -45,6 +50,7 @@ services:
       QD_TRAEFIK_CHECK_EVERY: ${QD_TRAEFIK_CHECK_EVERY:-30}
       MIMIR_UPSTREAM: ${MIMIR_UPSTREAM:-https://mimir:${MIMIR_HTTP_PORT:-9009}}
       LOKI_UPSTREAM: ${LOKI_UPSTREAM:-loki:${LOKI_HTTP_PORT:-3100}}
+      TRINO_UPSTREAM: ${TRINO_UPSTREAM:-}
     volumes:
       - "./dynamic:/etc/traefik/dynamic"
       - "./machine/entrypoint.sh:/etc/qd/traefik/entrypoint.sh:ro"
