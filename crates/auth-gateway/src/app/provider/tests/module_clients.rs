@@ -264,3 +264,29 @@ async fn quality_jobs_is_granted_only_to_a_module_that_requires_orchestration() 
         "no requires and no quality-jobs: as before"
     );
 }
+
+#[tokio::test]
+async fn a_machine_client_may_ask_for_audiences_alone() {
+    let f = fixture(ClientAuth::Public);
+    let only: ModuleClientsRequest = serde_json::from_value(json!({ "machine": {
+        "capabilities": [], "audiences": ["core"], "secret": MACHINE } }))
+    .unwrap();
+    let done = f
+        .server
+        .put_module_clients("orchestrator", &only, ORIGIN)
+        .await
+        .unwrap();
+    assert_eq!(
+        done.machine_client_id.as_deref(),
+        Some("orchestrator-machine")
+    );
+    let none: ModuleClientsRequest = serde_json::from_value(json!({ "machine": {
+        "audiences": [], "secret": MACHINE } }))
+    .unwrap();
+    assert!(matches!(
+        f.server
+            .put_module_clients("orchestrator", &none, ORIGIN)
+            .await,
+        Err(ModuleClientsError::Invalid(_))
+    ));
+}
