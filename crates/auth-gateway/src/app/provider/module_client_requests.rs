@@ -69,6 +69,8 @@ pub struct RoleClaimRequest {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MachineClient {
+    /// None when its audiences are all it asks for (ruling 94).
+    #[serde(default)]
     pub capabilities: Vec<String>,
     pub audiences: Vec<String>,
     /// The capabilities the module requires, from its manifest: what
@@ -178,8 +180,8 @@ pub(super) fn machine_client(
                         .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
             })
     };
-    if !names_ok(&m.capabilities) {
-        return Err(invalid("capabilities: 1 to 8 names"));
+    if !m.capabilities.is_empty() && !names_ok(&m.capabilities) {
+        return Err(invalid("capabilities: at most 8 names"));
     }
     if !names_ok(&m.audiences) {
         return Err(invalid("audiences: 1 to 8 names"));
