@@ -111,6 +111,7 @@ fn grant() -> RegistryGrant {
             version: "0.2.1".into(),
             services: vec!["rustfs".into(), "gate".into()],
             files: vec![role_file("compose.yml", b"services: {}\n")],
+            env: Default::default(),
         }],
     }
 }
