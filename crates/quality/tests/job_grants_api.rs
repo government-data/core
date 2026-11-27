@@ -206,3 +206,79 @@ async fn the_people_s_grants_come_beside_the_job_users() {
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(body["error"], "iam_unavailable");
 }
+
+/// Ruling 84: an open console run's user reads its asker's datasets only.
+#[tokio::test]
+async fn an_open_console_run_gets_its_askers_datasets() {
+    use contracts::ModuleRegistry;
+    use infrastructure::module_migrations::PgModuleMigrator;
+    use quality::job_grants_api::routes_with_consoles;
+    use quality::module::QualityModule;
+
+    let db = testkit::spawn_test_db().await;
+    sqlx::query("CREATE ROLE qd_queue LOGIN PASSWORD 'queue'")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let mut migrator = PgModuleMigrator::load(&db.pool).await.unwrap();
+    ModuleRegistry::new()
+        .register(QualityModule::default())
+        .run_migrations(&mut migrator)
+        .unwrap();
+    migrator.run(&db.pool).await.unwrap();
+    let options = testkit::app_role(&db).await;
+    for sql in [
+        "GRANT USAGE ON SCHEMA quality TO app",
+        "ALTER TABLE quality.jobs OWNER TO app",
+    ] {
+        sqlx::query(sql).execute(&db.pool).await.unwrap();
+    }
+    let app = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(2)
+        .connect_with(options)
+        .await
+        .unwrap();
+    for (id, state) in [
+        ("0b9c6a1e-0000-4000-8000-000000000091", "queued"),
+        ("0b9c6a1e-0000-4000-8000-000000000092", "done"),
+    ] {
+        sqlx::query(
+            "INSERT INTO quality.jobs (id, kind, state, parameters)
+             VALUES ($1::uuid, 'query', $2, '{\"sql\": \"SELECT 1\", \"datasets\": [\"clients\"]}')",
+        )
+        .bind(id)
+        .bind(state)
+        .execute(&app)
+        .await
+        .unwrap();
+    }
+    let router = routes_with_consoles(Arc::new(Main { fails: false }), Arc::new(Tokens), None, app);
+    let req = Request::get(URI).header("authorization", "Bearer rules-merge");
+    let res = router
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(res.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    let out: Value = serde_json::from_slice(&bytes).unwrap();
+    let console: Vec<&Value> = out["grants"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|g| g["subject"].as_str().unwrap().starts_with("job_console_"))
+        .collect();
+    assert!(console
+        .iter()
+        .all(|g| g["subject"] == "job_console_r0b9c6a1e000040008000000000000091"));
+    let namespaces: Vec<&str> = console
+        .iter()
+        .map(|g| g["namespace"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        namespaces,
+        ["clients_bronze", "clients_silver", "quality_gold"]
+    );
+    assert_eq!(console[2]["rows"]["in"], serde_json::json!(["clients"]));
+}

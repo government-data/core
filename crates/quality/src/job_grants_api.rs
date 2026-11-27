@@ -19,9 +19,11 @@ use serde::Serialize;
 use crate::catalog::Catalog;
 use contracts::Grantees;
 
-use crate::job_grants::{job_grants, DatasetJobs, Grant};
+use sqlx::PgPool;
+
+use crate::job_grants::{console_grants, job_grants, ConsoleRun, DatasetJobs, Grant};
 use crate::mapping::Mapping;
-use crate::people_grants::people_grants;
+use crate::people_grants::{people_grants, PEOPLE_GOLD};
 use crate::worker_api::MachineTokens;
 
 /// The audience the rules merge asks its machine token for.
@@ -38,6 +40,8 @@ struct GrantsApi {
     catalog: Arc<dyn Catalog>,
     tokens: Arc<dyn MachineTokens>,
     people: Option<Arc<dyn Grantees>>,
+    /// Where the open console runs are read (ruling 84).
+    consoles: Option<PgPool>,
 }
 
 /// `GET /internal/quality/v1/job-grants`, the job users' grants only.
@@ -46,6 +50,7 @@ pub fn routes(catalog: Arc<dyn Catalog>, tokens: Arc<dyn MachineTokens>) -> Rout
         catalog,
         tokens,
         people: None,
+        consoles: None,
     })
 }
 
@@ -60,7 +65,45 @@ pub fn routes_with_people(
         catalog,
         tokens,
         people: Some(people),
+        consoles: None,
     })
+}
+
+/// The same, with each open console run's user after the people's
+/// (decision 0090, ruling 84): its asker's datasets, read from `pool`.
+pub fn routes_with_consoles(
+    catalog: Arc<dyn Catalog>,
+    tokens: Arc<dyn MachineTokens>,
+    people: Option<Arc<dyn Grantees>>,
+    pool: PgPool,
+) -> Router {
+    serve(GrantsApi {
+        catalog,
+        tokens,
+        people,
+        consoles: Some(pool),
+    })
+}
+
+/// The console runs queued or running within their lease's hour, with the
+/// datasets their ask recorded.
+async fn open_consoles(pool: &PgPool) -> Result<Vec<ConsoleRun>, sqlx::Error> {
+    let rows: Vec<(uuid::Uuid, Option<serde_json::Value>)> = sqlx::query_as(
+        "SELECT id, parameters->'datasets' FROM quality.jobs
+          WHERE kind = 'query' AND state NOT IN ('done', 'failed')
+            AND created_at > now() - interval '1 hour'",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, datasets)| ConsoleRun {
+            target: format!("r{}", id.simple()),
+            datasets: datasets
+                .and_then(|d| serde_json::from_value(d).ok())
+                .unwrap_or_default(),
+        })
+        .collect())
 }
 
 fn serve(api: GrantsApi) -> Router {
@@ -125,6 +168,13 @@ async fn grants_of(
             refused(StatusCode::SERVICE_UNAVAILABLE, "iam_unavailable")
         })?;
         grants.extend(theirs);
+    }
+    if let Some(pool) = &api.consoles {
+        let runs = open_consoles(pool).await.map_err(|e| {
+            tracing::error!("job grants: the console runs: {e}");
+            refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable")
+        })?;
+        grants.extend(console_grants(&runs, PEOPLE_GOLD));
     }
     Ok(Json(JobGrants { grants }))
 }
