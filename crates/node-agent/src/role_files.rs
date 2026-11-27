@@ -3,8 +3,11 @@
 //! under `<root>/<module>/`, each checked against its SHA-256 first. A
 //! module's files are written into `<module>.new` and renamed over the
 //! folder before it only once every file checked, so a bad answer leaves
-//! the files in use as they were.
+//! the files in use as they were. The role's `env` (its `IMAGE_*` values,
+//! not secret) becomes the module's `.env`, which compose reads from the
+//! project directory (0013, contract d).
 
+use std::collections::BTreeMap;
 use std::path::{Component, Path};
 
 use base64::Engine as _;
@@ -19,6 +22,9 @@ pub struct RoleModule {
     pub services: Vec<String>,
     #[serde(default)]
     pub files: Vec<RoleFile>,
+    /// The role's plain variables, written as the module's `.env`.
+    #[serde(default)]
+    pub env: BTreeMap<String, String>,
 }
 
 /// One of its files.
@@ -54,7 +60,7 @@ fn place_module(root: &Path, m: &RoleModule) -> Result<(), String> {
     }
     let next = root.join(format!("{}.new", m.name));
     let _ = std::fs::remove_dir_all(&next);
-    let written = write_all(&next, &m.files);
+    let written = write_all(&next, &m.files).and_then(|()| write_env(&next, &m.env));
     if let Err(e) = written {
         let _ = std::fs::remove_dir_all(&next);
         return Err(e);
@@ -87,6 +93,29 @@ fn write_all(dir: &Path, files: &[RoleFile]) -> Result<(), String> {
         std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", f.path))?;
     }
     Ok(())
+}
+
+/// The `.env` of `env`, one `KEY='value'` per line: single-quoted, so
+/// compose reads each value as it is. A name that is not a variable's, or
+/// a value with a quote, a line break or a NUL, stops it.
+fn write_env(dir: &Path, env: &BTreeMap<String, String>) -> Result<(), String> {
+    let mut text = String::new();
+    for (key, value) in env {
+        let named = !key.is_empty()
+            && key.len() <= 64
+            && !key.starts_with(|c: char| c.is_ascii_digit())
+            && key
+                .chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
+        if !named {
+            return Err(format!("{key:?}: not a variable's name"));
+        }
+        if value.len() > 4096 || value.contains(['\'', '\n', '\r', '\0']) {
+            return Err(format!("{key}: a value it cannot write"));
+        }
+        text.push_str(&format!("{key}='{value}'\n"));
+    }
+    std::fs::write(dir.join(".env"), text).map_err(|e| format!(".env: {e}"))
 }
 
 /// Relative, with plain segments only.
@@ -123,6 +152,7 @@ mod tests {
             version: "0.2.1".into(),
             services: vec!["rustfs".into()],
             files,
+            env: BTreeMap::new(),
         }
     }
 
@@ -165,5 +195,33 @@ mod tests {
         assert!(!dir.path().join("lake-rustfs.new").exists());
         assert!(!dir.path().join("escape.sh").exists());
         assert!(place(dir.path(), &[module("../x", vec![])]).is_err());
+    }
+
+    #[test]
+    fn the_roles_env_is_the_modules_env_file() {
+        let dir = TempDir::new();
+        let mut m = module("lake-rustfs", vec![file("compose.yml", b"services: {}\n")]);
+        m.env
+            .insert("IMAGE_GATE".into(), "r.example/gate@sha256:ab".into());
+        m.env.insert("QD_CORE_NAME".into(), "app-1".into());
+        place(dir.path(), &[m.clone()]).unwrap();
+        let env = std::fs::read_to_string(dir.path().join("lake-rustfs/.env")).unwrap();
+        assert_eq!(
+            env,
+            "IMAGE_GATE='r.example/gate@sha256:ab'\nQD_CORE_NAME='app-1'\n"
+        );
+        for (key, value) in [
+            ("lower", "x"),
+            ("1ST", "x"),
+            ("A B", "x"),
+            ("QUOTED", "it's"),
+            ("LINES", "a\nB=c"),
+        ] {
+            let mut bad = m.clone();
+            bad.env.insert(key.into(), value.into());
+            assert!(place(dir.path(), &[bad]).is_err(), "{key}");
+        }
+        let kept = std::fs::read_to_string(dir.path().join("lake-rustfs/.env")).unwrap();
+        assert_eq!(kept, env);
     }
 }
