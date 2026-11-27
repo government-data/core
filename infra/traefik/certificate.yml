@@ -34,7 +34,8 @@
 # agent's machine.pem; MIMIR_UPSTREAM (https://mimir:9009), Mimir as
 # Traefik reaches it; LOKI_UPSTREAM (loki:3100), Loki's address;
 # TRINO_UPSTREAM (none: no route), the coordinator's TLS address, such as
-# trino:8443, where the coordinator runs on this machine.
+# engine-trino-coordinator:443 on data-quality-edge, where the coordinator
+# runs on this machine.
 #
 # Verified with tools/verify/traefik_app_certificate.sh; this file itself
 # only by `docker compose config`.
