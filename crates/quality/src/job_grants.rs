@@ -196,3 +196,75 @@ fn dataset_grants(
         name,
     ));
 }
+
+/// A console statement's run as its grants see it (decision 0090, ruling
+/// 84): its user's target (`r` and the run's hex) and the datasets its
+/// asker may view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsoleRun {
+    pub target: String,
+    pub datasets: Vec<String>,
+}
+
+/// Each open console run's user, `job_console_<target>`: `SELECT` on the
+/// bronze and silver of its datasets, and on `gold_tables` for those
+/// datasets' rows only; never a source, never another dataset.
+pub fn console_grants(runs: &[ConsoleRun], gold_tables: &[&str]) -> Vec<Grant> {
+    let mut out = Vec::new();
+    for run in runs.iter().filter(|r| is_name(&r.target)) {
+        let user = format!("job_console_{}", run.target);
+        let datasets: Vec<String> = run
+            .datasets
+            .iter()
+            .filter(|d| is_name(d))
+            .cloned()
+            .collect();
+        if datasets.is_empty() {
+            continue;
+        }
+        for d in &datasets {
+            for ns in &namespaces(d) {
+                out.push(grant(&user, ns, &["*"], &[Select]));
+            }
+        }
+        let mut gold = grant(&user, GOLD, gold_tables, &[Select]);
+        gold.rows = Some(Rows {
+            column: "dataset".into(),
+            values: datasets,
+        });
+        out.push(gold);
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_console_run_reads_only_its_askers_datasets() {
+        let runs = [
+            ConsoleRun {
+                target: "r0b9c6a1e000040008000000000000091".into(),
+                datasets: vec!["loans".into(), "Bad-Name".into()],
+            },
+            ConsoleRun {
+                target: "rnone".into(),
+                datasets: vec![],
+            },
+        ];
+        let g = console_grants(&runs, &["run_summary"]);
+        let user = "job_console_r0b9c6a1e000040008000000000000091";
+        assert!(g.iter().all(|g| g.subject == user));
+        let namespaces: Vec<&str> = g.iter().map(|g| g.namespace.as_str()).collect();
+        assert_eq!(namespaces, ["loans_bronze", "loans_silver", GOLD]);
+        assert_eq!(
+            g[2].rows,
+            Some(Rows {
+                column: "dataset".into(),
+                values: vec!["loans".into()]
+            })
+        );
+        assert_eq!(g[2].tables, ["run_summary"]);
+    }
+}
