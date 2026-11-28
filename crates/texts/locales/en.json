@@ -91,6 +91,13 @@
     }
   },
   "app": {
+    "notices": {
+      "trinoResults": {
+        "subject": "Results now come from Trino",
+        "label": "Quality",
+        "body": "Results now come from Trino/gold; the quality dashboard is in Superset."
+      }
+    },
     "account": {
       "activation": {
         "button": "Activate my account",

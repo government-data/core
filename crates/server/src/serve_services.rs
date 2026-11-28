@@ -96,6 +96,16 @@ pub(crate) async fn services(db: &Database, auth: &AuthConfig) -> Result<Service
     let captcha = settings_wiring::captcha_from_env()?;
     // The schedules (decision 0035): only the VM holding the lock fires.
     spawn_scheduler(db.pool.clone());
+    // The flip to Trino's results, told once to the administrators
+    // (decision 0090, ruling 78); retried at the next start if it fails.
+    let store = infrastructure::once_notices::PgOnceNotices::new(pool.clone());
+    let (mail, contacts) = (
+        settings.mailer(),
+        application::PlatformAdmins(platform_repo.clone()),
+    );
+    tokio::spawn(async move {
+        application::once_notices::send_trino_results(&store, &mail, &contacts).await;
+    });
     // Every new version and how each attempt ended, emailed to the
     // administrators (the daemon reports it through the internal routes).
     let updates = updates.with_notices(
