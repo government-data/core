@@ -61,6 +61,7 @@ pub const DETAILS: &[GoldTable] = &[
             ("distinct_values", BIGINT),
             ("pattern", TEXT),
             ("pattern_count", BIGINT),
+            ("floating", "BOOLEAN"),
             ("mean_icd", DOUBLE),
             ("recency", "ARRAY(BIGINT)"),
         ],
@@ -165,7 +166,7 @@ fn create(t: &GoldTable, partitioning: &str) -> String {
 }
 
 fn plain(sql: String) -> Statement {
-    Statement { sql, cut_params: 0 }
+    Statement { sql }
 }
 
 /// The install's statements, in order: the schemas, gold's tables, the
