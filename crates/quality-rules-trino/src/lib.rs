@@ -8,8 +8,12 @@
 mod cells;
 mod distribution;
 mod extract;
+mod field_quality;
 mod findings;
 mod gold;
+mod gold_distribution;
+mod gold_findings;
+mod gold_scratch;
 mod gold_write;
 mod icd;
 mod loads;
@@ -23,8 +27,12 @@ pub use distribution::{outliers, variable_percentiles, Method};
 pub use extract::{
     bronze_type, create_bronze, create_catalog, extract, split, Connector, Conversion, Range,
 };
+pub use field_quality::{field_quality, FieldSources};
 pub use findings::{finding_groups, findings, queues, Findings};
 pub use gold::{install, GoldTable, DETAILS, GOLD, REMEDIATION_SLAS, RUN_SUMMARY};
+pub use gold_distribution::{outlier_rows, percentile_guard, percentile_row};
+pub use gold_findings::{previous_findings, run_findings, GoldFindings};
+pub use gold_scratch::{cell_rows, entity_icd, group_metrics};
 pub use gold_write::{delete_older, delete_run, flip, insert, older_rows, run_rows, Run};
 pub use icd::{measured, scratch_insert, IcdRule, Measured, FINDINGS_KEY, SCRATCH};
 pub use loads::{
@@ -38,7 +46,7 @@ pub use retract::{
     dataset_rows, delete_dataset, delete_older_slas, delete_run_slas, insert_slas, older_slas,
     run_slas, tombstone, Sla,
 };
-pub use rules::rule_counts;
+pub use rules::{rule_counts, rule_results};
 pub use scratch::{cells, entities, groups, means, scratch_delete, scratch_rows};
 
 use quality_rules_sql::quote_ident;
