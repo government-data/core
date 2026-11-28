@@ -74,7 +74,11 @@ fn each_kind_gets_only_its_own_places() {
         places("job_extract_loans"),
         ["src_crm.*", "loans_bronze", "loans_silver", "quality_gold"]
     );
-    assert_eq!(places("job_sample_loans"), ["loans_bronze", "loans_silver"]);
+    // And its references' silver, read pinned by a test (ruling 105).
+    assert_eq!(
+        places("job_sample_loans"),
+        ["loans_bronze", "loans_silver", "branches_silver"]
+    );
     assert_eq!(
         places("job_maint_loans"),
         ["loans_bronze", "loans_silver", "quality_scratch"]
