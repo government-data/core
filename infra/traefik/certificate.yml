@@ -33,9 +33,10 @@
 # Optional: QD_TRAEFIK_CHECK_EVERY (30), seconds between looks at the
 # agent's machine.pem; MIMIR_UPSTREAM (https://mimir:9009), Mimir as
 # Traefik reaches it; LOKI_UPSTREAM (loki:3100), Loki's address;
-# TRINO_UPSTREAM (none: no route), the coordinator's TLS address, such as
-# engine-trino-coordinator:443 on data-quality-edge, where the coordinator
-# runs on this machine.
+# TRINO_UPSTREAM (engine-trino-coordinator:443), the coordinator's TLS
+# address on data-quality-edge, where it runs on this machine; until it
+# runs, a connection for trino.<INTERNAL_DOMAIN> finds nothing, as Loki's
+# before the observability stack.
 #
 # Verified with tools/verify/traefik_app_certificate.sh; this file itself
 # only by `docker compose config`.
@@ -50,7 +51,7 @@ services:
       QD_TRAEFIK_CHECK_EVERY: ${QD_TRAEFIK_CHECK_EVERY:-30}
       MIMIR_UPSTREAM: ${MIMIR_UPSTREAM:-https://mimir:${MIMIR_HTTP_PORT:-9009}}
       LOKI_UPSTREAM: ${LOKI_UPSTREAM:-loki:${LOKI_HTTP_PORT:-3100}}
-      TRINO_UPSTREAM: ${TRINO_UPSTREAM:-}
+      TRINO_UPSTREAM: ${TRINO_UPSTREAM:-engine-trino-coordinator:443}
     volumes:
       - "./dynamic:/etc/traefik/dynamic"
       - "./machine/entrypoint.sh:/etc/qd/traefik/entrypoint.sh:ro"
