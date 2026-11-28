@@ -21,7 +21,9 @@ use contracts::Grantees;
 
 use sqlx::PgPool;
 
-use crate::job_grants::{console_grants, job_grants, ConsoleRun, DatasetJobs, Grant};
+use crate::job_grants::{
+    console_grants, job_grants, lookup_grants, ConsoleRun, DatasetJobs, Grant,
+};
 use crate::mapping::Mapping;
 use crate::people_grants::{people_grants, PEOPLE_GOLD};
 use crate::worker_api::MachineTokens;
@@ -85,14 +87,16 @@ pub fn routes_with_consoles(
     })
 }
 
-/// The console runs queued or running within their lease's hour, with the
-/// datasets their ask recorded.
-async fn open_consoles(pool: &PgPool) -> Result<Vec<ConsoleRun>, sqlx::Error> {
+/// The runs of `kind` (console statements, entity lookups) queued or
+/// running within their lease's hour, with the datasets their ask
+/// recorded.
+async fn open_runs(pool: &PgPool, kind: &str) -> Result<Vec<ConsoleRun>, sqlx::Error> {
     let rows: Vec<(uuid::Uuid, Option<serde_json::Value>)> = sqlx::query_as(
         "SELECT id, parameters->'datasets' FROM quality.jobs
-          WHERE kind = 'query' AND state NOT IN ('done', 'failed')
+          WHERE kind = $1 AND state NOT IN ('done', 'failed')
             AND created_at > now() - interval '1 hour'",
     )
+    .bind(kind)
     .fetch_all(pool)
     .await?;
     Ok(rows
@@ -170,11 +174,15 @@ async fn grants_of(
         grants.extend(theirs);
     }
     if let Some(pool) = &api.consoles {
-        let runs = open_consoles(pool).await.map_err(|e| {
-            tracing::error!("job grants: the console runs: {e}");
+        let failed = |e: sqlx::Error| {
+            tracing::error!("job grants: the open runs: {e}");
             refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable")
-        })?;
-        grants.extend(console_grants(&runs, PEOPLE_GOLD));
+        };
+        let consoles = open_runs(pool, "query").await.map_err(failed)?;
+        grants.extend(console_grants(&consoles, PEOPLE_GOLD));
+        // Entity lookups (ruling 102), `entity_key` jobs.
+        let lookups = open_runs(pool, "entity_key").await.map_err(failed)?;
+        grants.extend(lookup_grants(&lookups));
     }
     Ok(Json(JobGrants { grants }))
 }

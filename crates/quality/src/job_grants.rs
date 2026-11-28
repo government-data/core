@@ -242,6 +242,42 @@ pub fn console_grants(runs: &[ConsoleRun], gold_tables: &[&str]) -> Vec<Grant> {
     out
 }
 
+/// The findings key's namespace and table (decision 0090, point 8.6).
+pub const SECRETS: &str = "quality_secrets";
+pub const FINDINGS_KEY: &str = "findings_key";
+
+/// Each open entity lookup's user, `job_lookup_<target>` (ruling 102):
+/// `SELECT` on the findings key, and on gold's `entity_icd`, `run_summary`
+/// and `current_run` for its datasets' rows only.
+pub fn lookup_grants(runs: &[ConsoleRun]) -> Vec<Grant> {
+    let mut out = Vec::new();
+    for run in runs.iter().filter(|r| is_name(&r.target)) {
+        let user = format!("job_lookup_{}", run.target);
+        let datasets: Vec<String> = run
+            .datasets
+            .iter()
+            .filter(|d| is_name(d))
+            .cloned()
+            .collect();
+        if datasets.is_empty() {
+            continue;
+        }
+        out.push(grant(&user, SECRETS, &[FINDINGS_KEY], &[Select]));
+        let mut gold = grant(
+            &user,
+            GOLD,
+            &["entity_icd", "run_summary", "current_run"],
+            &[Select],
+        );
+        gold.rows = Some(Rows {
+            column: "dataset".into(),
+            values: datasets,
+        });
+        out.push(gold);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290,5 +326,26 @@ mod tests {
             sample,
             ["clients_bronze", "clients_silver", "advisors_silver"]
         );
+    }
+
+    #[test]
+    fn a_lookup_reads_the_key_and_its_datasets_entities_only() {
+        let g = lookup_grants(&[ConsoleRun {
+            target: "r0b9c6a1e000040008000000000000101".into(),
+            datasets: vec!["loans".into()],
+        }]);
+        let places: Vec<(&str, Vec<String>)> = g
+            .iter()
+            .map(|g| (g.namespace.as_str(), g.tables.clone()))
+            .collect();
+        assert_eq!(
+            places[0],
+            ("quality_secrets", vec!["findings_key".to_string()])
+        );
+        assert_eq!(places[1].0, GOLD);
+        assert!(g[0].rows.is_none() && g[1].rows.is_some());
+        assert!(g
+            .iter()
+            .all(|g| g.subject == "job_lookup_r0b9c6a1e000040008000000000000101"));
     }
 }
