@@ -12,11 +12,16 @@ name: CI
 # infra/aws/ci; without it, on GitHub's.
 
 on:
-  # On PRs and in the merge queue, not on main: a PR reaches main only through
-  # the queue, which tests it on top of main first, so what reaches main is
-  # already tested (running it again was 35 % of the minutes).
+  # On PRs and in the merge queue: a PR reaches main only through the queue,
+  # which tests it on top of main first, so what reaches main is already
+  # tested (running everything again was 35 % of the minutes).
   pull_request:
   merge_group:
+  # On main only `backend` runs, and only when the Rust inputs change: it is
+  # the one run that saves the Rust cache, which PRs and the merge queue
+  # restore (see `backend`).
+  push:
+    branches: [main]
   # Weekly re-audit of dependencies: a vulnerability disclosed against an
   # unchanged dependency is caught even when no one pushes.
   schedule:
@@ -24,9 +29,11 @@ on:
   workflow_dispatch:
 
 # Cancel superseded runs on the same ref (e.g. a new push to an open PR).
+# Not on main: a cancelled run there saves no Rust cache, and merges from the
+# queue arrive faster than `backend` finishes.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
@@ -40,7 +47,8 @@ jobs:
     # GitHub has no minutes; without it, on GitHub's.
     runs-on: ${{ fromJSON(vars.CI_RUNNER_LIVIANO || '"ubuntu-latest"') }}
     # On a PR, paths-filter asks GitHub's API for the list of files; in the
-    # merge queue it diffs the group's base and head commits with git.
+    # merge queue it diffs the group's base and head commits with git; on a
+    # push to main, the commits the push added.
     permissions:
       contents: read
       pull-requests: read
@@ -58,7 +66,7 @@ jobs:
           fetch-depth: 0
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push'
         with:
           filters: |
             backend:
@@ -190,8 +198,14 @@ jobs:
         uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
         with:
           components: rustfmt, clippy
+      # Only main saves. A run can restore only its own ref's caches or the
+      # default branch's; each PR and merge-queue ref saving its own (~800 MB)
+      # filled the repository's 10 GB, evicted main's, and every run compiled
+      # from scratch. PRs and the merge queue restore main's cache.
       - name: Cache cargo registry and target
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Format
         run: cargo fmt --all -- --check
       # A new migration only adds: if an update does not start, the previous
@@ -246,7 +260,8 @@ jobs:
   # pnpm frontend: lint, prettier check, test, build across the pnpm workspace.
   frontend:
     needs: check
-    if: ${{ needs.check.outputs.frontend == 'true' }}
+    # Not on a push to main: only `backend` runs there, to save the Rust cache.
+    if: ${{ github.event_name != 'push' && needs.check.outputs.frontend == 'true' }}
     runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -288,7 +303,7 @@ jobs:
   # need more than the free space an ubuntu-latest runner starts with.
   image-api:
     needs: check
-    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-api == 'true' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'push' && (needs.check.outputs.image-api == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -332,7 +347,7 @@ jobs:
   # mismatch.
   image-worker:
     needs: check
-    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-worker == 'true' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'push' && (needs.check.outputs.image-worker == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -367,7 +382,7 @@ jobs:
   # lake-rustfs repository, step 15).
   image-lake-rustfs-admin:
     needs: check
-    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-lake-rustfs-admin == 'true' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'push' && (needs.check.outputs.image-lake-rustfs-admin == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -397,7 +412,7 @@ jobs:
 
   image-web:
     needs: check
-    if: ${{ github.event_name != 'pull_request' && (needs.check.outputs.image-web == 'true' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'push' && (needs.check.outputs.image-web == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
