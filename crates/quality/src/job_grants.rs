@@ -191,6 +191,11 @@ fn dataset_grants(
         out.push(grant(&sample, ns, &["*"], &[Select]));
         out.push(grant(&maint, ns, &["*"], &writes));
     }
+    // A tested rule reads its references' silver, pinned (ruling 105).
+    for r in d.references.iter().filter(|r| is_name(r) && *r != name) {
+        let [_, silver] = namespaces(r);
+        out.push(grant(&sample, &silver, &["*"], &[Select]));
+    }
     out.push(of_dataset(
         grant(&maint, SCRATCH, &[SCRATCH_TABLE], &writes),
         name,
@@ -266,5 +271,24 @@ mod tests {
             })
         );
         assert_eq!(g[2].tables, ["run_summary"]);
+    }
+
+    #[test]
+    fn the_sample_user_reads_its_references_silver_only() {
+        let g = job_grants(&[DatasetJobs {
+            dataset: "clients".into(),
+            sources: vec![],
+            references: vec!["advisors".into()],
+            table: None,
+        }]);
+        let sample: Vec<&str> = g
+            .iter()
+            .filter(|g| g.subject == "job_sample_clients")
+            .map(|g| g.namespace.as_str())
+            .collect();
+        assert_eq!(
+            sample,
+            ["clients_bronze", "clients_silver", "advisors_silver"]
+        );
     }
 }

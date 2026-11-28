@@ -27,7 +27,7 @@ use crate::people_grants::{people_grants, PEOPLE_GOLD};
 use crate::worker_api::MachineTokens;
 
 /// The audience the rules merge asks its machine token for.
-pub const AUDIENCE: &str = "quality-grants";
+pub const AUDIENCE: &str = "core";
 
 /// What the route answers.
 #[derive(Debug, Serialize)]

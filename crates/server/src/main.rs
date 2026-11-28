@@ -36,6 +36,7 @@ mod config;
 mod database;
 mod drain_wiring;
 mod events_wiring;
+mod grants_wiring;
 mod machine_gauge;
 mod machines_wiring;
 mod metrics_wiring;
