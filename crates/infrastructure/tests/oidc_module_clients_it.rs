@@ -23,6 +23,7 @@ fn people(module: &str) -> OidcClient {
         }],
     });
     side.logout_uris = vec!["https://qd.example.com/bi/".into()];
+    side.requires = vec!["sql-query".into()];
     OidcClient {
         id: ClientId::parse(module).unwrap(),
         name: module.into(),

@@ -253,6 +253,18 @@ async fn quality_jobs_is_granted_only_to_a_module_that_requires_orchestration() 
         done.machine_client_id.as_deref(),
         Some("orchestrator-machine")
     );
+    // What it requires is kept with its client (ruling 109).
+    let kept = f
+        .server
+        .clients
+        .find(&ClientId::parse("orchestrator-machine").unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        kept.settings.module.unwrap().requires,
+        ["orchestration", "lake"]
+    );
     let without: ModuleClientsRequest = serde_json::from_value(json!({ "machine": {
         "capabilities": ["sql-query"], "audiences": ["trino"], "secret": MACHINE } }))
     .unwrap();

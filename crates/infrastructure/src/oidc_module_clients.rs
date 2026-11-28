@@ -1,5 +1,5 @@
 //! The module side of the clients in `oidc_clients` (quality-sdk decision
-//! 0009, migration 0030): read with every client, written whole when a
+//! 0009, migrations 0030 and 0035): read with every client, written whole when a
 //! module registers or changes its clients. A row with `module` null was
 //! registered by hand.
 
@@ -15,7 +15,7 @@ use crate::oidc_clients::auth_columns;
 
 /// The module columns, as [`module_of`] reads them.
 pub(crate) const MODULE_COLUMNS: &str = "module, disabled_at, previous_secret_hash, \
-     previous_secret_until, role_claim, consumes, post_logout_redirect_uris";
+     previous_secret_until, role_claim, consumes, requires, post_logout_redirect_uris";
 
 fn backend(err: sqlx::Error) -> RepositoryError {
     RepositoryError::Backend(err.to_string())
@@ -36,6 +36,7 @@ pub(crate) fn module_of(
     let until: Option<DateTime<Utc>> = row.try_get("previous_secret_until").map_err(backend)?;
     let claim: Option<Value> = row.try_get("role_claim").map_err(backend)?;
     let consumes: Option<Vec<String>> = row.try_get("consumes").map_err(backend)?;
+    let requires: Option<Vec<String>> = row.try_get("requires").map_err(backend)?;
     let logout: Option<Vec<String>> = row.try_get("post_logout_redirect_uris").map_err(backend)?;
     Ok(Some(ModuleClient {
         module,
@@ -46,6 +47,7 @@ pub(crate) fn module_of(
         }),
         role_claim: claim.as_ref().map(claim_of).transpose()?,
         consumes: consumes.unwrap_or_default(),
+        requires: requires.unwrap_or_default(),
         logout_uris: logout.unwrap_or_default(),
     }))
 }
@@ -99,9 +101,9 @@ pub(crate) async fn save(pool: &PgPool, client: &OidcClient) -> Result<bool, Rep
         "INSERT INTO oidc_clients (client_id, name, redirect_uris, secret_hash, token_alg, \
          pkce_required, grant_client_credentials, audiences, module, disabled_at, \
          previous_secret_hash, previous_secret_until, role_claim, consumes, \
-         post_logout_redirect_uris) \
+         post_logout_redirect_uris, requires) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $10 THEN now() END, \
-                 $11, $12, $13, $14, $15) \
+                 $11, $12, $13, $14, $15, $16) \
          ON CONFLICT (tenant_id, client_id) DO UPDATE SET \
          name = EXCLUDED.name, redirect_uris = EXCLUDED.redirect_uris, \
          secret_hash = EXCLUDED.secret_hash, token_alg = EXCLUDED.token_alg, \
@@ -112,7 +114,8 @@ pub(crate) async fn save(pool: &PgPool, client: &OidcClient) -> Result<bool, Rep
          previous_secret_hash = EXCLUDED.previous_secret_hash, \
          previous_secret_until = EXCLUDED.previous_secret_until, \
          role_claim = EXCLUDED.role_claim, consumes = EXCLUDED.consumes, \
-         post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris \
+         post_logout_redirect_uris = EXCLUDED.post_logout_redirect_uris, \
+         requires = EXCLUDED.requires \
          WHERE oidc_clients.module = EXCLUDED.module",
     )
     .bind(client.id.as_str())
@@ -130,6 +133,7 @@ pub(crate) async fn save(pool: &PgPool, client: &OidcClient) -> Result<bool, Rep
     .bind(m.role_claim.as_ref().map(claim_json))
     .bind(&m.consumes)
     .bind(&m.logout_uris)
+    .bind(&m.requires)
     .execute(pool)
     .await
     .map_err(backend)?;
