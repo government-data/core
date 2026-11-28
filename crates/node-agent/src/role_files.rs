@@ -5,7 +5,9 @@
 //! folder before it only once every file checked, so a bad answer leaves
 //! the files in use as they were. The role's `env` (its `IMAGE_*` values,
 //! not secret) becomes the module's `.env`, which compose reads from the
-//! project directory (0013, contract d).
+//! project directory (0013, contract d). The role's secrets go to
+//! `secrets/<name>`, 0600, beside it (0013; ruling 96): a module's compose
+//! file reads them from `./secrets`. A value is never logged or printed.
 
 use std::collections::BTreeMap;
 use std::path::{Component, Path};
@@ -25,6 +27,20 @@ pub struct RoleModule {
     /// The role's plain variables, written as the module's `.env`.
     #[serde(default)]
     pub env: BTreeMap<String, String>,
+    /// The role's secrets, by file name.
+    #[serde(default)]
+    pub secrets: BTreeMap<String, SecretValue>,
+}
+
+/// A secret's value: its `Debug` shows none of it.
+#[derive(Clone, PartialEq, Eq, Deserialize)]
+#[serde(transparent)]
+pub struct SecretValue(String);
+
+impl std::fmt::Debug for SecretValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[secret]")
+    }
 }
 
 /// One of its files.
@@ -60,7 +76,9 @@ fn place_module(root: &Path, m: &RoleModule) -> Result<(), String> {
     }
     let next = root.join(format!("{}.new", m.name));
     let _ = std::fs::remove_dir_all(&next);
-    let written = write_all(&next, &m.files).and_then(|()| write_env(&next, &m.env));
+    let written = write_all(&next, &m.files)
+        .and_then(|()| write_env(&next, &m.env))
+        .and_then(|()| write_secrets(&next, &m.secrets));
     if let Err(e) = written {
         let _ = std::fs::remove_dir_all(&next);
         return Err(e);
@@ -118,6 +136,35 @@ fn write_env(dir: &Path, env: &BTreeMap<String, String>) -> Result<(), String> {
     std::fs::write(dir.join(".env"), text).map_err(|e| format!(".env: {e}"))
 }
 
+/// Each secret as `secrets/<name>`, only its owner reading it (0600), in
+/// a folder only it opens (0700). A name that is not a file's stops it.
+fn write_secrets(dir: &Path, secrets: &BTreeMap<String, SecretValue>) -> Result<(), String> {
+    if secrets.is_empty() {
+        return Ok(());
+    }
+    let folder = dir.join("secrets");
+    let mut builder = std::fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder
+        .create(&folder)
+        .map_err(|e| format!("secrets: {e}"))?;
+    for (name, value) in secrets {
+        if !plain(name) || name.contains('/') {
+            return Err(format!("secret {name:?}: not a file's name"));
+        }
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+        let written = options
+            .open(folder.join(name))
+            .and_then(|mut f| std::io::Write::write_all(&mut f, value.0.as_bytes()));
+        written.map_err(|e| format!("secret {name}: {e}"))?;
+    }
+    Ok(())
+}
+
 /// Relative, with plain segments only.
 fn plain(path: &str) -> bool {
     !path.is_empty()
@@ -153,6 +200,7 @@ mod tests {
             services: vec!["rustfs".into()],
             files,
             env: BTreeMap::new(),
+            secrets: BTreeMap::new(),
         }
     }
 
@@ -223,5 +271,31 @@ mod tests {
         }
         let kept = std::fs::read_to_string(dir.path().join("lake-rustfs/.env")).unwrap();
         assert_eq!(kept, env);
+    }
+
+    #[test]
+    fn the_roles_secrets_are_files_only_the_agent_reads() {
+        let dir = TempDir::new();
+        let mut m = module("query-trino", vec![file("compose.yml", b"services: {}\n")]);
+        m.secrets.insert(
+            "trino-shared-secret".into(),
+            SecretValue("invented-value".into()),
+        );
+        place(dir.path(), &[m.clone()]).unwrap();
+        let path = dir.path().join("query-trino/secrets/trino-shared-secret");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "invented-value");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode(&path), 0o600);
+            assert_eq!(mode(path.parent().unwrap()), 0o700);
+        }
+        assert!(!format!("{m:?}").contains("invented-value"));
+        let mut bad = m.clone();
+        bad.secrets
+            .insert("../x".into(), SecretValue("invented-value".into()));
+        assert!(place(dir.path(), &[bad]).is_err());
+        assert!(path.exists(), "the files in use are kept");
     }
 }
