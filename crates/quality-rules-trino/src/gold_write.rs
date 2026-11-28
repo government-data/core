@@ -8,7 +8,7 @@
 //! same count-then-delete, and a retry after a committed insert never
 //! doubles the run's rows.
 
-use quality_rules_sql::quote_text;
+use quality_rules_sql::{quote_text, Cut};
 
 use crate::gold::{GoldTable, GOLD, RUN_SUMMARY};
 use crate::{Error, Statement};
@@ -18,7 +18,7 @@ use crate::{Error, Statement};
 #[derive(Debug, Clone, Copy)]
 pub struct Run<'a> {
     pub dataset: &'a str,
-    pub cut: &'a str,
+    pub cut: &'a Cut,
     pub run_id: &'a str,
     pub run_seq: i64,
 }
@@ -33,9 +33,9 @@ fn names(t: &GoldTable) -> String {
 
 fn keys(run: &Run<'_>) -> Result<String, Error> {
     Ok(format!(
-        "{}, DATE {}, {}",
+        "{}, {}, {}",
         quote_text(run.dataset)?,
-        quote_text(run.cut)?,
+        run.cut.literal(),
         quote_text(run.run_id)?
     ))
 }
@@ -51,7 +51,6 @@ pub fn insert(table: &GoldTable, run: &Run<'_>, body: &Statement) -> Result<Stat
             k = keys(run)?,
             body = body.sql,
         ),
-        cut_params: body.cut_params,
     })
 }
 
@@ -67,15 +66,14 @@ pub fn flip(run: &Run<'_>, body: &Statement) -> Result<Statement, Error> {
             seq = run.run_seq,
             body = body.sql,
         ),
-        cut_params: body.cut_params,
     })
 }
 
 fn rows_of(table: &str, run: &Run<'_>, op: &str) -> Result<String, Error> {
     Ok(format!(
-        "{GOLD}.\"{table}\" WHERE dataset = {} AND cut = DATE {} AND run_id {op} {}",
+        "{GOLD}.\"{table}\" WHERE dataset = {} AND cut = {} AND run_id {op} {}",
         quote_text(run.dataset)?,
-        quote_text(run.cut)?,
+        run.cut.literal(),
         quote_text(run.run_id)?
     ))
 }
@@ -84,12 +82,28 @@ fn older(table: &str, run: &Run<'_>) -> Result<String, Error> {
     rows_of(table, run, "<>")
 }
 
+/// The run's own rows of `table`, `columns` in order: what the report
+/// hands back to the core's index (decision 0090, ruling 76), read as the
+/// report user; counts and names only.
+pub fn run_read(table: &str, run: &Run<'_>, columns: &[&str]) -> Result<Statement, Error> {
+    let cols: Vec<String> = columns
+        .iter()
+        .map(|c| quality_rules_sql::quote_ident(c))
+        .collect::<Result<_, _>>()?;
+    Ok(Statement {
+        sql: format!(
+            "SELECT {} FROM {}",
+            cols.join(", "),
+            rows_of(table, run, "=")?
+        ),
+    })
+}
+
 /// Step 0's count: what an earlier attempt of this run left in `table`
 /// (`run_summary` included, a flip that committed).
 pub fn run_rows(table: &str, run: &Run<'_>) -> Result<Statement, Error> {
     Ok(Statement {
         sql: format!("SELECT count(*) FROM {}", rows_of(table, run, "=")?),
-        cut_params: 0,
     })
 }
 
@@ -98,7 +112,6 @@ pub fn run_rows(table: &str, run: &Run<'_>) -> Result<Statement, Error> {
 pub fn delete_run(table: &str, run: &Run<'_>) -> Result<Statement, Error> {
     Ok(Statement {
         sql: format!("DELETE FROM {}", rows_of(table, run, "=")?),
-        cut_params: 0,
     })
 }
 
@@ -106,7 +119,6 @@ pub fn delete_run(table: &str, run: &Run<'_>) -> Result<Statement, Error> {
 pub fn older_rows(table: &str, run: &Run<'_>) -> Result<Statement, Error> {
     Ok(Statement {
         sql: format!("SELECT count(*) FROM {}", older(table, run)?),
-        cut_params: 0,
     })
 }
 
@@ -115,7 +127,6 @@ pub fn older_rows(table: &str, run: &Run<'_>) -> Result<Statement, Error> {
 pub fn delete_older(table: &str, run: &Run<'_>) -> Result<Statement, Error> {
     Ok(Statement {
         sql: format!("DELETE FROM {}", older(table, run)?),
-        cut_params: 0,
     })
 }
 
@@ -124,49 +135,47 @@ mod tests {
     use super::*;
     use crate::gold::DETAILS;
 
-    const RUN: Run<'static> = Run {
-        dataset: "loans",
-        cut: "2026-10-31",
-        run_id: "r-2",
-        run_seq: 7,
-    };
-
     #[test]
     fn a_run_inserts_flips_then_deletes_the_older() {
+        let cut = Cut::parse("2026-10-31").unwrap();
+        let run = Run {
+            dataset: "loans",
+            cut: &cut,
+            run_id: "r-2",
+            run_seq: 7,
+        };
         let body = Statement {
             sql: "SELECT 1".into(),
-            cut_params: 1,
         };
-        let i = insert(&DETAILS[0], &RUN, &body).unwrap();
+        let i = insert(&DETAILS[0], &run, &body).unwrap();
         assert_eq!(
             i.sql,
             "INSERT INTO \"lake\".\"quality_gold\".\"rule_results\" (dataset, cut, run_id, \
              \"rule\", \"applies\", \"failures\", \"field\", \"pattern\", \"dimension\", \"severity\") \
              SELECT 'loans', DATE '2026-10-31', 'r-2', b.* FROM (SELECT 1) b"
         );
-        assert_eq!(i.cut_params, 1);
-        let f = flip(&RUN, &body).unwrap();
+        let f = flip(&run, &body).unwrap();
         assert!(f
             .sql
             .contains("SELECT 'loans', DATE '2026-10-31', 'r-2', 7, b.*"));
         let at = "\"lake\".\"quality_gold\".\"findings\" WHERE dataset = 'loans' \
                   AND cut = DATE '2026-10-31' AND run_id <> 'r-2'";
         assert_eq!(
-            older_rows("findings", &RUN).unwrap().sql,
+            older_rows("findings", &run).unwrap().sql,
             format!("SELECT count(*) FROM {at}")
         );
         assert_eq!(
-            delete_older("findings", &RUN).unwrap().sql,
+            delete_older("findings", &run).unwrap().sql,
             format!("DELETE FROM {at}")
         );
         let this = "\"lake\".\"quality_gold\".\"findings\" WHERE dataset = 'loans' \
                     AND cut = DATE '2026-10-31' AND run_id = 'r-2'";
         assert_eq!(
-            run_rows("findings", &RUN).unwrap().sql,
+            run_rows("findings", &run).unwrap().sql,
             format!("SELECT count(*) FROM {this}")
         );
         assert_eq!(
-            delete_run("findings", &RUN).unwrap().sql,
+            delete_run("findings", &run).unwrap().sql,
             format!("DELETE FROM {this}")
         );
         for s in [i.sql, f.sql] {
