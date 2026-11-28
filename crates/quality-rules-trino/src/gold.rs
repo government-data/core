@@ -39,7 +39,8 @@ pub const RUN_SUMMARY: GoldTable = GoldTable {
 
 /// The detail tables, as the PostgreSQL index stores them (decision 0089,
 /// point 2.1), plus `findings` and `finding_groups` (decision 0059) and
-/// `entity_icd`.
+/// `entity_icd`; not `job_stats`, whose stage timings are metrics (decision
+/// 0090, ruling 70).
 pub const DETAILS: &[GoldTable] = &[
     GoldTable {
         name: "rule_results",
@@ -61,6 +62,7 @@ pub const DETAILS: &[GoldTable] = &[
             ("distinct_values", BIGINT),
             ("pattern", TEXT),
             ("pattern_count", BIGINT),
+            ("floating", "BOOLEAN"),
             ("mean_icd", DOUBLE),
             ("recency", "ARRAY(BIGINT)"),
         ],
@@ -108,10 +110,6 @@ pub const DETAILS: &[GoldTable] = &[
             ("resolved", BIGINT),
             ("priority", DOUBLE),
         ],
-    },
-    GoldTable {
-        name: "job_stats",
-        columns: &[("stage", TEXT), ("position", "INTEGER"), ("ms", BIGINT)],
     },
     GoldTable {
         name: "findings",
@@ -165,11 +163,12 @@ fn create(t: &GoldTable, partitioning: &str) -> String {
 }
 
 fn plain(sql: String) -> Statement {
-    Statement { sql, cut_params: 0 }
+    Statement { sql }
 }
 
 /// The install's statements, in order: the schemas, gold's tables, the
-/// views people read, the scratch table and the findings key's table.
+/// views people read, the jobs' counts (ruling 53), the scratch table and
+/// the findings key's table.
 /// Each can run twice. The views join with `ON`, never `USING` with `t.*`
 /// (T2: `t.*` after `USING` drops the join columns, and a row filter on
 /// `dataset` then fails).
@@ -211,6 +210,7 @@ pub fn install() -> Vec<Statement> {
             n = t.name
         )));
     }
+    out.push(crate::job_counts::create());
     out.push(plain(format!(
         "CREATE TABLE IF NOT EXISTS {} (job_id VARCHAR, dataset VARCHAR, k VARCHAR, \
          r_key VARCHAR, s VARCHAR, a DOUBLE, serious BOOLEAN, act BOOLEAN, icd DOUBLE, \
@@ -252,6 +252,9 @@ mod tests {
         assert!(entities.contains("\"entity\" VARCHAR, \"icd\" DOUBLE, \"band\" VARCHAR"));
         assert!(entities.ends_with("ARRAY['dataset', 'cut', 'run_id'])"));
         assert!(sql.iter().any(|s| s.contains("v_entity_icd")));
+        assert!(sql
+            .iter()
+            .any(|s| s.contains("\"job_counts\" (dataset VARCHAR, run VARCHAR")));
         let views: Vec<&&str> = sql.iter().filter(|s| s.contains("VIEW")).collect();
         assert_eq!(views.len(), 2 + DETAILS.len());
         for v in views {
