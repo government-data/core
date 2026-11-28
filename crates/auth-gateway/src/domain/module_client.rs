@@ -2,8 +2,8 @@
 //! (quality-sdk decision 0009): the module it belongs to, whether it is
 //! disabled (the module removed), the secret it replaced for at most an hour
 //! (a rotation), the claim whose values come from the person's actions, the
-//! capabilities its machine client consumes and where a person may land
-//! after signing out. A client registered by hand (`server oidc-client`) has
+//! capabilities its machine client consumes, those its module requires and
+//! where a person may land after signing out. A client registered by hand (`server oidc-client`) has
 //! none of it, and a module never takes it over.
 
 use std::time::SystemTime;
@@ -23,6 +23,9 @@ pub struct ModuleClient {
     pub role_claim: Option<RoleClaim>,
     /// The capabilities its machine client consumes (`sql-query`).
     pub consumes: Vec<String>,
+    /// The capabilities its module requires, from its manifest, as its
+    /// machine client was registered (decision 0090, ruling 109).
+    pub requires: Vec<String>,
     /// Where a person may be sent after signing out.
     pub logout_uris: Vec<String>,
 }
@@ -36,6 +39,7 @@ impl ModuleClient {
             previous_secret: None,
             role_claim: None,
             consumes: Vec::new(),
+            requires: Vec::new(),
             logout_uris: Vec::new(),
         }
     }

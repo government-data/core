@@ -199,6 +199,7 @@ pub(super) fn machine_client(
     check_secret(&m.secret)?;
     let mut side = ModuleClient::of(module);
     side.consumes = m.capabilities.clone();
+    side.requires = m.requires.clone();
     let client = OidcClient {
         id: id.clone(),
         name: format!("{module} (machine)"),
