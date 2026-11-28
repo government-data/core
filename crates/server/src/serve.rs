@@ -130,6 +130,9 @@ fn app(
     // feature modules' too (theirs are merged outside `api::router`).
     let resolver = api::iam::resolver(platform.clone());
     let (machines, modules) = machines_and_modules(&db, provider.clone(), &secret_box)?;
+    // The Trino rules merge's grants (decision 0090, point 7.2).
+    let grants =
+        crate::grants_wiring::routes(provider.clone(), &db.pool, admins.clone(), platform.clone())?;
     // What the update agent waits for, and whether a module may be removed.
     let updates = drain_wiring::with_module_checks(updates, &modules)?;
     // The machines: Settings → Execution, the install routes (their own
@@ -161,6 +164,7 @@ fn app(
         ))
         .merge(module_users)
         .merge(machine_routes)
+        .merge(grants)
         // The update agent's protocol, with its certificate (decision 0003).
         .merge(api::updater_v1::routes(
             updates.clone(),
